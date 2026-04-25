@@ -17,11 +17,6 @@ interface CandlestickData {
 
 type DataCallback = (data: CandlestickData) => void;
 
-// Extended CryptoBar with Symbol (added by websocket callback)
-interface CryptoBarWithSymbol extends CryptoBar {
-  Symbol: string;
-}
-
 // Alpaca WebSocket stream interface (using ReturnType to get actual SDK types)
 type AlpacaInstance = InstanceType<typeof Alpaca>;
 type AlpacaStockStream = AlpacaInstance["data_stream_v2"];
@@ -187,9 +182,9 @@ export class AlpacaService {
 
         // Handle crypto bar data from crypto stream
         // Note: The SDK's CryptoBar type doesn't include Symbol, but the websocket adds it
-        this.cryptoWs.onCryptoBar((bar) => {
+        this.cryptoWs.onCryptoBar((bar: CryptoBar) => {
           console.log("🔍 DEBUG: Received crypto bar data:", bar);
-          this.handleCryptoBarData(bar as CryptoBarWithSymbol);
+          this.handleCryptoBarData(bar);
         });
 
         // Stock WebSocket error handling
@@ -278,10 +273,13 @@ export class AlpacaService {
     }
   }
 
-  private handleCryptoBarData(bar: CryptoBarWithSymbol) {
-    const symbol = bar.Symbol;
+  private handleCryptoBarData(bar: CryptoBar) {
+    // TODO: Get symbol from bar
+    const symbol = "ETH/USD";
 
     console.log(`📊 Processing crypto bar for ${symbol}:`, bar);
+    console.log(typeof bar);
+    console.log(JSON.stringify(bar, null, 4));
 
     // Only process if we have callbacks for this symbol
     if (!this.dataCallbacks.has(symbol)) {

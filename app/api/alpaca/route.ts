@@ -128,12 +128,6 @@ export async function GET(request: NextRequest) {
             historicalData.push(processedBar);
             totalFetched++;
           }
-          
-          // Log first and last bars for debugging
-          if (bars.length > 0) {
-            console.log(`📅 First bar timestamp: ${bars[0].Timestamp} (${new Date(bars[0].Timestamp).toLocaleString()})`);
-            console.log(`📅 Last bar timestamp: ${bars[bars.length - 1].Timestamp} (${new Date(bars[bars.length - 1].Timestamp).toLocaleString()})`);
-          }
         }
       }
 

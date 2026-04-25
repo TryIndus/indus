@@ -126,17 +126,13 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 	};
 
 	const loadMoreHistoricalData = async () => {
-		const symbol = selectedSymbolRef.current;
-		const timeframe = selectedTimeframeRef.current;
-		const earliestDate = earliestLoadedTimestampRef.current;
-
-		if (!earliestDate || isLoadingMoreDataRef.current) return;
+		if (!earliestLoadedTimestampRef.current || isLoadingMoreDataRef.current) return;
 
 		setIsLoadingMoreData(true);
 		isLoadingMoreDataRef.current = true;
 
 		try {
-			const response = await fetch(`/api/alpaca?symbol=${symbol}&timeframe=${timeframe}&end=${earliestDate}`);
+			const response = await fetch(`/api/alpaca?symbol=${selectedSymbolRef.current}&timeframe=${selectedTimeframeRef.current}&end=${earliestLoadedTimestampRef.current}`);
 			const result = await response.json();
 
 			if (response.ok && result.data && !result.isEmpty) {
@@ -163,7 +159,7 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 					setDataLimitMessage(`Reached data limit: ${earliestDate.toLocaleDateString()} (${yearsBack} years ago)`);
 				}
 
-				addDebugInfo(`No more historical data available for ${symbol} - reached data limit`);
+				addDebugInfo(`No more historical data available for ${selectedSymbolRef.current} - reached data limit`);
 			}
 		} catch (error) {
 			addDebugInfo(`Error loading more historical data: ${error}`);
