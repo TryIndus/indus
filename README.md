@@ -1,5 +1,7 @@
 # Indus - AI-Powered Financial Intelligence Platform
 
+https://github.com/user-attachments/assets/82d2c5de-a971-4c8b-8481-fa68fcffc9e4
+
 Indus is an intelligent financial analysis platform that provides comprehensive stock market data, real-time charts, and AI-powered insights to help investors make informed decisions. Built with Next.js, TypeScript, socket.io, Alpaca API, Yahoo Finance, Google Gemini, and TradingView.
 
 ## 🌟 Features
