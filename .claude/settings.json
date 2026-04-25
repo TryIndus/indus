@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install *)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm remove *)",
+      "Bash(pnpm run *)",
+      "Bash(pnpm check *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm exec *)",
+      "Bash(npx biome *)",
+      "Bash(npx next *)",
+      "Bash(npx vitest *)",
+      "Bash(npx playwright *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git stash *)",
+      "Bash(git show *)",
+      "Bash(git blame *)",
+      "Bash(git rev-parse *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(wc *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(sort *)",
+      "Bash(test *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean -f *)"
+    ]
+  }
+}
