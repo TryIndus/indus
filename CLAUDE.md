@@ -30,6 +30,7 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 - TypeScript and ESLint errors ignored in builds (`ignoreBuildErrors: true`, `ignoreDuringBuilds: true`)
 - No test suite
 - `supabase.auth.getUser()` called twice in middleware
+- Middleware only protects `/dashboard`, `/company`, `/search` — the `/crypto`, `/reports`, `/settings` routes are unprotected
 - Socket.io adds ~50KB to client bundle for a unidirectional data flow
 - Manual SSE streaming logic in `/api/context-chat` (~190 lines of boilerplate)
 - No input validation on any API route
@@ -37,8 +38,12 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 - No server-side caching for AI explanations — every batch-explain request hits Gemini even when the same symbol+metric was just explained for another user
 - Explanation caching is client-only (localStorage) — no cross-user benefit
 - Socket.io server uses Pages Router (`pages/api/socket/index.ts`) while the rest of the app uses App Router — mixed routing
+- Crypto real-time bar handler in `lib/server/alpaca-server.ts:278` hardcodes `const symbol = "ETH/USD"` instead of reading from bar data — only ETH/USD gets real-time crypto updates, all other crypto symbols are silently dropped
 - No React error boundaries or loading states
 - `lib/prompts.ts` and `lib/system-prompts.ts` are tightly coupled to the raw Gemini API format
+- `scripts/check-env.js` exists as a manual env check script but is not integrated into any build or dev workflow
+- `@radix-ui/react-icons` is in dependencies but Lucide is the actual icon library — likely dead dependency
+- `tw-animate-css` is in devDependencies — verify if still needed or remove during bundle audit
 
 ---
 
@@ -48,7 +53,7 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 
 | Layer | Choice | Rationale |
 |---|---|---|
-| **Deployment** | Vercel Hobby | Best-in-class Next.js DX, free tier covers portfolio use, SSE supported up to 120s |
+| **Deployment** | Vercel Hobby | Best-in-class Next.js DX, free tier covers portfolio use, 60s serverless function timeout (SSE auto-reconnects) |
 | **Framework** | Next.js 15 (App Router) + React 19 | Already modern — clean up usage, properly leverage RSC and Server Actions |
 | **Database & Auth** | Supabase (stay) | Already integrated, auth + realtime + PostgreSQL in one. Keep project active via Vercel cron. |
 | **AI Provider** | Vercel AI SDK v6 + `@ai-sdk/google` (Gemini) | Replaces manual streaming with `useChat()`/`streamText()`, enables agentic tool use, provider-swappable |
@@ -60,7 +65,7 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 | **Linting/Formatting** | Biome (replaces ESLint + Prettier) | Single tool, 10-100x faster, zero config |
 | **Charts** | TradingView Lightweight Charts v5 (keep) | Purpose-built for OHLCV candlestick data, ~40KB, no better alternative |
 | **Styling** | Tailwind CSS v4 + shadcn/ui + Lucide (keep) + add next-themes | Already best-practice. Add next-themes for proper dark/light toggle instead of hardcoded dark. |
-| **Package Manager / Runtime** | Bun (replace npm) | 10-25x faster installs, native TypeScript execution, built-in test runner, drop-in Node.js compatible |
+| **Package Manager / Runtime** | Bun (replace npm) | 10-25x faster installs, native TypeScript execution, built-in test runner, drop-in Node.js compatible. **Fallback:** if Bun causes Next.js runtime issues (middleware, SSR, `@supabase/ssr`), use Bun only as the package manager (`bun install`) and keep Node.js as the runtime for `next dev`/`next build`. |
 | **Date utils** | date-fns v4 (keep) | Already modern, tree-shakeable |
 | **Financial Data** | Alpaca + Yahoo Finance 2 (keep) | Working data sources, no reason to change |
 
@@ -146,6 +151,7 @@ The AI chat becomes an agentic system where Gemini autonomously decides which to
 - Cache miss → call Gemini, upsert result into `metric_explanations`, return to client
 - Supabase cache survives Vercel cold starts (unlike in-memory caching on serverless)
 - Client-side TanStack Query adds a second caching layer per-user with stale-while-revalidate
+- **Cache cleanup:** The `/api/cron/keepalive` daily cron job (Phase 6) should also delete `metric_explanations` rows older than 24 hours to prevent unbounded table growth. Stale rows (>1h) are refreshed on demand, but unused rows would otherwise accumulate forever.
 
 **Prompt files:**
 - `lib/prompts.ts` and `lib/system-prompts.ts` must be adapted for the Vercel AI SDK format
@@ -169,15 +175,17 @@ The AI chat becomes an agentic system where Gemini autonomously decides which to
 
 Replace Socket.io with SSE:
 
-**Server side:** A Next.js Route Handler (`/api/stream/[symbol]`) maintains the Alpaca WebSocket connection server-side and writes bar data to a `ReadableStream` as SSE events.
+**Server side:** A Next.js Route Handler (`/api/stream/[symbol]`) creates an Alpaca WebSocket connection, subscribes to the requested symbol, and writes bar data to a `ReadableStream` as SSE events. The route must detect whether the symbol is a stock or crypto asset (crypto symbols contain `/`, e.g., `ETH/USD`) and use the appropriate Alpaca stream: `data_stream_v2` for stocks, `crypto_stream_v1beta3` for crypto. These are different SDK APIs with different subscription methods and data shapes.
 
 **Client side:** Native `EventSource` API connects to the SSE endpoint. Zero library needed. The `StockChart` and `CryptoChart` components consume events and update the TradingView chart.
 
-**SSE reconnection handling:** Vercel Hobby caps serverless functions at 60 seconds (configurable up to 120s). The SSE stream will drop when the function times out. The native `EventSource` API auto-reconnects by default, but the client must:
+**Serverless isolation tradeoff (accepted):** On Vercel, each App Router route handler is an isolated serverless function invocation. This means every SSE client connection creates its own Alpaca WebSocket connection — there is no shared singleton like the current `AlpacaService`. If 5 users watch AAPL simultaneously, that's 5 separate Alpaca WebSocket connections. This is acceptable for a portfolio project with low concurrent users, but would not scale. See "Future Improvements" below for the Supabase Realtime fan-out solution that eliminates this limitation.
+
+**SSE reconnection handling:** Vercel Hobby has a hard 60-second serverless function timeout (not configurable — only Pro/Enterprise can increase to 120s+). The SSE stream will drop when the function times out. The native `EventSource` API auto-reconnects by default, but the client must:
 - Handle the `onerror` event gracefully (don't show an error to the user on expected reconnects)
 - Use `Last-Event-ID` header to resume from where it left off (the server includes an incrementing event ID)
 - Show a brief "reconnecting" indicator only if reconnection takes more than a few seconds
-- The gap between disconnect and reconnect is typically <1 second — users won't notice missed bars at the 1-minute timeframe level
+- Reconnection involves a cold start: new serverless function → new Alpaca WebSocket → subscribe → wait for first bar. This can take 2-5 seconds, not sub-second. At 1-minute bar timeframes, users are unlikely to notice a missed bar, but the reconnecting indicator should account for this delay.
 
 **Bundle impact:** Removes `socket.io-client` (~50KB) and `socket.io` (server). Net client bundle reduction: ~50KB.
 
@@ -245,6 +253,8 @@ During the rewrite, both old and new env vars must coexist:
 
 - **Do not touch `pages/` directory until Phase 4.** The Socket.io server at `pages/api/socket/index.ts` uses Pages Router. It must continue working through Phases 1-3. Phase 4 replaces it with SSE and deletes the entire `pages/` directory.
 - **The `@alpacahq/alpaca-trade-api` SDK stays.** Phase 4 only removes the WebSocket manager class (`lib/server/alpaca-server.ts`) and Socket.io transport. The Alpaca SDK is still needed for REST API calls (historical bars in `/api/alpaca`).
+- **Preserve `serverExternalPackages: ['yahoo-finance2']`** in `next.config.ts` throughout all phases. Removing this breaks the build because `yahoo-finance2` cannot be bundled by webpack.
+- **Preserve the `punycode` webpack warning suppression** in `next.config.ts` until the upstream dependency (`yahoo-finance2` → `punycode`) is resolved.
 - **Do not merge to `main`.** All work stays on `dev/revamp`. The user will create the PR when all phases are complete.
 - **Small, incremental commits.** Each sub-step gets its own commit. Never batch an entire phase into one commit.
 - **Test after every phase.** Each phase ends with a verification checklist. Do not proceed to the next phase until all checks pass.
@@ -255,9 +265,9 @@ During the rewrite, both old and new env vars must coexist:
 
 1. **Switch npm → Bun** — `rm -rf node_modules package-lock.json && bun install`
 2. **Replace ESLint with Biome** — remove eslint config, add `biome.json`, run `biome check --fix`
-3. **Add Zod** — create `lib/env.ts` with validated env vars, add schemas to all API route inputs
+3. **Add Zod** — create `lib/env.ts` with validated env vars, add schemas to all API route inputs. Remove `scripts/check-env.js` (replaced by Zod validation).
 4. **Fix security: move Alpaca keys server-side** — remove `NEXT_PUBLIC_` prefix, all Alpaca calls already go through API routes
-5. **Fix middleware** — call `getUser()` once, reuse result
+5. **Fix middleware** — call `getUser()` once, reuse result. Also add `/crypto`, `/reports`, and `/settings` to the protected route list (currently unprotected).
 6. **Enable TypeScript strict builds** — remove `ignoreBuildErrors`, fix all type errors
 7. **Enable Biome in builds** — remove `ignoreDuringBuilds`, fix all lint errors
 8. **Add next-themes** — replace hardcoded `className="dark"` with proper theme provider and toggle
@@ -306,9 +316,10 @@ During the rewrite, both old and new env vars must coexist:
 17. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output + Supabase explanation cache (1h TTL)
 18. **Adapt `lib/prompts.ts` and `lib/system-prompts.ts`** — refactor prompt construction for Vercel AI SDK format (system prompt as separate parameter, tool descriptions as Zod schemas)
 19. **Rewrite `/api/reports/generate`** using `generateText()` with tools + `maxSteps` for multi-step autonomous research
-20. **Update chat frontend** — replace manual SSE parsing with `useChat()` from AI SDK
-21. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
-22. **Remove `GEMINI_API_KEY`** from `lib/env.ts` Zod schema and Vercel dashboard
+20. **Update chat frontend** — replace manual SSE parsing with `useChat()` from AI SDK. Clear legacy localStorage explanation cache keys on first load to prevent stale data from the old caching approach.
+21. **Add rate limiting to AI endpoints** — simple per-user rate limit on `/api/chat`, `/api/explain`, and `/api/reports/generate` (e.g., check request count per user_id in the last N seconds via Supabase or in-memory counter). Prevents a single user from exhausting Gemini API quota. Even a basic implementation (e.g., 20 chat requests/min, 5 report generations/hour) is better than none.
+22. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
+23. **Remove `GEMINI_API_KEY`** from `lib/env.ts` Zod schema and Vercel dashboard
 
 **Commits (one per sub-step):** ~10-15 commits. Each route rewrite is its own commit. Tool definitions get their own commit. Frontend `useChat()` migration is its own commit. Cleanup/removal is its own commit.
 
@@ -327,20 +338,20 @@ During the rewrite, both old and new env vars must coexist:
 
 ### Phase 4: Real-time Modernization
 
-23. **Create SSE endpoint** — `/api/stream/[symbol]/route.ts` that maintains Alpaca WS server-side, streams bars via SSE with event IDs for reconnection
-24. **Add SSE reconnection logic to client** — handle `EventSource.onerror`, use `Last-Event-ID`, show reconnecting indicator only after 3+ seconds
-25. **Update StockChart.tsx** — replace socket.io-client with native `EventSource`
-26. **Update CryptoChart.tsx** — same SSE migration
-27. **Remove Socket.io** — `bun remove socket.io socket.io-client`
-28. **Delete `pages/` directory entirely** — removes Pages Router Socket.io handler and eliminates mixed router architecture
-29. **Delete `lib/server/alpaca-server.ts`** — WebSocket manager class no longer needed (SSE route handler manages Alpaca connection directly). The `@alpacahq/alpaca-trade-api` SDK stays for REST calls.
+24. **Create SSE endpoint** — `/api/stream/[symbol]/route.ts` that creates an Alpaca WebSocket connection per request, subscribes to the symbol, and streams bars as SSE events with event IDs for reconnection. Must detect stock vs. crypto symbols (crypto contains `/`, e.g., `ETH/USD`) and use the correct Alpaca stream: `data_stream_v2` for stocks, `crypto_stream_v1beta3` for crypto. **Note:** The current `alpaca-server.ts` has a bug where the crypto bar handler hardcodes `const symbol = "ETH/USD"` instead of extracting the symbol from the bar data — the SSE endpoint must fix this by properly reading the symbol from the Alpaca bar event.
+25. **Add SSE reconnection logic to client** — handle `EventSource.onerror`, use `Last-Event-ID`, show reconnecting indicator only after 3+ seconds. Account for the fact that reconnections involve a full cold start (new serverless function → new Alpaca WS → subscribe) which takes 2-5 seconds, not sub-second.
+26. **Update StockChart.tsx** — replace socket.io-client with native `EventSource`
+27. **Update CryptoChart.tsx** — same SSE migration
+28. **Remove Socket.io** — `bun remove socket.io socket.io-client`
+29. **Delete `pages/` directory entirely** — removes Pages Router Socket.io handler and eliminates mixed router architecture
+30. **Delete `lib/server/alpaca-server.ts`** — WebSocket manager class no longer needed (SSE route handler manages Alpaca connection directly). The `@alpacahq/alpaca-trade-api` SDK stays for REST calls.
 
 **Commits (one per sub-step):** ~7-10 commits. SSE endpoint is one commit. Each chart component migration is one commit. Socket.io removal is one commit. `pages/` deletion is one commit.
 
 **Verification:**
 - Open a stock chart — real-time bars should appear via SSE (check Network tab for `EventSource` connection to `/api/stream/[symbol]`)
-- Open a crypto chart — same SSE verification
-- Wait 60+ seconds — SSE should auto-reconnect without user-visible error
+- Open a crypto chart (e.g., `BTC/USD` and `ETH/USD`) — same SSE verification. Confirm the crypto symbol is correctly parsed from the bar data (not hardcoded).
+- Wait 60+ seconds — SSE should auto-reconnect. Reconnecting indicator appears briefly (2-5s) then disappears.
 - Check that no gap in data is visible after reconnection at 1-minute timeframe
 - `pages/` directory no longer exists
 - `socket.io` and `socket.io-client` no longer in `package.json`
@@ -355,44 +366,44 @@ During the rewrite, both old and new env vars must coexist:
 
 **Testing:**
 
-30. **Add Vitest** — config, first tests on API route handlers (mock Supabase/Alpaca/Gemini), test Zod schemas, test env validation
-31. **Add Playwright** — config, E2E tests for: auth flow (sign in, sign out, protected route redirect), dashboard load, company page with chart rendering, AI chat interaction, report generation
-32. **Add test scripts** to package.json: `bun test` (Vitest), `bun test:e2e` (Playwright)
+31. **Add Vitest** — config, first tests on API route handlers (mock Supabase/Alpaca/Gemini), test Zod schemas, test env validation
+32. **Add Playwright** — config, E2E tests for: auth flow (sign in, sign out, protected route redirect), dashboard load, company page with chart rendering, AI chat interaction, report generation
+33. **Add test scripts** to package.json: `bun test` (Vitest), `bun test:e2e` (Playwright)
 
 **CI/CD Pipeline (GitHub Actions):**
 
-33. **CI workflow** (`.github/workflows/ci.yml`) — runs on every push to `dev/revamp` and on PRs to `main`:
+34. **CI workflow** (`.github/workflows/ci.yml`) — runs on every push to `dev/revamp` and on PRs to `main`:
     - Biome lint check (`biome check`)
     - TypeScript type check (`tsc --noEmit`)
     - Vitest unit/integration tests (`bun test`)
     - Build verification (`next build`)
-34. **E2E workflow** (`.github/workflows/e2e.yml`) — runs on PRs to `main`:
+35. **E2E workflow** (`.github/workflows/e2e.yml`) — runs on PRs to `main`:
     - Waits for Vercel preview deployment to complete (uses `vercel-preview-url` action)
     - Runs Playwright against the Vercel preview URL
     - Reports pass/fail on the PR
-35. **Bundle size tracking** (`.github/workflows/ci.yml`) — added as a step in the CI workflow:
+36. **Bundle size tracking** (`.github/workflows/ci.yml`) — added as a step in the CI workflow:
     - Runs `next build` and extracts bundle sizes from the build output
     - Comments on PR with bundle size diff vs `main` (uses `actions/github-script` to post the comment)
-36. **Lighthouse CI** (`.github/workflows/lighthouse.yml`) — runs on PRs to `main`:
+37. **Lighthouse CI** (`.github/workflows/lighthouse.yml`) — runs on PRs to `main`:
     - Runs Lighthouse against the Vercel preview URL
     - Enforces thresholds: Performance > 90, Accessibility > 95, Best Practices > 90
     - Comments results on the PR
-37. **Renovate config** (`renovate.json`) — automated dependency update PRs:
+38. **Renovate config** (`renovate.json`) — automated dependency update PRs:
     - Groups minor/patch updates into a single weekly PR
     - Pins major versions (requires manual review)
     - Auto-merges devDependency patches if CI passes
 
 **Branch Protection (requires manual setup by user):**
 
-38. **Configure branch protection rules on `main`** via GitHub Settings → Branches → Add rule:
+39. **Configure branch protection rules on `main`** via GitHub Settings → Branches → Add rule:
     - Require status checks to pass (CI workflow)
     - Require branch to be up to date before merging
     - Require at least 1 approval on PRs (even self-approval — shows the pattern)
 
 **What requires manual action by the user:**
-- Step 34 (E2E workflow): Vercel automatically provides preview URLs on PRs, but if the repo is **private**, you need to add `VERCEL_TOKEN` as a GitHub Actions secret (Settings → Secrets → Actions → New secret). Get the token from https://vercel.com/account/tokens. If the repo is **public**, the preview URL is available without a token.
-- Step 38 (Branch protection): Must be done manually in GitHub UI — cannot be configured via code. Go to repo Settings → Branches → Add branch protection rule for `main`.
-- Everything else (steps 30-37) is fully code-based — I create the config files and workflow YAML, no manual setup needed.
+- Step 35 (E2E workflow): Vercel automatically provides preview URLs on PRs, but if the repo is **private**, you need to add `VERCEL_TOKEN` as a GitHub Actions secret (Settings → Secrets → Actions → New secret). Get the token from https://vercel.com/account/tokens. If the repo is **public**, the preview URL is available without a token.
+- Step 39 (Branch protection): Must be done manually in GitHub UI — cannot be configured via code. Go to repo Settings → Branches → Add branch protection rule for `main`.
+- Everything else (steps 31-38) is fully code-based — I create the config files and workflow YAML, no manual setup needed.
 
 **Commits (one per sub-step):** ~12-18 commits. Vitest config is one commit. Each test suite is its own commit. Playwright config is one commit. Each E2E test is its own commit. Each CI/CD workflow file is its own commit. Renovate config is one commit.
 
@@ -410,10 +421,10 @@ During the rewrite, both old and new env vars must coexist:
 
 ### Phase 6: Polish
 
-33. **Audit bundle size** — `next build` analysis, verify Socket.io is gone, check for unused deps, remove any dead code
-34. **Performance** — add `loading.tsx` skeletons for all routes, optimize TanStack Query stale times, verify no waterfall fetches
-35. **Final security audit** — verify no API keys in client bundle, all inputs validated, no `any` types on API boundaries
-36. **Supabase keepalive** — add Vercel cron job (`vercel.json` + `/api/cron/keepalive` route) that pings Supabase daily to prevent 7-day auto-pause
+40. **Audit bundle size** — `next build` analysis, verify Socket.io is gone, check for unused deps (e.g., `@radix-ui/react-icons`, `tw-animate-css` if unused), remove any dead code
+41. **Performance** — add `loading.tsx` skeletons for all routes, optimize TanStack Query stale times, verify no waterfall fetches
+42. **Final security audit** — verify no API keys in client bundle, all inputs validated, no `any` types on API boundaries, rate limits on AI endpoints are working
+43. **Supabase keepalive + cache cleanup** — add Vercel cron job (`vercel.json` + `/api/cron/keepalive` route) that pings Supabase daily to prevent 7-day auto-pause. The cron should also delete `metric_explanations` rows older than 24 hours to prevent unbounded table growth.
 
 **Commits (one per sub-step):** ~5-8 commits. Each audit finding/fix is its own commit. Vercel cron setup is one commit. Loading skeletons are one commit per route.
 
@@ -442,10 +453,30 @@ Items that cannot be done via code and require manual setup in external dashboar
 
 ---
 
+## Future Improvements (Post-Rewrite)
+
+### Real-time Fan-Out via Supabase Realtime
+
+The Phase 4 SSE implementation creates a **1:1 mapping** between SSE client connections and Alpaca WebSocket connections. Each serverless function invocation is isolated — there is no shared state. This means:
+- N concurrent users watching the same symbol = N separate Alpaca WebSocket connections
+- Each reconnection (every 60s due to Vercel's function timeout) creates a new Alpaca WS connection with 2-5s startup latency
+- Alpaca's free/paper tier has connection limits that could be hit under moderate load
+
+This is acceptable for a portfolio project with low concurrent users, but the proper solution is a **fan-out architecture using Supabase Realtime**:
+
+1. A single always-on process (Supabase Edge Function, Fly.io container, or a dedicated worker) maintains one set of Alpaca WebSocket connections
+2. That process writes incoming bar data to a Supabase Realtime channel (or a Supabase table with Realtime enabled)
+3. Clients subscribe to the Supabase Realtime channel instead of connecting to an SSE endpoint
+4. Result: one Alpaca connection per symbol regardless of user count, instant "reconnection" (Supabase Realtime handles it), and no serverless timeout issues
+
+This would replace the SSE endpoint entirely with Supabase's client-side Realtime library (already a dependency via `@supabase/supabase-js`). The tradeoff is that it requires an always-on compute component, which adds cost and breaks the "fully serverless, $0/month" constraint. Evaluate this when the project outgrows the 1:1 SSE approach.
+
+---
+
 ## Key Files (Current)
 
 - `app/layout.tsx` — Root layout with AuthProvider > FavoritesProvider > ConditionalLayout
-- `middleware.ts` — Supabase auth, protects /dashboard, /company, /search
+- `middleware.ts` — Supabase auth, protects /dashboard, /company, /search (missing: /crypto, /reports, /settings)
 - `pages/api/socket/index.ts` — Pages Router Socket.io handler (to be deleted in Phase 4)
 - `lib/server/alpaca-server.ts` — Server-side Alpaca WebSocket manager (to be replaced by SSE route in Phase 4)
 - `lib/ai/geminiClient.ts` — Gemini API wrapper (to be replaced by Vercel AI SDK in Phase 3)
@@ -454,6 +485,8 @@ Items that cannot be done via code and require manual setup in external dashboar
 - `lib/context/AuthContext.tsx` — Auth state provider (to be replaced by Zustand in Phase 2)
 - `lib/context/FavoritesContext.tsx` — Favorites CRUD (to be replaced by Zustand + TanStack Query in Phase 2)
 - `components/StockChart.tsx` / `CryptoChart.tsx` — TradingView charts with socket.io (to use SSE in Phase 4)
+- `scripts/check-env.js` — Manual env check script (to be removed in Phase 1, replaced by Zod `lib/env.ts`)
+- `next.config.ts` — Next.js config with `ignoreBuildErrors`, `ignoreDuringBuilds`, `serverExternalPackages: ['yahoo-finance2']`, punycode warning suppression
 
 ## Environment Variables
 
@@ -481,6 +514,7 @@ Items that cannot be done via code and require manual setup in external dashboar
   - Unique constraint on (symbol, metric) — upsert on cache refresh
   - Index on created_at for TTL-based cache expiry queries
   - Rows older than 1 hour are treated as stale and refreshed on next request
+  - Daily cron job (Phase 6) deletes rows older than 24 hours to prevent unbounded growth
 
 ## Portfolio Writeup Talking Points
 
