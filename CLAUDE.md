@@ -429,6 +429,19 @@ During the rewrite, both old and new env vars must coexist:
 
 ---
 
+## Post-Rewrite: Manual Configuration
+
+Items that cannot be done via code and require manual setup in external dashboards after the rewrite is complete:
+
+- [ ] **GitHub: Add `VERCEL_TOKEN` secret** (only if repo is private) — GitHub → repo Settings → Secrets and variables → Actions → New repository secret. Get the token from https://vercel.com/account/tokens. Required for the E2E workflow to fetch Vercel preview URLs.
+- [ ] **GitHub: Branch protection rules on `main`** — GitHub → repo Settings → Branches → Add branch protection rule. Set branch name pattern to `main`, enable: "Require status checks to pass before merging" (select the CI workflow), "Require branches to be up to date before merging", "Require approvals" (set to 1).
+- [ ] **Vercel: Add `GOOGLE_GENERATIVE_AI_API_KEY`** — Vercel dashboard → project Settings → Environment Variables. Same value as existing `GEMINI_API_KEY`.
+- [ ] **Vercel: Remove `GEMINI_API_KEY`** — after Phase 3 is complete and verified working.
+- [ ] **Vercel: Remove `NEXT_PUBLIC_ALPACA_*` vars** — after Phase 1 replaces them with server-only `ALPACA_*` vars.
+- [ ] **Supabase: Create `metric_explanations` table** — Supabase dashboard → SQL Editor. Run the migration SQL provided in Phase 3.
+
+---
+
 ## Key Files (Current)
 
 - `app/layout.tsx` — Root layout with AuthProvider > FavoritesProvider > ConditionalLayout
