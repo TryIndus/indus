@@ -1,16 +1,25 @@
 import { NextResponse } from "next/server";
+import { z } from "zod/v4";
 import { createClient } from "@/lib/supabase/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { env } from "@/lib/env";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+
+const generateReportSchema = z.object({
+	symbol: z.string().min(1),
+});
 
 export async function POST(request: Request) {
   try {
-    const { symbol } = await request.json();
-    
-    if (!symbol) {
+    const body = await request.json();
+    const parsed = generateReportSchema.safeParse(body);
+
+    if (!parsed.success) {
       return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
     }
+
+    const { symbol } = parsed.data;
 
     const supabase = await createClient();
     

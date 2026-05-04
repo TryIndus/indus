@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
+import { z } from "zod/v4";
 import YahooFinance from "yahoo-finance2";
+
+const stockDataQuerySchema = z.object({
+	symbol: z.string().min(1),
+});
 
 const yahooFinance = new YahooFinance({
     suppressNotices: ["yahooSurvey"],
@@ -7,11 +12,15 @@ const yahooFinance = new YahooFinance({
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const symbol = searchParams.get("symbol");
+  const parsed = stockDataQuerySchema.safeParse({
+    symbol: searchParams.get("symbol"),
+  });
 
-  if (!symbol) {
+  if (!parsed.success) {
     return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
   }
+
+  const { symbol } = parsed.data;
 
   try {
     // Try to fetch real Yahoo Finance data first

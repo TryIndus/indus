@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
+import { z } from "zod/v4";
 import { makeBatchPrompt, Item } from "@/lib/prompts";
 import { VALUE_ANALYSIS_SYSTEM_PROMPT } from "@/lib/system-prompts";
+import { env } from "@/lib/env";
+
+const batchExplainSchema = z.array(
+	z.object({
+		symbol: z.string().min(1),
+		metric: z.string().min(1),
+		value: z.number(),
+	}),
+).min(1);
 
 // UPDATED: Using gemini-2.5-flash which is the current stable release (June 2025)
 const GEMINI_API_URL =
@@ -8,19 +18,15 @@ const GEMINI_API_URL =
 
 export async function POST(req: Request) {
   try {
-    const items: Item[] = await req.json();
+    const body = await req.json();
+    const parsed = batchExplainSchema.safeParse(body);
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!parsed.success) {
       return NextResponse.json({ error: "Invalid input." }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "Missing Gemini API key." },
-        { status: 500 },
-      );
-    }
+    const items: Item[] = parsed.data;
+    const apiKey = env.GEMINI_API_KEY;
 
     const prompt = makeBatchPrompt(items);
     const fullPrompt = `${VALUE_ANALYSIS_SYSTEM_PROMPT}\n\n${prompt}`;

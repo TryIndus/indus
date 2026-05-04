@@ -1,12 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod/v4";
 import { GeminiClient } from "@/lib/ai/geminiClient";
 import { GEMINI_SYSTEM_PROMPT } from "@/lib/ai/geminiSystemPrompt";
 import { PageContext, ChatMessage } from "@/lib/types";
+import { env } from "@/lib/env";
+
+const contextChatSchema = z.object({
+	context: z.object({
+		symbol: z.string().min(1),
+		companyName: z.string(),
+		asOf: z.string(),
+		metricGroups: z.record(z.string(), z.any()),
+		chart: z
+			.object({
+				interval: z.string(),
+				points: z.array(z.any()),
+				latestPrice: z.number(),
+				dayChangePct: z.number(),
+			})
+			.optional(),
+		cachedExplanations: z.record(z.string(), z.string()),
+		trigger: z.object({
+			metricKey: z.string(),
+			metricLabel: z.string(),
+			value: z.union([z.number(), z.string()]),
+		}),
+	}),
+	messages: z.array(
+		z.object({
+			id: z.string(),
+			role: z.enum(["user", "assistant", "system"]),
+			content: z.string(),
+			createdAt: z.number(),
+			streaming: z.boolean().optional(),
+		}),
+	),
+	newMessage: z.string().min(1),
+});
 
 interface RequestBody {
-  context: PageContext;
-  messages: ChatMessage[];
-  newMessage: string;
+	context: PageContext;
+	messages: ChatMessage[];
+	newMessage: string;
 }
 
 // Helper function to sanitize user input against prompt injection
@@ -48,27 +83,18 @@ function validateRequest(body: unknown): RequestBody | null {
 
 export async function POST(request: NextRequest) {
   try {
-    // Validate environment
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error('GEMINI_API_KEY not configured');
-      return NextResponse.json(
-        { error: 'error' },
-        { status: 500 }
-      );
-    }
+    const apiKey = env.GEMINI_API_KEY;
 
-    // Parse and validate request
     const body = await request.json();
-    const validatedRequest = validateRequest(body);
-    if (!validatedRequest) {
+    const parsed = contextChatSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'error' },
+        { error: 'Invalid request body' },
         { status: 400 }
       );
     }
 
-    const { context, messages, newMessage } = validatedRequest;
+    const { context, messages, newMessage } = parsed.data as RequestBody;
 
     // Sanitize user input
     const sanitizedMessage = sanitizeInput(newMessage);

@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import Alpaca from "@alpacahq/alpaca-trade-api";
+import { z } from "zod/v4";
+import { env } from "@/lib/env";
+
+const alpacaQuerySchema = z.object({
+	symbol: z.string().min(1),
+	type: z.enum(["stock", "crypto"]).default("stock"),
+	timeframe: z
+		.enum(["1Min", "5Min", "15Min", "1Hour", "1Day", "1Week", "1Month"])
+		.default("1Min"),
+	limit: z.coerce.number().int().positive().max(10000).default(2000),
+	start: z.coerce.number().optional(),
+	end: z.coerce.number().optional(),
+});
 
 const EST_TIMEZONE_OFFSET = 5 * 60 * 60; // 5 hours in seconds
 
 interface BarData {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
+	time: number;
+	open: number;
+	high: number;
+	low: number;
+	close: number;
+	volume: number;
 }
 
 // Helper function to convert timestamp to EST timezone
@@ -26,48 +39,43 @@ function convertToUTCTimestamp(estTimestamp: number): number {
   }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const symbol = searchParams.get("symbol");
-  const type = searchParams.get("type") || "stock"; // "stock" or "crypto"
-  const timeframe = searchParams.get("timeframe") || "1Min";
-  const limit = parseInt(searchParams.get("limit") || "2000"); // Reduced limit for better performance
-  const startParam = searchParams.get("start");
-  const endParam = searchParams.get("end");
+	const { searchParams } = new URL(request.url);
+	const parsed = alpacaQuerySchema.safeParse({
+		symbol: searchParams.get("symbol"),
+		type: searchParams.get("type") ?? undefined,
+		timeframe: searchParams.get("timeframe") ?? undefined,
+		limit: searchParams.get("limit") ?? undefined,
+		start: searchParams.get("start") ?? undefined,
+		end: searchParams.get("end") ?? undefined,
+	});
 
-  if (!symbol) {
-    return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
-  }
+	if (!parsed.success) {
+		return NextResponse.json(
+			{ error: "Invalid query parameters", details: parsed.error.issues },
+			{ status: 400 },
+		);
+	}
 
-  try {
-    // Initialize Alpaca client
-    if (
-      !process.env.NEXT_PUBLIC_ALPACA_API_KEY ||
-      !process.env.NEXT_PUBLIC_ALPACA_SECRET_KEY
-    ) {
-      return NextResponse.json(
-        { error: "Alpaca API keys not configured" },
-        { status: 500 },
-      );
-    }
+	const { symbol, type, timeframe, limit } = parsed.data;
+	const startParam = parsed.data.start;
+	const endParam = parsed.data.end;
 
-    const isPaper = process.env.NEXT_PUBLIC_ALPACA_IS_PAPER === "true";
-    const alpaca = new Alpaca({
-      keyId: process.env.NEXT_PUBLIC_ALPACA_API_KEY,
-      secretKey: process.env.NEXT_PUBLIC_ALPACA_SECRET_KEY,
-      paper: isPaper,
-      usePolygon: false,
-    });
+	try {
+		const alpaca = new Alpaca({
+			keyId: env.ALPACA_API_KEY,
+			secretKey: env.ALPACA_SECRET_KEY,
+			paper: env.ALPACA_IS_PAPER,
+			usePolygon: false,
+		});
 
     console.log(`📊 Fetching historical data for ${symbol} (${timeframe})`);
 
     // Calculate start and end dates
     let startDate: Date;
-    // Use default date range based on timeframe if no end date is provided
-    const endDate: Date = endParam ? new Date(parseInt(endParam) * 1000) : new Date();
+    const endDate: Date = endParam ? new Date(endParam * 1000) : new Date();
 
     if (startParam) {
-      // Use custom start date
-      startDate = new Date(parseInt(startParam) * 1000);
+      startDate = new Date(startParam * 1000);
     } else {
       // Date ranges optimized for ~1000 bars with clean calendar intervals
       switch (timeframe) {
