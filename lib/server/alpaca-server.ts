@@ -4,6 +4,7 @@
 import Alpaca from "@alpacahq/alpaca-trade-api";
 import type { Server } from "socket.io";
 import type { AlpacaTrade, AlpacaBar, CryptoBar } from "@alpacahq/alpaca-trade-api/dist/resources/datav2/entityv2";
+import { env } from "@/lib/env";
 
 // Candlestick data format for chart updates
 interface CandlestickData {
@@ -51,25 +52,13 @@ export class AlpacaService {
     if (this.alpaca) return this.alpaca;
 
     try {
-      // Check if API keys are configured
-      if (
-        !process.env.NEXT_PUBLIC_ALPACA_API_KEY ||
-        !process.env.NEXT_PUBLIC_ALPACA_SECRET_KEY
-      ) {
-        throw new Error(
-          "Alpaca API keys are not configured. Please set NEXT_PUBLIC_ALPACA_API_KEY and NEXT_PUBLIC_ALPACA_SECRET_KEY in your .env.local file.",
-        );
-      }
-
-      const isPaper = process.env.NEXT_PUBLIC_ALPACA_IS_PAPER || "true";
-
       this.alpaca = new Alpaca({
-        keyId: process.env.NEXT_PUBLIC_ALPACA_API_KEY,
-        secretKey: process.env.NEXT_PUBLIC_ALPACA_SECRET_KEY,
-        paper: isPaper
+        keyId: env.ALPACA_API_KEY,
+        secretKey: env.ALPACA_SECRET_KEY,
+        paper: env.ALPACA_IS_PAPER,
       });
 
-      console.log(`Alpaca initialized successfully (Paper: ${isPaper}).`);
+      console.log(`Alpaca initialized successfully (Paper: ${env.ALPACA_IS_PAPER}).`);
       return this.alpaca;
     } catch (error) {
       console.error("Failed to initialize Alpaca client:", error);
