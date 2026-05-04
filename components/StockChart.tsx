@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createChart, CandlestickSeries, IChartApi, ISeriesApi } from "lightweight-charts";
-import io, { Socket } from "socket.io-client";
 import type { CandlestickData, Time } from "lightweight-charts";
+import {
+	CandlestickSeries,
+	createChart,
+	type IChartApi,
+	type ISeriesApi,
+} from "lightweight-charts";
+import { useEffect, useRef, useState } from "react";
+import io, { type Socket } from "socket.io-client";
 
 // Use CandlestickData from lightweight-charts for type compatibility
 type BarData = CandlestickData<Time>;
@@ -50,7 +55,11 @@ export interface StockChartProps {
 	showControls?: boolean;
 }
 
-export default function StockChart({ symbol: initialSymbol, height = 500, className = "" }: StockChartProps) {
+export default function StockChart({
+	symbol: initialSymbol,
+	height = 500,
+	className = "",
+}: StockChartProps) {
 	const chartContainerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<IChartApi | null>(null);
 	const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -58,7 +67,7 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 	const [selectedTimeframe, setSelectedTimeframe] = useState("1Min");
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [connectionStatus, setConnectionStatus] = useState("disconnected");
+	const [_connectionStatus, setConnectionStatus] = useState("disconnected");
 	const [isLoadingMoreData, setIsLoadingMoreData] = useState(false);
 	const [websocketEnabled, setWebsocketEnabled] = useState(true);
 	const [hasReachedDataLimit, setHasReachedDataLimit] = useState(false);
@@ -133,12 +142,16 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 		isLoadingMoreDataRef.current = true;
 
 		try {
-			const response = await fetch(`/api/alpaca?symbol=${selectedSymbolRef.current}&timeframe=${selectedTimeframeRef.current}&end=${earliestLoadedTimestampRef.current}`);
+			const response = await fetch(
+				`/api/alpaca?symbol=${selectedSymbolRef.current}&timeframe=${selectedTimeframeRef.current}&end=${earliestLoadedTimestampRef.current}`,
+			);
 			const result = await response.json();
 
 			if (response.ok && result.data && !result.isEmpty) {
 				// Filter out overlap at boundary, then prepend new data
-				const filteredNewData = result.data.filter((bar: BarData) => bar.time < historicalDataRef.current[0].time);
+				const filteredNewData = result.data.filter(
+					(bar: BarData) => bar.time < historicalDataRef.current[0].time,
+				);
 				const combinedData = [...filteredNewData, ...historicalDataRef.current];
 
 				historicalDataRef.current = combinedData;
@@ -156,11 +169,17 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 				// Calculate how far back we've gone
 				if (earliestLoadedTimestampRef.current) {
 					const earliestDate = new Date(earliestLoadedTimestampRef.current * 1000);
-					const yearsBack = Math.round((Date.now() - earliestDate.getTime()) / (365 * 24 * 60 * 60 * 1000));
-					setDataLimitMessage(`Reached data limit: ${earliestDate.toLocaleDateString()} (${yearsBack} years ago)`);
+					const yearsBack = Math.round(
+						(Date.now() - earliestDate.getTime()) / (365 * 24 * 60 * 60 * 1000),
+					);
+					setDataLimitMessage(
+						`Reached data limit: ${earliestDate.toLocaleDateString()} (${yearsBack} years ago)`,
+					);
 				}
 
-				addDebugInfo(`No more historical data available for ${selectedSymbolRef.current} - reached data limit`);
+				addDebugInfo(
+					`No more historical data available for ${selectedSymbolRef.current} - reached data limit`,
+				);
 			}
 		} catch (error) {
 			addDebugInfo(`Error loading more historical data: ${error}`);
@@ -234,11 +253,22 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 			if (rangeChangeTimeout) clearTimeout(rangeChangeTimeout);
 
 			rangeChangeTimeout = setTimeout(() => {
-				if (logicalRange && earliestLoadedTimestampRef.current && !isLoadingMoreDataRef.current && !hasReachedDataLimitRef.current) {
+				if (
+					logicalRange &&
+					earliestLoadedTimestampRef.current &&
+					!isLoadingMoreDataRef.current &&
+					!hasReachedDataLimitRef.current
+				) {
 					// Only trigger if user has actually scrolled to the beginning (not initial load)
 					// And ensure we have sufficient data already loaded to avoid immediate trigger
-					if (logicalRange.from !== null && logicalRange.from <= 3 && historicalDataRef.current.length > 50) {
-						addDebugInfo(`Triggering loadMoreHistoricalData: From=${earliestLoadedTimestampRef.current}, timeframe=${selectedTimeframeRef.current}`);
+					if (
+						logicalRange.from !== null &&
+						logicalRange.from <= 3 &&
+						historicalDataRef.current.length > 50
+					) {
+						addDebugInfo(
+							`Triggering loadMoreHistoricalData: From=${earliestLoadedTimestampRef.current}, timeframe=${selectedTimeframeRef.current}`,
+						);
 						loadMoreHistoricalData();
 					}
 				}
@@ -264,7 +294,7 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 				chartRef.current.remove();
 			}
 		};
-	}, []);
+	}, [height, loadMoreHistoricalData, addDebugInfo]);
 
 	useEffect(() => {
 		addDebugInfo("Initializing socket connection...");
@@ -325,7 +355,9 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 						candlestickSeriesRef.current.update(data);
 						addDebugInfo(`📈 Updated chart with live data (1Min timeframe)`);
 					} else if (selectedTimeframeRef.current !== "1Min") {
-						addDebugInfo(`📊 Ignoring live data - timeframe is ${selectedTimeframeRef.current} (not 1Min)`);
+						addDebugInfo(
+							`📊 Ignoring live data - timeframe is ${selectedTimeframeRef.current} (not 1Min)`,
+						);
 					}
 				});
 
@@ -351,7 +383,7 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 
 		// Add cleanup for tab closure
 		const handleBeforeUnload = () => {
-			if (socket && socket.connected) {
+			if (socket?.connected) {
 				addDebugInfo("Tab closing - unsubscribing from symbol");
 				socket.emit("unsubscribe", { symbol: selectedSymbolRef.current, type: "stock" });
 				socket.disconnect();
@@ -374,7 +406,7 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 				socket = null;
 			}
 		};
-	}, [websocketEnabled]);
+	}, [websocketEnabled, addDebugInfo]);
 
 	// Update refs when state changes
 	useEffect(() => {
@@ -396,12 +428,16 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 
 		// Load historical data for new symbol
 		loadHistoricalData(selectedSymbol, selectedTimeframe);
-	}, [selectedSymbol]); // Only trigger on symbol change, not timeframe
+	}, [
+		selectedSymbol,
+		selectedTimeframe, // Load historical data for new symbol
+		loadHistoricalData,
+	]); // Only trigger on symbol change, not timeframe
 
 	// Handle WebSocket subscriptions separately
 	useEffect(() => {
 		// Only try to subscribe if websocket is enabled and connected
-		if (websocketEnabled && socket && socket.connected) {
+		if (websocketEnabled && socket?.connected) {
 			addDebugInfo(`Subscribing to symbol: ${selectedSymbol}`);
 			socket.emit("subscribe", { symbol: selectedSymbol });
 		} else {
@@ -411,7 +447,7 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 				addDebugInfo(`Cannot subscribe to ${selectedSymbol} - socket not connected`);
 			}
 		}
-	}, [connectionStatus, selectedSymbol, websocketEnabled]);
+	}, [selectedSymbol, websocketEnabled, addDebugInfo]);
 
 	// Update symbol when prop changes
 	useEffect(() => {
@@ -478,7 +514,11 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 							<div className="flex items-center space-x-2">
 								<div className="flex-shrink-0">
 									<svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-										<path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+										<path
+											fillRule="evenodd"
+											d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+											clipRule="evenodd"
+										/>
 									</svg>
 								</div>
 								<div className="text-sm">
@@ -499,7 +539,11 @@ export default function StockChart({ symbol: initialSymbol, height = 500, classN
 						</div>
 					)}
 
-					<div ref={chartContainerRef} className={`w-full max-w-full border border-border rounded-lg overflow-hidden`} style={{ height: `${height}px` }} />
+					<div
+						ref={chartContainerRef}
+						className={`w-full max-w-full border border-border rounded-lg overflow-hidden`}
+						style={{ height: `${height}px` }}
+					/>
 				</div>
 			</div>
 		</>

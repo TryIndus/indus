@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { ArrowLeft, ChevronDown, ChevronUp, Coins, DollarSign, TrendingUp } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import CryptoFinancialTable from "@/components/CryptoFinancialTable";
+import type React from "react";
+import { useEffect, useState } from "react";
 import CryptoChart from "@/components/CryptoChart";
-import { batchPreload } from "@/hooks/useExplanation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import CryptoFinancialTable from "@/components/CryptoFinancialTable";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Coins, TrendingUp, DollarSign, ChevronDown, ChevronUp } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { batchPreload } from "@/hooks/useExplanation";
 
 type CryptoData = {
 	symbol: string;
@@ -158,7 +159,7 @@ const CryptoPage: React.FC = () => {
 		} else {
 			setIsLoading(false);
 		}
-	}, [query]);
+	}, [query, fetchCryptoData]);
 
 	// Helper function to get display symbol (e.g., "BTC" from "BTC/USD")
 	const getDisplaySymbol = (fullSymbol: string) => {
@@ -200,7 +201,9 @@ const CryptoPage: React.FC = () => {
 					<Card className="w-full max-w-md">
 						<CardContent className="flex items-center justify-center space-x-2 py-8">
 							<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-							<span className="text-muted-foreground">Loading {getDisplaySymbol(query)} crypto data...</span>
+							<span className="text-muted-foreground">
+								Loading {getDisplaySymbol(query)} crypto data...
+							</span>
 						</CardContent>
 					</Card>
 				</div>
@@ -214,7 +217,9 @@ const CryptoPage: React.FC = () => {
 					</CardHeader>
 					<CardContent className="space-y-4">
 						<p className="text-destructive/80">{error}</p>
-						<p className="text-sm text-muted-foreground">Make sure &quot;{query}&quot; is a valid cryptocurrency symbol.</p>
+						<p className="text-sm text-muted-foreground">
+							Make sure &quot;{query}&quot; is a valid cryptocurrency symbol.
+						</p>
 						<Button variant="destructive" onClick={() => router.push("/crypto-search")}>
 							Back to Crypto Search
 						</Button>
@@ -232,7 +237,9 @@ const CryptoPage: React.FC = () => {
 								<div className="flex items-center gap-2">
 									<Coins className="h-6 w-6" />
 									<div className="flex-1">
-										<CardTitle className="text-2xl">{cryptoData.fullName || cryptoData.name || getDisplaySymbol(query)}</CardTitle>
+										<CardTitle className="text-2xl">
+											{cryptoData.fullName || cryptoData.name || getDisplaySymbol(query)}
+										</CardTitle>
 										<CardDescription className="text-lg font-mono">{query}</CardDescription>
 									</div>
 								</div>
@@ -243,9 +250,18 @@ const CryptoPage: React.FC = () => {
 									<div>
 										<h3 className="font-semibold text-lg mb-2">Project Overview</h3>
 										<div className="space-y-2">
-											<p className="text-muted-foreground text-sm leading-relaxed">{showFullDescription ? cryptoData.description : `${cryptoData.description.slice(0, 600)}${cryptoData.description.length > 300 ? "..." : ""}`}</p>
+											<p className="text-muted-foreground text-sm leading-relaxed">
+												{showFullDescription
+													? cryptoData.description
+													: `${cryptoData.description.slice(0, 600)}${cryptoData.description.length > 300 ? "..." : ""}`}
+											</p>
 											{cryptoData.description.length > 600 && (
-												<Button variant="ghost" size="sm" onClick={() => setShowFullDescription(!showFullDescription)} className="px-0 py-1 h-auto text-primary hover:text-primary/80 -ml-2">
+												<Button
+													variant="ghost"
+													size="sm"
+													onClick={() => setShowFullDescription(!showFullDescription)}
+													className="px-0 py-1 h-auto text-primary hover:text-primary/80 -ml-2"
+												>
 													{showFullDescription ? (
 														<>
 															Show Less <ChevronUp className="h-3 w-3" />
@@ -265,7 +281,12 @@ const CryptoPage: React.FC = () => {
 										{cryptoData.website && (
 											<div>
 												<p className="text-sm font-medium">Website</p>
-												<a href={`https://${cryptoData.website.replace(/^https?:\/\//, "")}`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+												<a
+													href={`https://${cryptoData.website.replace(/^https?:\/\//, "")}`}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="text-sm text-primary hover:underline"
+												>
 													{cryptoData.website.replace(/^https?:\/\//, "")}
 												</a>
 											</div>
@@ -294,9 +315,13 @@ const CryptoPage: React.FC = () => {
 									{cryptoData.regularMarketPrice && (
 										<div className="flex items-center gap-2 pt-4 border-t">
 											<DollarSign className="h-5 w-5 text-green-500" />
-											<span className="text-3xl font-bold text-green-500">${cryptoData.regularMarketPrice.toFixed(8)}</span>
+											<span className="text-3xl font-bold text-green-500">
+												${cryptoData.regularMarketPrice.toFixed(8)}
+											</span>
 											{cryptoData.percentChange24h && (
-												<span className={`text-lg font-medium ${cryptoData.percentChange24h >= 0 ? "text-green-500" : "text-red-500"}`}>
+												<span
+													className={`text-lg font-medium ${cryptoData.percentChange24h >= 0 ? "text-green-500" : "text-red-500"}`}
+												>
 													{cryptoData.percentChange24h >= 0 ? "+" : ""}
 													{cryptoData.percentChange24h.toFixed(2)}%
 												</span>
@@ -325,7 +350,9 @@ const CryptoPage: React.FC = () => {
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
-								<div className="text-2xl font-bold">{cryptoData.marketCap ? `$${(cryptoData.marketCap / 1e9).toFixed(1)}B` : "—"}</div>
+								<div className="text-2xl font-bold">
+									{cryptoData.marketCap ? `$${(cryptoData.marketCap / 1e9).toFixed(1)}B` : "—"}
+								</div>
 							</CardContent>
 						</Card>
 
@@ -337,7 +364,11 @@ const CryptoPage: React.FC = () => {
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
-								<div className="text-2xl font-bold">{cryptoData.circulatingSupply ? `${(cryptoData.circulatingSupply / 1e6).toFixed(1)}M` : "—"}</div>
+								<div className="text-2xl font-bold">
+									{cryptoData.circulatingSupply
+										? `${(cryptoData.circulatingSupply / 1e6).toFixed(1)}M`
+										: "—"}
+								</div>
 							</CardContent>
 						</Card>
 					</div>
@@ -346,7 +377,10 @@ const CryptoPage: React.FC = () => {
 					<Card>
 						<CardHeader>
 							<CardTitle>Crypto Metrics</CardTitle>
-							<CardDescription>Comprehensive cryptocurrency analysis with AI-powered explanations. Hover over any metric for detailed insights.</CardDescription>
+							<CardDescription>
+								Comprehensive cryptocurrency analysis with AI-powered explanations. Hover over any
+								metric for detailed insights.
+							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<CryptoFinancialTable data={cryptoData} />

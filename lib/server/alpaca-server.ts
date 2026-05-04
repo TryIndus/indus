@@ -2,18 +2,21 @@
 // You'll need to get API keys from: https://alpaca.markets/
 
 import Alpaca from "@alpacahq/alpaca-trade-api";
+import type {
+	AlpacaBar,
+	CryptoBar,
+} from "@alpacahq/alpaca-trade-api/dist/resources/datav2/entityv2";
 import type { Server } from "socket.io";
-import type { AlpacaTrade, AlpacaBar, CryptoBar } from "@alpacahq/alpaca-trade-api/dist/resources/datav2/entityv2";
 import { env } from "@/lib/env";
 
 // Candlestick data format for chart updates
 interface CandlestickData {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
+	time: number;
+	open: number;
+	high: number;
+	low: number;
+	close: number;
+	volume: number;
 }
 
 type DataCallback = (data: CandlestickData) => void;
@@ -25,429 +28,408 @@ type AlpacaCryptoStream = AlpacaInstance["crypto_stream_v1beta3"];
 
 // Helper function to convert timestamp to EST timezone (same as alpaca route)
 function convertToESTTimestamp(timestamp: string | Date): number {
-  const date = new Date(timestamp);
-  return Math.floor((date.getTime() - date.getTimezoneOffset() * 60 * 1000) / 1000);
+	const date = new Date(timestamp);
+	return Math.floor((date.getTime() - date.getTimezoneOffset() * 60 * 1000) / 1000);
 }
 
 let socketServer: Server | null = null; // We'll inject this from /api/socket
 
 export function setSocketServer(io: Server) {
-  socketServer = io;
+	socketServer = io;
 }
 
 export class AlpacaService {
-  private alpaca: AlpacaInstance | null = null;
-  private ws: AlpacaStockStream | null = null; // Stock WebSocket (data_stream_v2)
-  private cryptoWs: AlpacaCryptoStream | null = null; // Crypto WebSocket (crypto_stream_v1beta3)
-  private isConnected = false;
-  private isCryptoConnected = false;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private dataCallbacks: Map<string, DataCallback[]> = new Map();
-  private subscribedSymbols: Set<string> = new Set();
-  private intentionalDisconnect = false; // Flag to suppress reconnects during intentional disconnection
+	private alpaca: AlpacaInstance | null = null;
+	private ws: AlpacaStockStream | null = null; // Stock WebSocket (data_stream_v2)
+	private cryptoWs: AlpacaCryptoStream | null = null; // Crypto WebSocket (crypto_stream_v1beta3)
+	private isConnected = false;
+	private isCryptoConnected = false;
+	private reconnectAttempts = 0;
+	private maxReconnectAttempts = 5;
+	private dataCallbacks: Map<string, DataCallback[]> = new Map();
+	private subscribedSymbols: Set<string> = new Set();
+	private intentionalDisconnect = false; // Flag to suppress reconnects during intentional disconnection
 
-  // Initialize Alpaca client dynamically
-  private async initializeAlpaca() {
-    if (this.alpaca) return this.alpaca;
+	// Initialize Alpaca client dynamically
+	private async initializeAlpaca() {
+		if (this.alpaca) return this.alpaca;
 
-    try {
-      this.alpaca = new Alpaca({
-        keyId: env.ALPACA_API_KEY,
-        secretKey: env.ALPACA_SECRET_KEY,
-        paper: env.ALPACA_IS_PAPER,
-      });
+		try {
+			this.alpaca = new Alpaca({
+				keyId: env.ALPACA_API_KEY,
+				secretKey: env.ALPACA_SECRET_KEY,
+				paper: env.ALPACA_IS_PAPER,
+			});
 
-      console.log(`Alpaca initialized successfully (Paper: ${env.ALPACA_IS_PAPER}).`);
-      return this.alpaca;
-    } catch (error) {
-      console.error("Failed to initialize Alpaca client:", error);
-      throw error;
-    }
-  }
+			console.log(`Alpaca initialized successfully (Paper: ${env.ALPACA_IS_PAPER}).`);
+			return this.alpaca;
+		} catch (error) {
+			console.error("Failed to initialize Alpaca client:", error);
+			throw error;
+		}
+	}
 
-  // WebSocket methods for live data using official package
-  async connectWebSocket(): Promise<void> {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const alpaca = await this.initializeAlpaca();
+	// WebSocket methods for live data using official package
+	async connectWebSocket(): Promise<void> {
+		return new Promise(async (resolve, reject) => {
+			try {
+				const alpaca = await this.initializeAlpaca();
 
-        // Initialize both stock and crypto WebSockets
-        this.ws = alpaca.data_stream_v2; // Stock WebSocket
-        this.cryptoWs = alpaca.crypto_stream_v1beta3; // Crypto WebSocket
+				// Initialize both stock and crypto WebSockets
+				this.ws = alpaca.data_stream_v2; // Stock WebSocket
+				this.cryptoWs = alpaca.crypto_stream_v1beta3; // Crypto WebSocket
 
-        let stockConnected = false;
-        let cryptoConnected = false;
-        
-        const checkBothConnected = () => {
-          if (stockConnected && cryptoConnected) {
-            console.log("✅ Both stock and crypto WebSockets connected");
-            resolve();
-          }
-        };
+				let stockConnected = false;
+				let cryptoConnected = false;
 
-        // Stock WebSocket handlers
-        this.ws.onConnect(() => {
-          console.log("✅ Stock WebSocket connected to Alpaca");
-          this.isConnected = true;
-          stockConnected = true;
-          this.reconnectAttempts = 0;
-          this.intentionalDisconnect = false; // Reset flag on successful connection
+				const checkBothConnected = () => {
+					if (stockConnected && cryptoConnected) {
+						console.log("✅ Both stock and crypto WebSockets connected");
+						resolve();
+					}
+				};
 
-          // Emit connection status to all clients
-          if (socketServer) {
-            socketServer.emit("alpaca_connected", {
-              message: "Alpaca Stock WebSocket connected",
-            });
-          }
+				// Stock WebSocket handlers
+				this.ws.onConnect(() => {
+					console.log("✅ Stock WebSocket connected to Alpaca");
+					this.isConnected = true;
+					stockConnected = true;
+					this.reconnectAttempts = 0;
+					this.intentionalDisconnect = false; // Reset flag on successful connection
 
-          checkBothConnected();
-        });
+					// Emit connection status to all clients
+					if (socketServer) {
+						socketServer.emit("alpaca_connected", {
+							message: "Alpaca Stock WebSocket connected",
+						});
+					}
 
-        this.ws.onDisconnect(() => {
-          console.log("❌ Stock WebSocket disconnected from Alpaca");
-          this.isConnected = false;
+					checkBothConnected();
+				});
 
-          // Emit disconnection status to all clients
-          if (socketServer) {
-            socketServer.emit("alpaca_disconnected", {
-              message: "Alpaca Stock WebSocket disconnected",
-            });
-          }
+				this.ws.onDisconnect(() => {
+					console.log("❌ Stock WebSocket disconnected from Alpaca");
+					this.isConnected = false;
 
-          // Only attempt reconnect if not intentionally disconnecting
-          if (!this.intentionalDisconnect) {
-            this.handleReconnect();
-          }
-        });
+					// Emit disconnection status to all clients
+					if (socketServer) {
+						socketServer.emit("alpaca_disconnected", {
+							message: "Alpaca Stock WebSocket disconnected",
+						});
+					}
 
-        // Crypto WebSocket handlers
-        this.cryptoWs.onConnect(() => {
-          console.log("✅ Crypto WebSocket connected to Alpaca");
-          this.isCryptoConnected = true;
-          cryptoConnected = true;
-          this.intentionalDisconnect = false; // Reset flag on successful connection
+					// Only attempt reconnect if not intentionally disconnecting
+					if (!this.intentionalDisconnect) {
+						this.handleReconnect();
+					}
+				});
 
-          // Emit connection status to all clients
-          if (socketServer) {
-            socketServer.emit("alpaca_connected", {
-              message: "Alpaca Crypto WebSocket connected",
-            });
-          }
+				// Crypto WebSocket handlers
+				this.cryptoWs.onConnect(() => {
+					console.log("✅ Crypto WebSocket connected to Alpaca");
+					this.isCryptoConnected = true;
+					cryptoConnected = true;
+					this.intentionalDisconnect = false; // Reset flag on successful connection
 
-          checkBothConnected();
-        });
+					// Emit connection status to all clients
+					if (socketServer) {
+						socketServer.emit("alpaca_connected", {
+							message: "Alpaca Crypto WebSocket connected",
+						});
+					}
 
-        this.cryptoWs.onDisconnect(() => {
-          console.log("❌ Crypto WebSocket disconnected from Alpaca");
-          this.isCryptoConnected = false;
+					checkBothConnected();
+				});
 
-          // Emit disconnection status to all clients
-          if (socketServer) {
-            socketServer.emit("alpaca_disconnected", {
-              message: "Alpaca Crypto WebSocket disconnected",
-            });
-          }
+				this.cryptoWs.onDisconnect(() => {
+					console.log("❌ Crypto WebSocket disconnected from Alpaca");
+					this.isCryptoConnected = false;
 
-          // Only attempt reconnect if not intentionally disconnecting
-          if (!this.intentionalDisconnect) {
-            this.handleReconnect();
-          }
-        });
+					// Emit disconnection status to all clients
+					if (socketServer) {
+						socketServer.emit("alpaca_disconnected", {
+							message: "Alpaca Crypto WebSocket disconnected",
+						});
+					}
 
-        // Handle stock trade data
-        // High frequency trade data, disabled for now to prevent rate limiting
-        // this.ws.onStockTrade((trade: any) => {
-        //   const symbol = trade.Symbol || trade.symbol;
-        //   console.log(`📊 Received stock trade for ${symbol}: $${trade.Price || trade.price}`);
-        //   this.handleTradeData(trade);
-        // });
+					// Only attempt reconnect if not intentionally disconnecting
+					if (!this.intentionalDisconnect) {
+						this.handleReconnect();
+					}
+				});
 
-        // Handle stock bar data (candlesticks)
-        this.ws.onStockBar((bar: AlpacaBar) => {
-        //   console.log("🔍 DEBUG: Received stock bar data:", bar);
-          this.handleBarData(bar);
-        });
+				// Handle stock trade data
+				// High frequency trade data, disabled for now to prevent rate limiting
+				// this.ws.onStockTrade((trade: any) => {
+				//   const symbol = trade.Symbol || trade.symbol;
+				//   console.log(`📊 Received stock trade for ${symbol}: $${trade.Price || trade.price}`);
+				//   this.handleTradeData(trade);
+				// });
 
-        // Handle crypto bar data from crypto stream
-        // Note: The SDK's CryptoBar type doesn't include Symbol, but the websocket adds it
-        this.cryptoWs.onCryptoBar((bar: CryptoBar) => {
-          console.log("🔍 DEBUG: Received crypto bar data:", bar);
-          this.handleCryptoBarData(bar);
-        });
+				// Handle stock bar data (candlesticks)
+				this.ws.onStockBar((bar: AlpacaBar) => {
+					//   console.log("🔍 DEBUG: Received stock bar data:", bar);
+					this.handleBarData(bar);
+				});
 
-        // Stock WebSocket error handling
-        this.ws.onError((error: Error) => {
-          console.error("🔴 Stock WebSocket error:", error);
+				// Handle crypto bar data from crypto stream
+				// Note: The SDK's CryptoBar type doesn't include Symbol, but the websocket adds it
+				this.cryptoWs.onCryptoBar((bar: CryptoBar) => {
+					console.log("🔍 DEBUG: Received crypto bar data:", bar);
+					this.handleCryptoBarData(bar);
+				});
 
-          // Emit error to all clients
-          if (socketServer) {
-            socketServer.emit("alpaca_error", {
-              message: "Alpaca Stock WebSocket error",
-              error: error.message,
-            });
-          }
+				// Stock WebSocket error handling
+				this.ws.onError((error: Error) => {
+					console.error("🔴 Stock WebSocket error:", error);
 
-          reject(error);
-        });
+					// Emit error to all clients
+					if (socketServer) {
+						socketServer.emit("alpaca_error", {
+							message: "Alpaca Stock WebSocket error",
+							error: error.message,
+						});
+					}
 
-        // Crypto WebSocket error handling
-        this.cryptoWs.onError((error: Error) => {
-          console.error("🔴 Crypto WebSocket error:", error);
+					reject(error);
+				});
 
-          // Emit error to all clients
-          if (socketServer) {
-            socketServer.emit("alpaca_error", {
-              message: "Alpaca Crypto WebSocket error",
-              error: error.message,
-            });
-          }
+				// Crypto WebSocket error handling
+				this.cryptoWs.onError((error: Error) => {
+					console.error("🔴 Crypto WebSocket error:", error);
 
-          reject(error);
-        });
+					// Emit error to all clients
+					if (socketServer) {
+						socketServer.emit("alpaca_error", {
+							message: "Alpaca Crypto WebSocket error",
+							error: error.message,
+						});
+					}
 
-        // Connect both WebSockets
-        this.ws.connect();
-        this.cryptoWs.connect();
-      } catch (error) {
-        console.error("Failed to connect to Alpaca WebSocket:", error);
-        reject(error);
-      }
-    });
-  }
+					reject(error);
+				});
 
-  private handleTradeData(trade: AlpacaTrade) {
-    // Alpaca SDK returns PascalCase properties (Symbol, Price, etc.)
-    const symbol = trade.Symbol;
+				// Connect both WebSockets
+				this.ws.connect();
+				this.cryptoWs.connect();
+			} catch (error) {
+				console.error("Failed to connect to Alpaca WebSocket:", error);
+				reject(error);
+			}
+		});
+	}
 
-    // Only process if we have callbacks for this symbol
-    if (!this.dataCallbacks.has(symbol)) return;
+	private handleBarData(bar: AlpacaBar) {
+		// Alpaca SDK returns PascalCase properties (Symbol, OpenPrice, HighPrice, etc.)
+		const symbol = bar.Symbol;
 
-    const candlestickData: CandlestickData = {
-      time: convertToESTTimestamp(trade.Timestamp),
-      open: trade.Price,
-      high: trade.Price,
-      low: trade.Price,
-      close: trade.Price,
-      volume: trade.Size,
-    };
+		// Only process if we have callbacks for this symbol
+		if (!this.dataCallbacks.has(symbol)) return;
 
-    // Notify all callbacks for this symbol
-    const callbacks = this.dataCallbacks.get(symbol);
-    if (callbacks) {
-      callbacks.forEach((callback) => callback(candlestickData));
-    }
-  }
+		const candlestickData: CandlestickData = {
+			time: convertToESTTimestamp(bar.Timestamp),
+			open: bar.OpenPrice,
+			high: bar.HighPrice,
+			low: bar.LowPrice,
+			close: bar.ClosePrice,
+			volume: bar.Volume,
+		};
 
-  private handleBarData(bar: AlpacaBar) {
-    // Alpaca SDK returns PascalCase properties (Symbol, OpenPrice, HighPrice, etc.)
-    const symbol = bar.Symbol;
+		// Notify all callbacks for this symbol
+		const callbacks = this.dataCallbacks.get(symbol);
+		if (callbacks) {
+			callbacks.forEach((callback) => callback(candlestickData));
+		}
+	}
 
-    // Only process if we have callbacks for this symbol
-    if (!this.dataCallbacks.has(symbol)) return;
+	private handleCryptoBarData(bar: CryptoBar) {
+		// TODO: Get symbol from bar
+		const symbol = "ETH/USD";
 
-    const candlestickData: CandlestickData = {
-      time: convertToESTTimestamp(bar.Timestamp),
-      open: bar.OpenPrice,
-      high: bar.HighPrice,
-      low: bar.LowPrice,
-      close: bar.ClosePrice,
-      volume: bar.Volume,
-    };
+		console.log(`📊 Processing crypto bar for ${symbol}:`, bar);
+		console.log(typeof bar);
+		console.log(JSON.stringify(bar, null, 4));
 
-    // Notify all callbacks for this symbol
-    const callbacks = this.dataCallbacks.get(symbol);
-    if (callbacks) {
-      callbacks.forEach((callback) => callback(candlestickData));
-    }
-  }
+		// Only process if we have callbacks for this symbol
+		if (!this.dataCallbacks.has(symbol)) {
+			console.log(`❌ No callbacks found for symbol: ${symbol}`);
+			console.log(`Available symbols:`, Array.from(this.dataCallbacks.keys()));
+			return;
+		}
 
-  private handleCryptoBarData(bar: CryptoBar) {
-    // TODO: Get symbol from bar
-    const symbol = "ETH/USD";
+		const candlestickData: CandlestickData = {
+			time: convertToESTTimestamp(bar.Timestamp),
+			open: bar.Open,
+			high: bar.High,
+			low: bar.Low,
+			close: bar.Close,
+			volume: bar.Volume,
+		};
 
-    console.log(`📊 Processing crypto bar for ${symbol}:`, bar);
-    console.log(typeof bar);
-    console.log(JSON.stringify(bar, null, 4));
+		console.log(`📈 Sending candlestick data for ${symbol}:`, candlestickData);
 
-    // Only process if we have callbacks for this symbol
-    if (!this.dataCallbacks.has(symbol)) {
-      console.log(`❌ No callbacks found for symbol: ${symbol}`);
-      console.log(`Available symbols:`, Array.from(this.dataCallbacks.keys()));
-      return;
-    }
+		// Notify all callbacks for this symbol
+		const callbacks = this.dataCallbacks.get(symbol);
+		if (callbacks) {
+			callbacks.forEach((callback) => callback(candlestickData));
+		}
+	}
 
-    const candlestickData: CandlestickData = {
-      time: convertToESTTimestamp(bar.Timestamp),
-      open: bar.Open,
-      high: bar.High,
-      low: bar.Low,
-      close: bar.Close,
-      volume: bar.Volume,
-    };
+	private handleReconnect() {
+		// Don't attempt reconnect if we're intentionally disconnecting
+		if (this.intentionalDisconnect) {
+			console.log("🛑 Skipping reconnect - intentional disconnection");
+			return;
+		}
 
-    console.log(`📈 Sending candlestick data for ${symbol}:`, candlestickData);
+		if (this.reconnectAttempts < this.maxReconnectAttempts) {
+			this.reconnectAttempts++;
+			console.log(
+				`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`,
+			);
 
-    // Notify all callbacks for this symbol
-    const callbacks = this.dataCallbacks.get(symbol);
-    if (callbacks) {
-      callbacks.forEach((callback) => callback(candlestickData));
-    }
-  }
+			setTimeout(() => {
+				this.connectWebSocket().catch((error) => {
+					console.error("Reconnection failed:", error);
+				});
+			}, 1000 * this.reconnectAttempts); // Exponential backoff
+		} else {
+			console.error("❌ Max reconnection attempts reached");
+		}
+	}
 
-  private handleReconnect() {
-    // Don't attempt reconnect if we're intentionally disconnecting
-    if (this.intentionalDisconnect) {
-      console.log("🛑 Skipping reconnect - intentional disconnection");
-      return;
-    }
+	// Subscribe to live data for a symbol using official package
+	async subscribeToSymbol(symbol: string, callback: DataCallback, type: string = "stock") {
+		console.log(`🔔 Attempting to subscribe to ${type} symbol: ${symbol}`);
 
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      console.log(
-        `🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`,
-      );
+		if (type === "crypto" && (!this.isCryptoConnected || !this.cryptoWs)) {
+			console.error("❌ Crypto WebSocket not connected or not initialized");
+			throw new Error("Crypto WebSocket not connected");
+		}
+		if (type === "stock" && (!this.isConnected || !this.ws)) {
+			console.error("❌ Stock WebSocket not connected or not initialized");
+			throw new Error("Stock WebSocket not connected");
+		}
 
-      setTimeout(() => {
-        this.connectWebSocket().catch((error) => {
-          console.error("Reconnection failed:", error);
-        });
-      }, 1000 * this.reconnectAttempts); // Exponential backoff
-    } else {
-      console.error("❌ Max reconnection attempts reached");
-    }
-  }
+		// Store callback
+		if (!this.dataCallbacks.has(symbol)) {
+			this.dataCallbacks.set(symbol, []);
+		}
+		this.dataCallbacks.get(symbol)!.push(callback);
+		console.log(
+			`✅ Added callback for ${symbol}. Total callbacks: ${this.dataCallbacks.get(symbol)!.length}`,
+		);
 
-  // Subscribe to live data for a symbol using official package
-  async subscribeToSymbol(symbol: string, callback: DataCallback, type: string = "stock") {
-    console.log(`🔔 Attempting to subscribe to ${type} symbol: ${symbol}`);
-    
-    if (type === "crypto" && (!this.isCryptoConnected || !this.cryptoWs)) {
-        console.error("❌ Crypto WebSocket not connected or not initialized");
-        throw new Error("Crypto WebSocket not connected");
-    }
-    if (type === "stock" && (!this.isConnected || !this.ws)) {
-        console.error("❌ Stock WebSocket not connected or not initialized");
-        throw new Error("Stock WebSocket not connected");
-    }
+		// Subscribe using official package if not already subscribed
+		if (!this.subscribedSymbols.has(symbol)) {
+			if (type === "crypto" && this.cryptoWs) {
+				// Subscribe to crypto data using crypto stream
+				this.cryptoWs.subscribeForBars([symbol]);
+				console.log(`📊 Subscribed to live crypto data for ${symbol}`);
+			} else if (this.ws) {
+				// Subscribe to stock data using stock stream
+				this.ws.subscribeForBars([symbol]);
+				console.log(`📊 Subscribed to live stock data for ${symbol}`);
+			}
 
-    // Store callback
-    if (!this.dataCallbacks.has(symbol)) {
-      this.dataCallbacks.set(symbol, []);
-    }
-    this.dataCallbacks.get(symbol)!.push(callback);
-    console.log(`✅ Added callback for ${symbol}. Total callbacks: ${this.dataCallbacks.get(symbol)!.length}`);
+			this.subscribedSymbols.add(symbol);
+			console.log(
+				`🎯 Successfully subscribed to ${symbol}. Total subscriptions: ${this.subscribedSymbols.size}`,
+			);
+		} else {
+			console.log(`⚠️ Already subscribed to ${symbol}, just added callback`);
+		}
+	}
 
-    // Subscribe using official package if not already subscribed
-    if (!this.subscribedSymbols.has(symbol)) {
-      if (type === "crypto" && this.cryptoWs) {
-        // Subscribe to crypto data using crypto stream
-        this.cryptoWs.subscribeForBars([symbol]);
-        console.log(`📊 Subscribed to live crypto data for ${symbol}`);
-      } else if (this.ws) {
-        // Subscribe to stock data using stock stream
-        this.ws.subscribeForBars([symbol]);
-        console.log(`📊 Subscribed to live stock data for ${symbol}`);
-      }
-      
-      this.subscribedSymbols.add(symbol);
-      console.log(`🎯 Successfully subscribed to ${symbol}. Total subscriptions: ${this.subscribedSymbols.size}`);
-    } else {
-      console.log(`⚠️ Already subscribed to ${symbol}, just added callback`);
-    }
-  }
+	// Unsubscribe from live data for a symbol
+	async unsubscribeFromSymbol(symbol: string, callback?: DataCallback, type: string = "stock") {
+		// Check if the appropriate stream is connected
+		if ((type === "crypto" && !this.isCryptoConnected) || (type === "stock" && !this.isConnected)) {
+			return;
+		}
 
-  // Unsubscribe from live data for a symbol
-  async unsubscribeFromSymbol(symbol: string, callback?: DataCallback, type: string = "stock") {
-    // Check if the appropriate stream is connected
-    if ((type === "crypto" && !this.isCryptoConnected) || (type === "stock" && !this.isConnected)) {
-      return;
-    }
+		if (callback) {
+			// Remove specific callback
+			const callbacks = this.dataCallbacks.get(symbol);
+			if (callbacks) {
+				const index = callbacks.indexOf(callback);
+				if (index > -1) {
+					callbacks.splice(index, 1);
+				}
+			}
+		} else {
+			// Remove all callbacks for this symbol
+			this.dataCallbacks.delete(symbol);
+		}
 
-    if (callback) {
-      // Remove specific callback
-      const callbacks = this.dataCallbacks.get(symbol);
-      if (callbacks) {
-        const index = callbacks.indexOf(callback);
-        if (index > -1) {
-          callbacks.splice(index, 1);
-        }
-      }
-    } else {
-      // Remove all callbacks for this symbol
-      this.dataCallbacks.delete(symbol);
-    }
+		// Unsubscribe using official package if no more callbacks for this symbol
+		if (!this.dataCallbacks.has(symbol) && this.subscribedSymbols.has(symbol)) {
+			if (type === "crypto" && this.cryptoWs) {
+				// Unsubscribe from crypto data using crypto stream
+				this.cryptoWs.unsubscribeFromBars([symbol]);
+				console.log(`📊 Unsubscribed from live crypto data for ${symbol}`);
+			} else if (this.ws) {
+				// Unsubscribe from stock data using stock stream
+				this.ws.unsubscribeFromBars([symbol]);
+				console.log(`📊 Unsubscribed from live stock data for ${symbol}`);
+			}
 
-    // Unsubscribe using official package if no more callbacks for this symbol
-    if (!this.dataCallbacks.has(symbol) && this.subscribedSymbols.has(symbol)) {
-      if (type === "crypto" && this.cryptoWs) {
-        // Unsubscribe from crypto data using crypto stream
-        this.cryptoWs.unsubscribeFromBars([symbol]);
-        console.log(`📊 Unsubscribed from live crypto data for ${symbol}`);
-      } else if (this.ws) {
-        // Unsubscribe from stock data using stock stream
-        this.ws.unsubscribeFromBars([symbol]);
-        console.log(`📊 Unsubscribed from live stock data for ${symbol}`);
-      }
-      
-      this.subscribedSymbols.delete(symbol);
-    }
-  }
+			this.subscribedSymbols.delete(symbol);
+		}
+	}
 
-  // Disconnect WebSocket
-  disconnect() {
-    console.log("🔄 Disconnecting Alpaca WebSocket connections...");
-    
-    // Set flag to prevent reconnection attempts
-    this.intentionalDisconnect = true;
-    
-    // Unsubscribe from all symbols first
-    if (this.subscribedSymbols.size > 0) {
-      console.log(`🧹 Unsubscribing from ${this.subscribedSymbols.size} symbols...`);
-      
-      for (const symbol of this.subscribedSymbols) {
-        try {
-          if (this.ws && this.isConnected) {
-            this.ws.unsubscribeFromBars([symbol]);
-          }
-          if (this.cryptoWs && this.isCryptoConnected) {
-            this.cryptoWs.unsubscribeFromBars([symbol]);
-          }
-        } catch (error) {
-          console.error(`❌ Error unsubscribing from ${symbol}:`, error);
-        }
-      }
-    }
-    
-    // Disconnect stock WebSocket
-    if (this.ws) {
-      console.log("🧹 Disconnecting stock WebSocket...");
-      try {
-        this.ws.disconnect();
-      } catch (error) {
-        console.error("❌ Error disconnecting stock WebSocket:", error);
-      }
-      this.ws = null;
-      this.isConnected = false;
-    }
-    
-    // Disconnect crypto WebSocket
-    if (this.cryptoWs) {
-      console.log("🧹 Disconnecting crypto WebSocket...");
-      try {
-        this.cryptoWs.disconnect();
-      } catch (error) {
-        console.error("❌ Error disconnecting crypto WebSocket:", error);
-      }
-      this.cryptoWs = null;
-      this.isCryptoConnected = false;
-    }
-    
-    // Clear all callbacks and subscriptions
-    this.dataCallbacks.clear();
-    this.subscribedSymbols.clear();
-    console.log("✅ Alpaca WebSocket cleanup completed");
-  }
+	// Disconnect WebSocket
+	disconnect() {
+		console.log("🔄 Disconnecting Alpaca WebSocket connections...");
 
+		// Set flag to prevent reconnection attempts
+		this.intentionalDisconnect = true;
 
+		// Unsubscribe from all symbols first
+		if (this.subscribedSymbols.size > 0) {
+			console.log(`🧹 Unsubscribing from ${this.subscribedSymbols.size} symbols...`);
+
+			for (const symbol of this.subscribedSymbols) {
+				try {
+					if (this.ws && this.isConnected) {
+						this.ws.unsubscribeFromBars([symbol]);
+					}
+					if (this.cryptoWs && this.isCryptoConnected) {
+						this.cryptoWs.unsubscribeFromBars([symbol]);
+					}
+				} catch (error) {
+					console.error(`❌ Error unsubscribing from ${symbol}:`, error);
+				}
+			}
+		}
+
+		// Disconnect stock WebSocket
+		if (this.ws) {
+			console.log("🧹 Disconnecting stock WebSocket...");
+			try {
+				this.ws.disconnect();
+			} catch (error) {
+				console.error("❌ Error disconnecting stock WebSocket:", error);
+			}
+			this.ws = null;
+			this.isConnected = false;
+		}
+
+		// Disconnect crypto WebSocket
+		if (this.cryptoWs) {
+			console.log("🧹 Disconnecting crypto WebSocket...");
+			try {
+				this.cryptoWs.disconnect();
+			} catch (error) {
+				console.error("❌ Error disconnecting crypto WebSocket:", error);
+			}
+			this.cryptoWs = null;
+			this.isCryptoConnected = false;
+		}
+
+		// Clear all callbacks and subscriptions
+		this.dataCallbacks.clear();
+		this.subscribedSymbols.clear();
+		console.log("✅ Alpaca WebSocket cleanup completed");
+	}
 }

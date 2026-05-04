@@ -1,7 +1,12 @@
 "use client";
 
+import {
+	CandlestickSeries,
+	createChart,
+	type IChartApi,
+	type ISeriesApi,
+} from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
-import { createChart, CandlestickSeries, IChartApi, ISeriesApi } from "lightweight-charts";
 
 interface MiniStockChartProps {
 	symbol: string;
@@ -9,7 +14,11 @@ interface MiniStockChartProps {
 	className?: string;
 }
 
-export default function MiniStockChart({ symbol, height = 200, className = "" }: MiniStockChartProps) {
+export default function MiniStockChart({
+	symbol,
+	height = 200,
+	className = "",
+}: MiniStockChartProps) {
 	const chartContainerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<IChartApi | null>(null);
 	const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -105,7 +114,11 @@ export default function MiniStockChart({ symbol, height = 200, className = "" }:
 				chartRef.current.remove();
 			}
 		};
-	}, [symbol, height]);
+	}, [
+		symbol,
+		height, // Load initial data
+		loadHistoricalData,
+	]);
 
 	return (
 		<div className={`relative ${className}`}>
@@ -121,7 +134,11 @@ export default function MiniStockChart({ symbol, height = 200, className = "" }:
 				</div>
 			)}
 
-			<div ref={chartContainerRef} className="w-full border border-border rounded" style={{ height: `${height}px` }} />
+			<div
+				ref={chartContainerRef}
+				className="w-full border border-border rounded"
+				style={{ height: `${height}px` }}
+			/>
 		</div>
 	);
 }

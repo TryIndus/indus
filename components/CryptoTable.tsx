@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import type React from "react";
 import Hoverable from "./Hoverable";
 import MetricNameHover from "./MetricNameHover";
 
@@ -41,7 +41,10 @@ const CRYPTOS = [
 
 const CryptoTable: React.FC = () => {
 	return (
-		<div className="overflow-x-hidden text-black" style={{ overflowY: "hidden", paddingTop: "80px", marginTop: "-80px" }}>
+		<div
+			className="overflow-x-hidden text-black"
+			style={{ overflowY: "hidden", paddingTop: "80px", marginTop: "-80px" }}
+		>
 			<table className="w-full bg-white border border-gray-200 rounded-lg shadow">
 				<thead>
 					<tr>
@@ -82,8 +85,14 @@ const CryptoTable: React.FC = () => {
 								</Hoverable>
 							</td>
 							<td className="px-4 py-2 border-b">
-								<Hoverable symbol={crypto.symbol} metric="percent_change_24h" value={crypto.percent_change_24h}>
-									<span className={`${crypto.percent_change_24h >= 0 ? "text-green-600" : "text-red-600"} font-medium`}>
+								<Hoverable
+									symbol={crypto.symbol}
+									metric="percent_change_24h"
+									value={crypto.percent_change_24h}
+								>
+									<span
+										className={`${crypto.percent_change_24h >= 0 ? "text-green-600" : "text-red-600"} font-medium`}
+									>
 										{crypto.percent_change_24h >= 0 ? "+" : ""}
 										{crypto.percent_change_24h.toFixed(2)}%
 									</span>
