@@ -36,6 +36,9 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 - No agent capabilities — AI is single-turn Q&A with pre-packed context, not agentic
 - No server-side caching for AI explanations — every batch-explain request hits Gemini even when the same symbol+metric was just explained for another user
 - Explanation caching is client-only (localStorage) — no cross-user benefit
+- Socket.io server uses Pages Router (`pages/api/socket/index.ts`) while the rest of the app uses App Router — mixed routing
+- No React error boundaries or loading states
+- `lib/prompts.ts` and `lib/system-prompts.ts` are tightly coupled to the raw Gemini API format
 
 ---
 
@@ -106,7 +109,7 @@ User Browser
 | Route | Method | Purpose | AI Model |
 |---|---|---|---|
 | `/api/chat` | POST | Agentic financial chat with tool use | Gemini 2.5 Pro via `streamText()` |
-| `/api/explain` | POST | Batch metric explanations | Gemini 2.5 Flash via `generateText()` |
+| `/api/explain` | POST | Batch metric explanations (Supabase-cached) | Gemini 2.5 Flash via `generateText()` |
 | `/api/reports/generate` | POST | Multi-step research report generation | Gemini 2.5 Pro via `generateText()` + tools + `maxSteps` |
 | `/api/reports` | GET | List user reports | — |
 | `/api/reports/[id]` | GET/DELETE | Get or delete a report | — |
@@ -133,13 +136,20 @@ The AI chat becomes an agentic system where Gemini autonomously decides which to
 - User has a multi-turn conversation about a stock → Gemini 2.5 Pro (stronger reasoning, larger context)
 - Generate a research report → Gemini 2.5 Pro with tools and maxSteps (autonomous multi-step research)
 
-**Server-side explanation cache:**
-- Metric explanations are symbol+metric specific, not user-specific — cache them server-side so all users benefit
-- In-memory `Map<string, { data: string, expiry: number }>` with configurable 1-hour TTL
-- Cache key: `${symbol}_${metric}` (e.g., `AAPL_pe_ratio`)
-- On cache hit: return immediately, skip Gemini API call entirely
-- On cache miss: call Gemini, store result with 1h expiry, return to client
+**Server-side explanation cache (Supabase):**
+- Metric explanations are symbol+metric specific, not user-specific — cache them in Supabase so all users benefit
+- New table: `metric_explanations` (symbol, metric, explanation, created_at)
+- Cache key: symbol + metric (e.g., `AAPL` + `pe_ratio`)
+- On request: query Supabase for matching row where `created_at > now() - 1 hour`
+- Cache hit → return immediately, skip Gemini API call entirely
+- Cache miss → call Gemini, upsert result into `metric_explanations`, return to client
+- Supabase cache survives Vercel cold starts (unlike in-memory caching on serverless)
 - Client-side TanStack Query adds a second caching layer per-user with stale-while-revalidate
+
+**Prompt files:**
+- `lib/prompts.ts` and `lib/system-prompts.ts` must be adapted for the Vercel AI SDK format
+- System prompts become a first-class `system` parameter in `streamText()` / `generateText()` — no more string concatenation
+- Prompt construction logic stays in these files but the interface changes
 
 ### State Architecture (Post-Rewrite)
 
@@ -162,13 +172,52 @@ Replace Socket.io with SSE:
 
 **Client side:** Native `EventSource` API connects to the SSE endpoint. Zero library needed. The `StockChart` and `CryptoChart` components consume events and update the TradingView chart.
 
+**SSE reconnection handling:** Vercel Hobby caps serverless functions at 60 seconds (configurable up to 120s). The SSE stream will drop when the function times out. The native `EventSource` API auto-reconnects by default, but the client must:
+- Handle the `onerror` event gracefully (don't show an error to the user on expected reconnects)
+- Use `Last-Event-ID` header to resume from where it left off (the server includes an incrementing event ID)
+- Show a brief "reconnecting" indicator only if reconnection takes more than a few seconds
+- The gap between disconnect and reconnect is typically <1 second — users won't notice missed bars at the 1-minute timeframe level
+
 **Bundle impact:** Removes `socket.io-client` (~50KB) and `socket.io` (server). Net client bundle reduction: ~50KB.
+
+---
+
+## Deployment & Operations
+
+### Rollback Strategy
+
+**Incremental merges to main.** After each phase is verified working, merge `dev/revamp` into `main` so Vercel deploys it. This means:
+- `main` always has a working production deployment
+- If a phase breaks something, revert that single merge commit on `main`
+- Each phase is a self-contained set of changes that can be independently verified
+
+### Supabase Auto-Pause Prevention
+
+Supabase free tier pauses projects after 7 days of inactivity. To prevent this:
+- Set up a GitHub Actions cron job that pings the Supabase REST endpoint weekly (e.g., `GET /rest/v1/favorites?limit=1`)
+- Alternatively, the Vercel deployment itself keeps Supabase active if the app receives any traffic within 7 days
+
+### Environment Variable Switchover
+
+During the rewrite, both old and new env vars must coexist:
+- **Before Phase 3:** Add `GOOGLE_GENERATIVE_AI_API_KEY` to Vercel dashboard (same value as `GEMINI_API_KEY` — it's the same Google API key)
+- **During Phase 3:** Both `GEMINI_API_KEY` (used by old routes not yet migrated) and `GOOGLE_GENERATIVE_AI_API_KEY` (used by new Vercel AI SDK routes) are active
+- **After Phase 3 complete:** Remove `GEMINI_API_KEY` from Vercel dashboard, remove from `lib/env.ts` Zod schema
 
 ---
 
 ## Rewrite Plan — Priority Order
 
+### Important Constraints
+
+- **Do not touch `pages/` directory until Phase 4.** The Socket.io server at `pages/api/socket/index.ts` uses Pages Router. It must continue working through Phases 1-3. Phase 4 replaces it with SSE and deletes the entire `pages/` directory.
+- **The `@alpacahq/alpaca-trade-api` SDK stays.** Phase 4 only removes the WebSocket manager class (`lib/server/alpaca-server.ts`) and Socket.io transport. The Alpaca SDK is still needed for REST API calls (historical bars in `/api/alpaca`).
+- **Test after every phase.** Each phase ends with a verification checklist. Do not proceed to the next phase until all checks pass.
+
+---
+
 ### Phase 1: Foundation (No Feature Changes)
+
 1. **Switch npm → Bun** — `rm -rf node_modules package-lock.json && bun install`
 2. **Replace ESLint with Biome** — remove eslint config, add `biome.json`, run `biome check --fix`
 3. **Add Zod** — create `lib/env.ts` with validated env vars, add schemas to all API route inputs
@@ -178,34 +227,117 @@ Replace Socket.io with SSE:
 7. **Enable Biome in builds** — remove `ignoreDuringBuilds`, fix all lint errors
 8. **Add next-themes** — replace hardcoded `className="dark"` with proper theme provider and toggle
 
+**Verification:**
+- `bun run build` completes with zero TypeScript and zero lint errors
+- App loads in browser, dark/light theme toggle works
+- All existing features work identically (dashboard, search, company pages, charts, favorites, auth)
+- No `NEXT_PUBLIC_ALPACA_*` vars visible in client bundle (check with browser devtools → Sources)
+- `pages/api/socket/index.ts` still works — Socket.io real-time data still flows
+
+**Rollback:** `git revert` the Phase 1 merge commit on `main`. Restore `package-lock.json` and `node_modules` via `npm install`.
+
+---
+
 ### Phase 2: State & Data Fetching
+
 9. **Add TanStack Query** — create query client provider, convert all `useEffect` fetch patterns to `useQuery`/`useMutation`
 10. **Add Zustand** — replace `AuthContext` with `useAuthStore`, replace `FavoritesContext` with `useFavoritesStore`
 11. **Remove React Context providers** from layout (replaced by Zustand + TanStack Query)
+12. **Add React error boundaries** — wrap major sections (charts, financial tables, chat) with error boundaries and `<Suspense>` fallbacks with skeleton loading states
+
+**Verification:**
+- Auth flow works end-to-end: sign up, sign in (email + Google OAuth), sign out, session persistence
+- Favorites: add, remove, persist across page reloads, sync to Supabase
+- Stock data loads on company pages with loading skeletons visible during fetch
+- Dashboard populates with data (no waterfall fetches — check Network tab)
+- Error boundaries catch and display errors gracefully (test by temporarily breaking an API route)
+- Chart real-time data still works (`pages/api/socket` untouched)
+- No React Context providers remain in `app/layout.tsx`
+
+**Rollback:** `git revert` the Phase 2 merge commit. Context providers are restored, TanStack Query and Zustand removed.
+
+---
 
 ### Phase 3: AI Modernization
-12. **Add Vercel AI SDK + @ai-sdk/google** — `bun add ai @ai-sdk/google`
-13. **Rewrite `/api/context-chat`** → `/api/chat` using `streamText()` with Gemini 2.5 Pro + tool definitions
-14. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output + server-side in-memory cache (1h TTL, keyed by symbol+metric, shared across all users)
-15. **Rewrite `/api/reports/generate`** using `generateText()` with tools + `maxSteps` for multi-step autonomous research
-16. **Update chat frontend** — replace manual SSE parsing with `useChat()` from AI SDK
-17. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
+
+13. **Add `GOOGLE_GENERATIVE_AI_API_KEY` to Vercel dashboard** before deploying any Phase 3 changes (same value as existing `GEMINI_API_KEY`)
+14. **Add Vercel AI SDK + @ai-sdk/google** — `bun add ai @ai-sdk/google`
+15. **Create `metric_explanations` table in Supabase** — columns: `id`, `symbol`, `metric`, `explanation` (jsonb), `created_at` (timestamptz, default now()). Add unique constraint on (symbol, metric). Add index on created_at for TTL queries.
+16. **Rewrite `/api/context-chat`** → `/api/chat` using `streamText()` with Gemini 2.5 Pro + tool definitions
+17. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output + Supabase explanation cache (1h TTL)
+18. **Adapt `lib/prompts.ts` and `lib/system-prompts.ts`** — refactor prompt construction for Vercel AI SDK format (system prompt as separate parameter, tool descriptions as Zod schemas)
+19. **Rewrite `/api/reports/generate`** using `generateText()` with tools + `maxSteps` for multi-step autonomous research
+20. **Update chat frontend** — replace manual SSE parsing with `useChat()` from AI SDK
+21. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
+22. **Remove `GEMINI_API_KEY`** from `lib/env.ts` Zod schema and Vercel dashboard
+
+**Verification:**
+- Chat works: ask "What is Apple's P/E ratio?" — Gemini should call `getFinancialMetrics` tool, get data, synthesize answer
+- Multi-step: ask "Compare AAPL and MSFT" — Gemini should call tools multiple times
+- Explanations: hover over a metric, verify explanation loads. Check Supabase `metric_explanations` table — row should exist. Hover again — should be instant (cache hit, no Gemini call). Wait >1 hour or manually set `created_at` to 2 hours ago — next request should refresh the cache.
+- Reports: generate a report, verify it completes and saves to Supabase
+- `useChat()` streaming works — response appears word-by-word, not all at once
+- No references to `@google/generative-ai` remain in codebase (`grep -r "generative-ai"`)
+- `GEMINI_API_KEY` no longer in env validation or Vercel dashboard
+
+**Rollback:** `git revert` the Phase 3 merge commit. Re-add `GEMINI_API_KEY` to Vercel dashboard. The `metric_explanations` table can stay in Supabase (harmless).
+
+---
 
 ### Phase 4: Real-time Modernization
-18. **Create SSE endpoint** — `/api/stream/[symbol]/route.ts` that maintains Alpaca WS server-side, streams bars via SSE
-19. **Update StockChart.tsx** — replace socket.io-client with native `EventSource`
-20. **Update CryptoChart.tsx** — same SSE migration
-21. **Remove Socket.io** — `bun remove socket.io socket.io-client`, delete `lib/server/alpaca-server.ts`
+
+23. **Create SSE endpoint** — `/api/stream/[symbol]/route.ts` that maintains Alpaca WS server-side, streams bars via SSE with event IDs for reconnection
+24. **Add SSE reconnection logic to client** — handle `EventSource.onerror`, use `Last-Event-ID`, show reconnecting indicator only after 3+ seconds
+25. **Update StockChart.tsx** — replace socket.io-client with native `EventSource`
+26. **Update CryptoChart.tsx** — same SSE migration
+27. **Remove Socket.io** — `bun remove socket.io socket.io-client`
+28. **Delete `pages/` directory entirely** — removes Pages Router Socket.io handler and eliminates mixed router architecture
+29. **Delete `lib/server/alpaca-server.ts`** — WebSocket manager class no longer needed (SSE route handler manages Alpaca connection directly). The `@alpacahq/alpaca-trade-api` SDK stays for REST calls.
+
+**Verification:**
+- Open a stock chart — real-time bars should appear via SSE (check Network tab for `EventSource` connection to `/api/stream/[symbol]`)
+- Open a crypto chart — same SSE verification
+- Wait 60+ seconds — SSE should auto-reconnect without user-visible error
+- Check that no gap in data is visible after reconnection at 1-minute timeframe
+- `pages/` directory no longer exists
+- `socket.io` and `socket.io-client` no longer in `package.json`
+- `bun run build` succeeds
+- Client bundle size decreased (~50KB less — verify with `next build` output)
+
+**Rollback:** `git revert` the Phase 4 merge commit. Restore `pages/api/socket/index.ts`, `lib/server/alpaca-server.ts`, and Socket.io dependencies.
+
+---
 
 ### Phase 5: Testing
-22. **Add Vitest** — config, first tests on API route handlers and Zod schemas
-23. **Add Playwright** — config, E2E tests for auth flow, dashboard load, chart rendering, AI chat
-24. **Add test scripts** to package.json
+
+30. **Add Vitest** — config, first tests on API route handlers (mock Supabase/Alpaca/Gemini), test Zod schemas, test env validation
+31. **Add Playwright** — config, E2E tests for: auth flow (sign in, sign out, protected route redirect), dashboard load, company page with chart rendering, AI chat interaction, report generation
+32. **Add test scripts** to package.json: `bun test` (Vitest), `bun test:e2e` (Playwright)
+
+**Verification:**
+- `bun test` passes — all Vitest unit/integration tests green
+- `bun test:e2e` passes — all Playwright E2E tests green
+- Tests cover: auth, dashboard, search, company page, chart, chat, reports, favorites
+
+**Rollback:** `git revert` the Phase 5 merge commit. Tests are additive — removing them doesn't break the app.
+
+---
 
 ### Phase 6: Polish
-25. **Audit bundle size** — `next build` analysis, verify Socket.io is gone, check for unused deps
-26. **Performance** — add `loading.tsx` skeletons, optimize TanStack Query stale times
-27. **Final security audit** — verify no API keys in client bundle, all inputs validated
+
+33. **Audit bundle size** — `next build` analysis, verify Socket.io is gone, check for unused deps, remove any dead code
+34. **Performance** — add `loading.tsx` skeletons for all routes, optimize TanStack Query stale times, verify no waterfall fetches
+35. **Final security audit** — verify no API keys in client bundle, all inputs validated, no `any` types on API boundaries
+36. **Supabase keepalive** — add GitHub Actions workflow that pings Supabase weekly to prevent auto-pause
+
+**Verification:**
+- `next build` output shows bundle sizes — compare against pre-rewrite baseline
+- Lighthouse performance score on dashboard page
+- All API routes have Zod input validation
+- `grep -r "NEXT_PUBLIC_ALPACA"` returns zero results
+- GitHub Actions cron job configured and runs successfully
+
+**Rollback:** Phase 6 changes are non-breaking polish. Individual commits can be reverted independently.
 
 ---
 
@@ -213,11 +345,14 @@ Replace Socket.io with SSE:
 
 - `app/layout.tsx` — Root layout with AuthProvider > FavoritesProvider > ConditionalLayout
 - `middleware.ts` — Supabase auth, protects /dashboard, /company, /search
-- `lib/server/alpaca-server.ts` — Server-side Alpaca WebSocket manager (to be replaced by SSE route)
-- `lib/ai/geminiClient.ts` — Gemini API wrapper (to be replaced by Vercel AI SDK)
-- `lib/context/AuthContext.tsx` — Auth state provider (to be replaced by Zustand)
-- `lib/context/FavoritesContext.tsx` — Favorites CRUD (to be replaced by Zustand + TanStack Query)
-- `components/StockChart.tsx` / `CryptoChart.tsx` — TradingView charts with socket.io (to use SSE)
+- `pages/api/socket/index.ts` — Pages Router Socket.io handler (to be deleted in Phase 4)
+- `lib/server/alpaca-server.ts` — Server-side Alpaca WebSocket manager (to be replaced by SSE route in Phase 4)
+- `lib/ai/geminiClient.ts` — Gemini API wrapper (to be replaced by Vercel AI SDK in Phase 3)
+- `lib/prompts.ts` — Prompt construction for batch explain (to be adapted for AI SDK format in Phase 3)
+- `lib/system-prompts.ts` — System prompts for AI (to be adapted for AI SDK format in Phase 3)
+- `lib/context/AuthContext.tsx` — Auth state provider (to be replaced by Zustand in Phase 2)
+- `lib/context/FavoritesContext.tsx` — Favorites CRUD (to be replaced by Zustand + TanStack Query in Phase 2)
+- `components/StockChart.tsx` / `CryptoChart.tsx` — TradingView charts with socket.io (to use SSE in Phase 4)
 
 ## Environment Variables
 
@@ -236,8 +371,15 @@ Replace Socket.io with SSE:
 
 ## Database Tables (Supabase)
 
+### Existing
 - `favorites` (user_id, symbol, created_at)
 - `reports` (id, user_id, symbol, company_name, status, report_content, summary, created_at)
+
+### New (Phase 3)
+- `metric_explanations` (id, symbol, metric, explanation jsonb, created_at timestamptz)
+  - Unique constraint on (symbol, metric) — upsert on cache refresh
+  - Index on created_at for TTL-based cache expiry queries
+  - Rows older than 1 hour are treated as stale and refreshed on next request
 
 ## Portfolio Writeup Talking Points
 
@@ -245,11 +387,12 @@ Key architectural decisions to highlight in a project writeup:
 
 1. **Agentic AI architecture** — Gemini autonomously calls financial data tools during conversation rather than relying on pre-packed context, demonstrating multi-step tool use with the Vercel AI SDK
 2. **Model routing** — Flash for cheap/fast explanations, Pro for complex reasoning, showing cost-optimization awareness
-3. **SSE over Socket.io** — chose SSE for unidirectional server-to-client streaming, reducing client bundle by ~50KB and matching the data flow semantics (no bidirectional communication needed)
+3. **SSE over Socket.io** — chose SSE for unidirectional server-to-client streaming, reducing client bundle by ~50KB and matching the data flow semantics (no bidirectional communication needed). Includes auto-reconnection with Last-Event-ID for Vercel's 60s function timeout.
 4. **Zustand + TanStack Query** — separated client state (Zustand) from server state (TanStack Query) for proper cache management, optimistic updates, and elimination of waterfall fetches
-5. **Zod validation at system boundaries** — all API inputs, environment variables, and external API responses validated with Zod, generating TypeScript types from schemas (single source of truth)
-6. **Biome over ESLint** — 100x faster linting and formatting in a single tool, demonstrating awareness of modern Rust-based JS tooling
-7. **Provider abstraction** — Vercel AI SDK enables switching between Gemini, Claude, and GPT with a one-line change, showing provider-agnostic design
-8. **Bun runtime** — 10-25x faster installs than npm, native TypeScript execution, modern JavaScript runtime showcasing awareness of next-generation tooling
-9. **Server-side AI response caching** — metric explanations cached in-memory with 1h TTL so all users benefit from previous Gemini calls, reducing API costs and latency for common queries
+5. **Two-layer AI response caching** — Supabase table as persistent cross-user cache (1h TTL) + TanStack Query as client-side per-user cache with stale-while-revalidate. Reduces Gemini API costs to near-zero for common queries.
+6. **Zod validation at system boundaries** — all API inputs, environment variables, and external API responses validated with Zod, generating TypeScript types from schemas (single source of truth)
+7. **Biome over ESLint** — 100x faster linting and formatting in a single tool, demonstrating awareness of modern Rust-based JS tooling
+8. **Provider abstraction** — Vercel AI SDK enables switching between Gemini, Claude, and GPT with a one-line change, showing provider-agnostic design
+9. **Bun runtime** — 10-25x faster installs than npm, native TypeScript execution, modern JavaScript runtime showcasing awareness of next-generation tooling
 10. **Security hardening** — moved API keys server-side, enabled strict TypeScript builds, added input validation (contrast with the pre-rewrite state)
+11. **Fully serverless architecture** — zero always-on compute. Vercel serverless functions, Supabase managed database, Gemini API pay-per-token. $0/month infrastructure cost.
