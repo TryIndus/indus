@@ -20,6 +20,7 @@ import {
 	TrendingUp,
 	User,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import type React from "react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -76,7 +77,7 @@ const settingSections: SettingSection[] = [
 export default function Settings() {
 	const [activeSection, setActiveSection] = useState("profile");
 	const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
-	const [theme, setTheme] = useState("dark");
+	const { theme, setTheme } = useTheme();
 	const [currency, setCurrency] = useState("USD");
 
 	const renderSectionContent = () => {

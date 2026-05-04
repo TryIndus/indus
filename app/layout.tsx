@@ -5,6 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
 import { ConditionalLayout } from "@/components/ConditionalLayout";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/lib/context/AuthContext";
 import { FavoritesProvider } from "@/lib/context/FavoritesContext";
 
@@ -53,15 +54,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	const defaultOpen = cookieStore.get("sidebar_state")?.value === "true";
 
 	return (
-		<html lang="en" className="dark">
+		<html lang="en" suppressHydrationWarning>
 			<body
-				className={`${geistSans.variable} ${geistMono.variable} text-white antialiased overflow-x-hidden`}
+				className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
 			>
-				<AuthProvider>
-					<FavoritesProvider>
-						<ConditionalLayout defaultOpen={defaultOpen}>{children}</ConditionalLayout>
-					</FavoritesProvider>
-				</AuthProvider>
+				<ThemeProvider>
+					<AuthProvider>
+						<FavoritesProvider>
+							<ConditionalLayout defaultOpen={defaultOpen}>
+								{children}
+							</ConditionalLayout>
+						</FavoritesProvider>
+					</AuthProvider>
+				</ThemeProvider>
 			</body>
 		</html>
 	);
