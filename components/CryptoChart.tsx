@@ -43,10 +43,11 @@ const sliderStyles = `
 	}
 `;
 
-interface CryptoChartProps {
+export interface CryptoChartProps {
 	symbol: string;
 	height?: number;
 	className?: string;
+	showControls?: boolean;
 }
 
 export default function CryptoChart({ symbol: initialSymbol, height = 500, className = "" }: CryptoChartProps) {

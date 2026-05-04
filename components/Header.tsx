@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 
 export function Header() {
   const pathname = usePathname();
-  const segments = pathname.split("/").filter(Boolean);
+  const segments = (pathname ?? "").split("/").filter(Boolean);
 
   const current =
     segments.length > 0

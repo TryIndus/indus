@@ -43,10 +43,11 @@ const sliderStyles = `
 	}
 `;
 
-interface StockChartProps {
+export interface StockChartProps {
 	symbol: string;
 	height?: number;
 	className?: string;
+	showControls?: boolean;
 }
 
 export default function StockChart({ symbol: initialSymbol, height = 500, className = "" }: StockChartProps) {
