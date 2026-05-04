@@ -351,20 +351,60 @@ During the rewrite, both old and new env vars must coexist:
 
 ---
 
-### Phase 5: Testing
+### Phase 5: Testing & CI/CD
+
+**Testing:**
 
 30. **Add Vitest** — config, first tests on API route handlers (mock Supabase/Alpaca/Gemini), test Zod schemas, test env validation
 31. **Add Playwright** — config, E2E tests for: auth flow (sign in, sign out, protected route redirect), dashboard load, company page with chart rendering, AI chat interaction, report generation
 32. **Add test scripts** to package.json: `bun test` (Vitest), `bun test:e2e` (Playwright)
 
-**Commits (one per sub-step):** ~6-10 commits. Vitest config is one commit. Each test file or test suite is its own commit. Playwright config is one commit. Each E2E test is its own commit.
+**CI/CD Pipeline (GitHub Actions):**
+
+33. **CI workflow** (`.github/workflows/ci.yml`) — runs on every push to `dev/revamp` and on PRs to `main`:
+    - Biome lint check (`biome check`)
+    - TypeScript type check (`tsc --noEmit`)
+    - Vitest unit/integration tests (`bun test`)
+    - Build verification (`next build`)
+34. **E2E workflow** (`.github/workflows/e2e.yml`) — runs on PRs to `main`:
+    - Waits for Vercel preview deployment to complete (uses `vercel-preview-url` action)
+    - Runs Playwright against the Vercel preview URL
+    - Reports pass/fail on the PR
+35. **Bundle size tracking** (`.github/workflows/ci.yml`) — added as a step in the CI workflow:
+    - Runs `next build` and extracts bundle sizes from the build output
+    - Comments on PR with bundle size diff vs `main` (uses `actions/github-script` to post the comment)
+36. **Lighthouse CI** (`.github/workflows/lighthouse.yml`) — runs on PRs to `main`:
+    - Runs Lighthouse against the Vercel preview URL
+    - Enforces thresholds: Performance > 90, Accessibility > 95, Best Practices > 90
+    - Comments results on the PR
+37. **Renovate config** (`renovate.json`) — automated dependency update PRs:
+    - Groups minor/patch updates into a single weekly PR
+    - Pins major versions (requires manual review)
+    - Auto-merges devDependency patches if CI passes
+
+**Branch Protection (requires manual setup by user):**
+
+38. **Configure branch protection rules on `main`** via GitHub Settings → Branches → Add rule:
+    - Require status checks to pass (CI workflow)
+    - Require branch to be up to date before merging
+    - Require at least 1 approval on PRs (even self-approval — shows the pattern)
+
+**What requires manual action by the user:**
+- Step 34 (E2E workflow): Vercel automatically provides preview URLs on PRs, but if the repo is **private**, you need to add `VERCEL_TOKEN` as a GitHub Actions secret (Settings → Secrets → Actions → New secret). Get the token from https://vercel.com/account/tokens. If the repo is **public**, the preview URL is available without a token.
+- Step 38 (Branch protection): Must be done manually in GitHub UI — cannot be configured via code. Go to repo Settings → Branches → Add branch protection rule for `main`.
+- Everything else (steps 30-37) is fully code-based — I create the config files and workflow YAML, no manual setup needed.
+
+**Commits (one per sub-step):** ~12-18 commits. Vitest config is one commit. Each test suite is its own commit. Playwright config is one commit. Each E2E test is its own commit. Each CI/CD workflow file is its own commit. Renovate config is one commit.
 
 **Verification:**
 - `bun test` passes — all Vitest unit/integration tests green
-- `bun test:e2e` passes — all Playwright E2E tests green
+- `bun test:e2e` passes — all Playwright E2E tests green locally
 - Tests cover: auth, dashboard, search, company page, chart, chat, reports, favorites
+- Push to `dev/revamp` triggers CI workflow — all checks green in GitHub Actions
+- Open a test PR to `main` — CI runs, bundle size comment appears, Lighthouse scores reported
+- Renovate creates its onboarding PR (will appear automatically after `renovate.json` is pushed)
 
-**Rollback:** Revert individual commits. Tests are additive — removing them doesn't break the app.
+**Rollback:** Revert individual commits. Tests and CI configs are additive — removing them doesn't break the app.
 
 ---
 
@@ -444,3 +484,4 @@ Key architectural decisions to highlight in a project writeup:
 9. **Bun runtime** — 10-25x faster installs than npm, native TypeScript execution, modern JavaScript runtime showcasing awareness of next-generation tooling
 10. **Security hardening** — moved API keys server-side, enabled strict TypeScript builds, added input validation (contrast with the pre-rewrite state)
 11. **Fully serverless architecture** — zero always-on compute. Vercel serverless functions + cron, Supabase managed database, Gemini API pay-per-token. $0/month infrastructure cost.
+12. **CI/CD pipeline** — GitHub Actions runs lint, type check, unit tests, and build on every push. PRs get bundle size diff comments, Lighthouse performance scores, and Playwright E2E tests against Vercel preview deployments. Branch protection enforces all checks pass before merge. Renovate keeps dependencies current with automated PRs.
