@@ -50,7 +50,7 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 |---|---|---|
 | **Deployment** | Vercel Hobby | Best-in-class Next.js DX, free tier covers portfolio use, SSE supported up to 120s |
 | **Framework** | Next.js 15 (App Router) + React 19 | Already modern — clean up usage, properly leverage RSC and Server Actions |
-| **Database & Auth** | Supabase (stay) | Already integrated, auth + realtime + PostgreSQL in one. Keep project active to avoid 7-day pause. |
+| **Database & Auth** | Supabase (stay) | Already integrated, auth + realtime + PostgreSQL in one. Keep project active via Vercel cron. |
 | **AI Provider** | Vercel AI SDK v6 + `@ai-sdk/google` (Gemini) | Replaces manual streaming with `useChat()`/`streamText()`, enables agentic tool use, provider-swappable |
 | **AI Models** | Gemini 2.5 Flash (explanations), Gemini 2.5 Pro (chat + reports) | Cost-optimized: Flash for fast/cheap single-turn, Pro for reasoning-heavy multi-turn and long-form |
 | **State Management** | Zustand (client state) + TanStack Query (server/async state) | Eliminates Context re-render issues, replaces all manual fetch patterns with caching/revalidation |
@@ -117,6 +117,7 @@ User Browser
 | `/api/alpaca` | POST | Historical candlestick bars | — |
 | `/api/stream/[symbol]` | GET | SSE real-time price stream | — |
 | `/api/metric-definition` | GET | Static metric definitions | — |
+| `/api/cron/keepalive` | GET | Vercel cron — pings Supabase to prevent auto-pause | — |
 
 ### AI Agent Architecture
 
@@ -184,18 +185,50 @@ Replace Socket.io with SSE:
 
 ## Deployment & Operations
 
+### Branch & Merge Strategy
+
+**All work happens on `dev/revamp`.** Do not merge to `main` until all 6 phases are complete and verified. The user will create the final PR to merge `dev/revamp` into `main` when ready.
+
+- `main` remains the stable production deployment throughout the rewrite
+- `dev/revamp` is the working branch — all phase commits land here
+- If something needs to be hotfixed on production during the rewrite, fix it on `main` directly and cherry-pick to `dev/revamp`
+
+### Commit Strategy
+
+**Small, incremental commits.** Each sub-step within a phase gets its own commit. Do not batch an entire phase into a single commit. Examples of good commit granularity:
+
+- Phase 1: "Switch from npm to Bun" → one commit. "Add Biome config and remove ESLint" → one commit. "Fix all Biome lint errors" → one commit. "Add Zod env validation" → one commit. Etc.
+- Phase 2: "Add TanStack Query provider and first useQuery hook" → one commit. "Migrate stock-data fetching to useQuery" → one commit. "Replace AuthContext with Zustand useAuthStore" → one commit. Etc.
+
+This makes `git bisect` possible if something breaks, and keeps the git history readable.
+
 ### Rollback Strategy
 
-**Incremental merges to main.** After each phase is verified working, merge `dev/revamp` into `main` so Vercel deploys it. This means:
-- `main` always has a working production deployment
-- If a phase breaks something, revert that single merge commit on `main`
-- Each phase is a self-contained set of changes that can be independently verified
+Since we don't merge to `main` until the end, rollback within `dev/revamp` is straightforward:
+- Each phase is a series of small commits — revert individual commits if a specific change breaks something
+- If an entire phase needs undoing: `git revert` the range of commits for that phase
+- `main` is never at risk during the rewrite
 
 ### Supabase Auto-Pause Prevention
 
-Supabase free tier pauses projects after 7 days of inactivity. To prevent this:
-- Set up a GitHub Actions cron job that pings the Supabase REST endpoint weekly (e.g., `GET /rest/v1/favorites?limit=1`)
-- Alternatively, the Vercel deployment itself keeps Supabase active if the app receives any traffic within 7 days
+Supabase free tier pauses projects after 7 days of inactivity. Solution: **Vercel Cron Job** (no external services needed).
+
+- Add a `vercel.json` with a cron definition that runs daily
+- The cron calls `/api/cron/keepalive` — a simple route handler that does `SELECT 1` from Supabase
+- Vercel Hobby allows 1 cron job, max once per day — more than enough
+- This keeps Supabase active with zero external infrastructure
+
+```json
+// vercel.json
+{
+  "crons": [
+    {
+      "path": "/api/cron/keepalive",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}
+```
 
 ### Environment Variable Switchover
 
@@ -212,6 +245,8 @@ During the rewrite, both old and new env vars must coexist:
 
 - **Do not touch `pages/` directory until Phase 4.** The Socket.io server at `pages/api/socket/index.ts` uses Pages Router. It must continue working through Phases 1-3. Phase 4 replaces it with SSE and deletes the entire `pages/` directory.
 - **The `@alpacahq/alpaca-trade-api` SDK stays.** Phase 4 only removes the WebSocket manager class (`lib/server/alpaca-server.ts`) and Socket.io transport. The Alpaca SDK is still needed for REST API calls (historical bars in `/api/alpaca`).
+- **Do not merge to `main`.** All work stays on `dev/revamp`. The user will create the PR when all phases are complete.
+- **Small, incremental commits.** Each sub-step gets its own commit. Never batch an entire phase into one commit.
 - **Test after every phase.** Each phase ends with a verification checklist. Do not proceed to the next phase until all checks pass.
 
 ---
@@ -227,6 +262,8 @@ During the rewrite, both old and new env vars must coexist:
 7. **Enable Biome in builds** — remove `ignoreDuringBuilds`, fix all lint errors
 8. **Add next-themes** — replace hardcoded `className="dark"` with proper theme provider and toggle
 
+**Commits (one per sub-step):** ~8-12 commits. Each numbered step above is at least one commit. Steps that require many file changes (e.g., "fix all type errors") may be split into multiple commits by file group.
+
 **Verification:**
 - `bun run build` completes with zero TypeScript and zero lint errors
 - App loads in browser, dark/light theme toggle works
@@ -234,7 +271,7 @@ During the rewrite, both old and new env vars must coexist:
 - No `NEXT_PUBLIC_ALPACA_*` vars visible in client bundle (check with browser devtools → Sources)
 - `pages/api/socket/index.ts` still works — Socket.io real-time data still flows
 
-**Rollback:** `git revert` the Phase 1 merge commit on `main`. Restore `package-lock.json` and `node_modules` via `npm install`.
+**Rollback:** Revert individual commits within `dev/revamp`. If the whole phase needs undoing, revert the commit range.
 
 ---
 
@@ -245,6 +282,8 @@ During the rewrite, both old and new env vars must coexist:
 11. **Remove React Context providers** from layout (replaced by Zustand + TanStack Query)
 12. **Add React error boundaries** — wrap major sections (charts, financial tables, chat) with error boundaries and `<Suspense>` fallbacks with skeleton loading states
 
+**Commits (one per sub-step):** ~8-15 commits. Step 9 alone should be multiple commits — one per component/page migrated to `useQuery`. Step 10 should be one commit per Context replaced. Step 12 should be one commit per error boundary added.
+
 **Verification:**
 - Auth flow works end-to-end: sign up, sign in (email + Google OAuth), sign out, session persistence
 - Favorites: add, remove, persist across page reloads, sync to Supabase
@@ -254,7 +293,7 @@ During the rewrite, both old and new env vars must coexist:
 - Chart real-time data still works (`pages/api/socket` untouched)
 - No React Context providers remain in `app/layout.tsx`
 
-**Rollback:** `git revert` the Phase 2 merge commit. Context providers are restored, TanStack Query and Zustand removed.
+**Rollback:** Revert individual commits. Context providers and manual fetch patterns are preserved in git history.
 
 ---
 
@@ -271,6 +310,8 @@ During the rewrite, both old and new env vars must coexist:
 21. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
 22. **Remove `GEMINI_API_KEY`** from `lib/env.ts` Zod schema and Vercel dashboard
 
+**Commits (one per sub-step):** ~10-15 commits. Each route rewrite is its own commit. Tool definitions get their own commit. Frontend `useChat()` migration is its own commit. Cleanup/removal is its own commit.
+
 **Verification:**
 - Chat works: ask "What is Apple's P/E ratio?" — Gemini should call `getFinancialMetrics` tool, get data, synthesize answer
 - Multi-step: ask "Compare AAPL and MSFT" — Gemini should call tools multiple times
@@ -280,7 +321,7 @@ During the rewrite, both old and new env vars must coexist:
 - No references to `@google/generative-ai` remain in codebase (`grep -r "generative-ai"`)
 - `GEMINI_API_KEY` no longer in env validation or Vercel dashboard
 
-**Rollback:** `git revert` the Phase 3 merge commit. Re-add `GEMINI_API_KEY` to Vercel dashboard. The `metric_explanations` table can stay in Supabase (harmless).
+**Rollback:** Revert individual commits. If rolling back the entire phase, re-add `GEMINI_API_KEY` to Vercel dashboard. The `metric_explanations` table can stay in Supabase (harmless).
 
 ---
 
@@ -294,6 +335,8 @@ During the rewrite, both old and new env vars must coexist:
 28. **Delete `pages/` directory entirely** — removes Pages Router Socket.io handler and eliminates mixed router architecture
 29. **Delete `lib/server/alpaca-server.ts`** — WebSocket manager class no longer needed (SSE route handler manages Alpaca connection directly). The `@alpacahq/alpaca-trade-api` SDK stays for REST calls.
 
+**Commits (one per sub-step):** ~7-10 commits. SSE endpoint is one commit. Each chart component migration is one commit. Socket.io removal is one commit. `pages/` deletion is one commit.
+
 **Verification:**
 - Open a stock chart — real-time bars should appear via SSE (check Network tab for `EventSource` connection to `/api/stream/[symbol]`)
 - Open a crypto chart — same SSE verification
@@ -304,7 +347,7 @@ During the rewrite, both old and new env vars must coexist:
 - `bun run build` succeeds
 - Client bundle size decreased (~50KB less — verify with `next build` output)
 
-**Rollback:** `git revert` the Phase 4 merge commit. Restore `pages/api/socket/index.ts`, `lib/server/alpaca-server.ts`, and Socket.io dependencies.
+**Rollback:** Revert individual commits. If rolling back the entire phase, restore `pages/api/socket/index.ts`, `lib/server/alpaca-server.ts`, and Socket.io dependencies from git history.
 
 ---
 
@@ -314,12 +357,14 @@ During the rewrite, both old and new env vars must coexist:
 31. **Add Playwright** — config, E2E tests for: auth flow (sign in, sign out, protected route redirect), dashboard load, company page with chart rendering, AI chat interaction, report generation
 32. **Add test scripts** to package.json: `bun test` (Vitest), `bun test:e2e` (Playwright)
 
+**Commits (one per sub-step):** ~6-10 commits. Vitest config is one commit. Each test file or test suite is its own commit. Playwright config is one commit. Each E2E test is its own commit.
+
 **Verification:**
 - `bun test` passes — all Vitest unit/integration tests green
 - `bun test:e2e` passes — all Playwright E2E tests green
 - Tests cover: auth, dashboard, search, company page, chart, chat, reports, favorites
 
-**Rollback:** `git revert` the Phase 5 merge commit. Tests are additive — removing them doesn't break the app.
+**Rollback:** Revert individual commits. Tests are additive — removing them doesn't break the app.
 
 ---
 
@@ -328,14 +373,17 @@ During the rewrite, both old and new env vars must coexist:
 33. **Audit bundle size** — `next build` analysis, verify Socket.io is gone, check for unused deps, remove any dead code
 34. **Performance** — add `loading.tsx` skeletons for all routes, optimize TanStack Query stale times, verify no waterfall fetches
 35. **Final security audit** — verify no API keys in client bundle, all inputs validated, no `any` types on API boundaries
-36. **Supabase keepalive** — add GitHub Actions workflow that pings Supabase weekly to prevent auto-pause
+36. **Supabase keepalive** — add Vercel cron job (`vercel.json` + `/api/cron/keepalive` route) that pings Supabase daily to prevent 7-day auto-pause
+
+**Commits (one per sub-step):** ~5-8 commits. Each audit finding/fix is its own commit. Vercel cron setup is one commit. Loading skeletons are one commit per route.
 
 **Verification:**
 - `next build` output shows bundle sizes — compare against pre-rewrite baseline
 - Lighthouse performance score on dashboard page
 - All API routes have Zod input validation
 - `grep -r "NEXT_PUBLIC_ALPACA"` returns zero results
-- GitHub Actions cron job configured and runs successfully
+- Vercel cron job configured in `vercel.json` and `/api/cron/keepalive` route exists
+- Deploy to Vercel preview branch to test cron execution
 
 **Rollback:** Phase 6 changes are non-breaking polish. Individual commits can be reverted independently.
 
@@ -395,4 +443,4 @@ Key architectural decisions to highlight in a project writeup:
 8. **Provider abstraction** — Vercel AI SDK enables switching between Gemini, Claude, and GPT with a one-line change, showing provider-agnostic design
 9. **Bun runtime** — 10-25x faster installs than npm, native TypeScript execution, modern JavaScript runtime showcasing awareness of next-generation tooling
 10. **Security hardening** — moved API keys server-side, enabled strict TypeScript builds, added input validation (contrast with the pre-rewrite state)
-11. **Fully serverless architecture** — zero always-on compute. Vercel serverless functions, Supabase managed database, Gemini API pay-per-token. $0/month infrastructure cost.
+11. **Fully serverless architecture** — zero always-on compute. Vercel serverless functions + cron, Supabase managed database, Gemini API pay-per-token. $0/month infrastructure cost.
