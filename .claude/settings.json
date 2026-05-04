@@ -1,13 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm install *)",
-      "Bash(pnpm add *)",
-      "Bash(pnpm remove *)",
-      "Bash(pnpm run *)",
-      "Bash(pnpm check *)",
-      "Bash(pnpm test *)",
-      "Bash(pnpm exec *)",
+      "Bash(bun install *)",
+      "Bash(bun add *)",
+      "Bash(bun remove *)",
+      "Bash(bun run *)",
+      "Bash(bun check *)",
+      "Bash(bun test *)",
+      "Bash(bun exec *)",
+      "Bash(bun x *)",
+      "Bash(bunx *)",
       "Bash(npx biome *)",
       "Bash(npx next *)",
       "Bash(npx vitest *)",

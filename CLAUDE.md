@@ -46,8 +46,8 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 | **Deployment** | Vercel Hobby | Best-in-class Next.js DX, free tier covers portfolio use, SSE supported up to 120s |
 | **Framework** | Next.js 15 (App Router) + React 19 | Already modern — clean up usage, properly leverage RSC and Server Actions |
 | **Database & Auth** | Supabase (stay) | Already integrated, auth + realtime + PostgreSQL in one. Keep project active to avoid 7-day pause. |
-| **AI Provider** | Vercel AI SDK v6 + `@ai-sdk/anthropic` (Claude) | Replaces manual streaming with `useChat()`/`streamText()`, enables agentic tool use, provider-swappable |
-| **AI Models** | Claude Haiku 4.5 (explanations), Claude Sonnet 4.6 (chat + reports) | Cost-optimized: Haiku for fast/cheap single-turn, Sonnet for reasoning-heavy multi-turn and long-form |
+| **AI Provider** | Vercel AI SDK v6 + `@ai-sdk/google` (Gemini) | Replaces manual streaming with `useChat()`/`streamText()`, enables agentic tool use, provider-swappable |
+| **AI Models** | Gemini 2.5 Flash (explanations), Gemini 2.5 Pro (chat + reports) | Cost-optimized: Flash for fast/cheap single-turn, Pro for reasoning-heavy multi-turn and long-form |
 | **State Management** | Zustand (client state) + TanStack Query (server/async state) | Eliminates Context re-render issues, replaces all manual fetch patterns with caching/revalidation |
 | **Real-time** | SSE via Next.js Route Handlers (replace Socket.io) | Unidirectional flow = SSE is the right primitive. Zero client library. Saves ~50KB bundle. |
 | **Validation** | Zod | Runtime validation + TypeScript type inference on all API boundaries, env vars, external API responses |
@@ -55,18 +55,18 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 | **Linting/Formatting** | Biome (replaces ESLint + Prettier) | Single tool, 10-100x faster, zero config |
 | **Charts** | TradingView Lightweight Charts v5 (keep) | Purpose-built for OHLCV candlestick data, ~40KB, no better alternative |
 | **Styling** | Tailwind CSS v4 + shadcn/ui + Lucide (keep) + add next-themes | Already best-practice. Add next-themes for proper dark/light toggle instead of hardcoded dark. |
-| **Package Manager** | pnpm (replace npm) | 3x faster installs, strict dependency resolution, disk-efficient |
+| **Package Manager / Runtime** | Bun (replace npm) | 10-25x faster installs, native TypeScript execution, built-in test runner, drop-in Node.js compatible |
 | **Date utils** | date-fns v4 (keep) | Already modern, tree-shakeable |
 | **Financial Data** | Alpaca + Yahoo Finance 2 (keep) | Working data sources, no reason to change |
 
 ### Full Target Stack Summary
 
 ```
-Runtime & Tooling:    Node.js + pnpm + Biome
+Runtime & Tooling:    Bun + Biome
 Framework:            Next.js 15 (App Router) + React 19 + TypeScript 5
 Styling:              Tailwind CSS v4 + shadcn/ui (Radix) + Lucide + next-themes
 Auth & DB:            Supabase (PostgreSQL + Auth + Realtime)
-AI:                   Vercel AI SDK v6 + Claude Sonnet 4.6 / Haiku 4.5
+AI:                   Vercel AI SDK v6 + Gemini 2.5 Pro / Flash
 State:                Zustand (client) + TanStack Query (server)
 Real-time:            SSE (server-maintained Alpaca WS → SSE to client)
 Validation:           Zod (API inputs, env vars, external responses)
@@ -84,7 +84,7 @@ Deployment:           Vercel Hobby (free tier)
 
 ```
 User Browser
-  ├── useChat() (Vercel AI SDK) ──→ /api/chat ──→ Claude Sonnet 4.6
+  ├── useChat() (Vercel AI SDK) ──→ /api/chat ──→ Gemini 2.5 Pro
   │                                                   ├── tool: getStockPrice (Alpaca)
   │                                                   ├── tool: getFinancialMetrics (Yahoo)
   │                                                   ├── tool: compareCompanies
@@ -103,9 +103,9 @@ User Browser
 
 | Route | Method | Purpose | AI Model |
 |---|---|---|---|
-| `/api/chat` | POST | Agentic financial chat with tool use | Sonnet 4.6 via `streamText()` |
-| `/api/explain` | POST | Batch metric explanations | Haiku 4.5 via `generateText()` |
-| `/api/reports/generate` | POST | Multi-step research report generation | Sonnet 4.6 via `generateText()` + tools + `maxSteps` |
+| `/api/chat` | POST | Agentic financial chat with tool use | Gemini 2.5 Pro via `streamText()` |
+| `/api/explain` | POST | Batch metric explanations | Gemini 2.5 Flash via `generateText()` |
+| `/api/reports/generate` | POST | Multi-step research report generation | Gemini 2.5 Pro via `generateText()` + tools + `maxSteps` |
 | `/api/reports` | GET | List user reports | — |
 | `/api/reports/[id]` | GET/DELETE | Get or delete a report | — |
 | `/api/stock-data` | GET | Financial metrics from Yahoo Finance | — |
@@ -115,7 +115,7 @@ User Browser
 
 ### AI Agent Architecture
 
-The AI chat becomes an agentic system where Claude autonomously decides which tools to call:
+The AI chat becomes an agentic system where Gemini autonomously decides which tools to call:
 
 **Tools defined with Zod schemas:**
 - `getStockPrice` — fetches real-time price/volume from Alpaca
@@ -124,12 +124,12 @@ The AI chat becomes an agentic system where Claude autonomously decides which to
 - `searchNews` — searches recent financial news (future: add news API)
 - `getMetricDefinition` — looks up metric definitions from the static definitions file
 
-**Agent loop:** `streamText({ model, tools, maxSteps: 5 })` — Claude calls tools, gets results, reasons, calls more tools if needed, then synthesizes a final response. This replaces the current pattern of pre-packing all context into the prompt.
+**Agent loop:** `streamText({ model, tools, maxSteps: 5 })` — Gemini calls tools, gets results, reasons, calls more tools if needed, then synthesizes a final response. This replaces the current pattern of pre-packing all context into the prompt.
 
 **Model routing:**
-- User asks a quick question about a metric → Haiku 4.5 (fast, cheap, $1/$5 per 1M tokens)
-- User has a multi-turn conversation about a stock → Sonnet 4.6 (stronger reasoning, $3/$15 per 1M tokens)
-- Generate a research report → Sonnet 4.6 with tools and maxSteps (autonomous multi-step research)
+- User asks a quick question about a metric → Gemini 2.5 Flash (fast, cheap)
+- User has a multi-turn conversation about a stock → Gemini 2.5 Pro (stronger reasoning, larger context)
+- Generate a research report → Gemini 2.5 Pro with tools and maxSteps (autonomous multi-step research)
 
 ### State Architecture (Post-Rewrite)
 
@@ -159,7 +159,7 @@ Replace Socket.io with SSE:
 ## Rewrite Plan — Priority Order
 
 ### Phase 1: Foundation (No Feature Changes)
-1. **Switch npm → pnpm** — `rm -rf node_modules package-lock.json && pnpm import && pnpm install`
+1. **Switch npm → Bun** — `rm -rf node_modules package-lock.json && bun install`
 2. **Replace ESLint with Biome** — remove eslint config, add `biome.json`, run `biome check --fix`
 3. **Add Zod** — create `lib/env.ts` with validated env vars, add schemas to all API route inputs
 4. **Fix security: move Alpaca keys server-side** — remove `NEXT_PUBLIC_` prefix, all Alpaca calls already go through API routes
@@ -174,18 +174,18 @@ Replace Socket.io with SSE:
 11. **Remove React Context providers** from layout (replaced by Zustand + TanStack Query)
 
 ### Phase 3: AI Modernization
-12. **Add Vercel AI SDK + @ai-sdk/anthropic** — `pnpm add ai @ai-sdk/anthropic`
-13. **Rewrite `/api/context-chat`** → `/api/chat` using `streamText()` with Claude Sonnet 4.6 + tool definitions
-14. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Claude Haiku 4.5 + Zod structured output
+12. **Add Vercel AI SDK + @ai-sdk/google** — `bun add ai @ai-sdk/google`
+13. **Rewrite `/api/context-chat`** → `/api/chat` using `streamText()` with Gemini 2.5 Pro + tool definitions
+14. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output
 15. **Rewrite `/api/reports/generate`** using `generateText()` with tools + `maxSteps` for multi-step autonomous research
 16. **Update chat frontend** — replace manual SSE parsing with `useChat()` from AI SDK
-17. **Remove `@google/generative-ai`** and `lib/ai/geminiClient.ts`
+17. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
 
 ### Phase 4: Real-time Modernization
 18. **Create SSE endpoint** — `/api/stream/[symbol]/route.ts` that maintains Alpaca WS server-side, streams bars via SSE
 19. **Update StockChart.tsx** — replace socket.io-client with native `EventSource`
 20. **Update CryptoChart.tsx** — same SSE migration
-21. **Remove Socket.io** — `pnpm remove socket.io socket.io-client`, delete `lib/server/alpaca-server.ts`
+21. **Remove Socket.io** — `bun remove socket.io socket.io-client`, delete `lib/server/alpaca-server.ts`
 
 ### Phase 5: Testing
 22. **Add Vitest** — config, first tests on API route handlers and Zod schemas
@@ -220,7 +220,7 @@ Replace Socket.io with SSE:
 ### Post-Rewrite
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public — required by Supabase client)
 - `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_IS_PAPER` (server-only — fixed)
-- `ANTHROPIC_API_KEY` (server-only — replaces GEMINI_API_KEY)
+- `GOOGLE_GENERATIVE_AI_API_KEY` (server-only — same Gemini API key, now used via Vercel AI SDK)
 - `NEXT_PUBLIC_VERCEL_URL`
 - All validated at startup via Zod in `lib/env.ts`
 
@@ -233,11 +233,12 @@ Replace Socket.io with SSE:
 
 Key architectural decisions to highlight in a project writeup:
 
-1. **Agentic AI architecture** — Claude autonomously calls financial data tools during conversation rather than relying on pre-packed context, demonstrating multi-step tool use with the Vercel AI SDK
-2. **Model routing** — Haiku 4.5 for cheap/fast explanations, Sonnet 4.6 for complex reasoning, showing cost-optimization awareness
-3. **SSE over Socket.io** — chose SSE for unidirectional server→client streaming, reducing client bundle by ~50KB and matching the data flow semantics (no bidirectional communication needed)
+1. **Agentic AI architecture** — Gemini autonomously calls financial data tools during conversation rather than relying on pre-packed context, demonstrating multi-step tool use with the Vercel AI SDK
+2. **Model routing** — Flash for cheap/fast explanations, Pro for complex reasoning, showing cost-optimization awareness
+3. **SSE over Socket.io** — chose SSE for unidirectional server-to-client streaming, reducing client bundle by ~50KB and matching the data flow semantics (no bidirectional communication needed)
 4. **Zustand + TanStack Query** — separated client state (Zustand) from server state (TanStack Query) for proper cache management, optimistic updates, and elimination of waterfall fetches
 5. **Zod validation at system boundaries** — all API inputs, environment variables, and external API responses validated with Zod, generating TypeScript types from schemas (single source of truth)
 6. **Biome over ESLint** — 100x faster linting and formatting in a single tool, demonstrating awareness of modern Rust-based JS tooling
-7. **Provider abstraction** — Vercel AI SDK enables switching between Claude, GPT, and Gemini with a one-line change, showing provider-agnostic design
-8. **Security hardening** — moved API keys server-side, enabled strict TypeScript builds, added input validation (contrast with the pre-rewrite state)
+7. **Provider abstraction** — Vercel AI SDK enables switching between Gemini, Claude, and GPT with a one-line change, showing provider-agnostic design
+8. **Bun runtime** — 10-25x faster installs than npm, native TypeScript execution, modern JavaScript runtime showcasing awareness of next-generation tooling
+9. **Security hardening** — moved API keys server-side, enabled strict TypeScript builds, added input validation (contrast with the pre-rewrite state)
