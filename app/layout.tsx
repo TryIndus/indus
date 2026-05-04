@@ -55,15 +55,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
 	return (
 		<html lang="en" suppressHydrationWarning>
-			<body
-				className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
-			>
+			<body className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}>
 				<ThemeProvider>
 					<AuthProvider>
 						<FavoritesProvider>
-							<ConditionalLayout defaultOpen={defaultOpen}>
-								{children}
-							</ConditionalLayout>
+							<ConditionalLayout defaultOpen={defaultOpen}>{children}</ConditionalLayout>
 						</FavoritesProvider>
 					</AuthProvider>
 				</ThemeProvider>

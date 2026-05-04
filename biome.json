@@ -46,9 +46,13 @@
 			"semicolons": "always"
 		}
 	},
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
 	"files": {
-		"includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.json"],
-		"experimentalScannerIgnores": [".claude/**", "node_modules/**", ".next/**"]
+		"includes": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.json"]
 	},
 	"assist": {
 		"actions": {
