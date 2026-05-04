@@ -34,6 +34,8 @@ Indus is a full-stack financial intelligence platform where users authenticate, 
 - Manual SSE streaming logic in `/api/context-chat` (~190 lines of boilerplate)
 - No input validation on any API route
 - No agent capabilities — AI is single-turn Q&A with pre-packed context, not agentic
+- No server-side caching for AI explanations — every batch-explain request hits Gemini even when the same symbol+metric was just explained for another user
+- Explanation caching is client-only (localStorage) — no cross-user benefit
 
 ---
 
@@ -131,6 +133,14 @@ The AI chat becomes an agentic system where Gemini autonomously decides which to
 - User has a multi-turn conversation about a stock → Gemini 2.5 Pro (stronger reasoning, larger context)
 - Generate a research report → Gemini 2.5 Pro with tools and maxSteps (autonomous multi-step research)
 
+**Server-side explanation cache:**
+- Metric explanations are symbol+metric specific, not user-specific — cache them server-side so all users benefit
+- In-memory `Map<string, { data: string, expiry: number }>` with configurable 1-hour TTL
+- Cache key: `${symbol}_${metric}` (e.g., `AAPL_pe_ratio`)
+- On cache hit: return immediately, skip Gemini API call entirely
+- On cache miss: call Gemini, store result with 1h expiry, return to client
+- Client-side TanStack Query adds a second caching layer per-user with stale-while-revalidate
+
 ### State Architecture (Post-Rewrite)
 
 **Zustand stores** (client state, no providers needed):
@@ -176,7 +186,7 @@ Replace Socket.io with SSE:
 ### Phase 3: AI Modernization
 12. **Add Vercel AI SDK + @ai-sdk/google** — `bun add ai @ai-sdk/google`
 13. **Rewrite `/api/context-chat`** → `/api/chat` using `streamText()` with Gemini 2.5 Pro + tool definitions
-14. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output
+14. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output + server-side in-memory cache (1h TTL, keyed by symbol+metric, shared across all users)
 15. **Rewrite `/api/reports/generate`** using `generateText()` with tools + `maxSteps` for multi-step autonomous research
 16. **Update chat frontend** — replace manual SSE parsing with `useChat()` from AI SDK
 17. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
@@ -241,4 +251,5 @@ Key architectural decisions to highlight in a project writeup:
 6. **Biome over ESLint** — 100x faster linting and formatting in a single tool, demonstrating awareness of modern Rust-based JS tooling
 7. **Provider abstraction** — Vercel AI SDK enables switching between Gemini, Claude, and GPT with a one-line change, showing provider-agnostic design
 8. **Bun runtime** — 10-25x faster installs than npm, native TypeScript execution, modern JavaScript runtime showcasing awareness of next-generation tooling
-9. **Security hardening** — moved API keys server-side, enabled strict TypeScript builds, added input validation (contrast with the pre-rewrite state)
+9. **Server-side AI response caching** — metric explanations cached in-memory with 1h TTL so all users benefit from previous Gemini calls, reducing API costs and latency for common queries
+10. **Security hardening** — moved API keys server-side, enabled strict TypeScript builds, added input validation (contrast with the pre-rewrite state)
