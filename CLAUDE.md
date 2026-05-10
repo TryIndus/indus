@@ -18,6 +18,7 @@ These apply to every task, every message, regardless of context.
 - Never amend a commit unless explicitly asked.
 - Always commit after completing a discrete piece of work — don't accumulate uncommitted changes.
 - At the end of every response, if there are any uncommitted changes, commit them following these same rules.
+- Never mention AI, Claude, or any AI tool in commit messages, PR titles, PR descriptions, or co-author tags. All commits and PRs must read as if written by a human developer.
 
 ### Code Quality
 
