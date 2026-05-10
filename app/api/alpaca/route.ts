@@ -1,16 +1,7 @@
 import Alpaca from "@alpacahq/alpaca-trade-api";
 import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod/v4";
 import { env } from "@/lib/env";
-
-const alpacaQuerySchema = z.object({
-	symbol: z.string().min(1),
-	type: z.enum(["stock", "crypto"]).default("stock"),
-	timeframe: z.enum(["1Min", "5Min", "15Min", "1Hour", "1Day", "1Week", "1Month"]).default("1Min"),
-	limit: z.coerce.number().int().positive().max(10000).default(2000),
-	start: z.coerce.number().optional(),
-	end: z.coerce.number().optional(),
-});
+import { alpacaQuerySchema } from "@/lib/schemas/api";
 
 const EST_TIMEZONE_OFFSET = 5 * 60 * 60; // 5 hours in seconds
 

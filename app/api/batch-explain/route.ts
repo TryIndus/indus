@@ -1,18 +1,8 @@
 import { NextResponse } from "next/server";
-import { z } from "zod/v4";
 import { env } from "@/lib/env";
 import { type Item, makeBatchPrompt } from "@/lib/prompts";
+import { batchExplainSchema } from "@/lib/schemas/api";
 import { VALUE_ANALYSIS_SYSTEM_PROMPT } from "@/lib/system-prompts";
-
-const batchExplainSchema = z
-	.array(
-		z.object({
-			symbol: z.string().min(1),
-			metric: z.string().min(1),
-			value: z.number(),
-		}),
-	)
-	.min(1);
 
 // UPDATED: Using gemini-2.5-flash which is the current stable release (June 2025)
 const GEMINI_API_URL =

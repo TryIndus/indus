@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
-import { z } from "zod/v4";
-
-const stockDataQuerySchema = z.object({
-	symbol: z.string().min(1),
-});
+import { stockDataQuerySchema } from "@/lib/schemas/api";
 
 const yahooFinance = new YahooFinance({
 	suppressNotices: ["yahooSurvey"],

@@ -1,42 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { z } from "zod/v4";
 import { GeminiClient } from "@/lib/ai/geminiClient";
 import { GEMINI_SYSTEM_PROMPT } from "@/lib/ai/geminiSystemPrompt";
 import { env } from "@/lib/env";
+import { contextChatSchema } from "@/lib/schemas/api";
 import type { ChatMessage, PageContext } from "@/lib/types";
-
-const contextChatSchema = z.object({
-	context: z.object({
-		symbol: z.string().min(1),
-		companyName: z.string(),
-		asOf: z.string(),
-		metricGroups: z.record(z.string(), z.any()),
-		chart: z
-			.object({
-				interval: z.string(),
-				points: z.array(z.any()),
-				latestPrice: z.number(),
-				dayChangePct: z.number(),
-			})
-			.optional(),
-		cachedExplanations: z.record(z.string(), z.string()),
-		trigger: z.object({
-			metricKey: z.string(),
-			metricLabel: z.string(),
-			value: z.union([z.number(), z.string()]),
-		}),
-	}),
-	messages: z.array(
-		z.object({
-			id: z.string(),
-			role: z.enum(["user", "assistant", "system"]),
-			content: z.string(),
-			createdAt: z.number(),
-			streaming: z.boolean().optional(),
-		}),
-	),
-	newMessage: z.string().min(1),
-});
 
 interface RequestBody {
 	context: PageContext;

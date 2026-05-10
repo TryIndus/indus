@@ -1,14 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-import { z } from "zod/v4";
 import { env } from "@/lib/env";
+import { generateReportSchema } from "@/lib/schemas/api";
 import { createClient } from "@/lib/supabase/server";
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-
-const generateReportSchema = z.object({
-	symbol: z.string().min(1),
-});
 
 export async function POST(request: Request) {
 	try {

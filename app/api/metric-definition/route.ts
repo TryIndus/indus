@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import { z } from "zod/v4";
 import { METRIC_DEFINITIONS } from "@/lib/metric-definitions";
-
-const querySchema = z.object({
-	metric: z.string().min(1),
-});
+import { metricDefinitionQuerySchema as querySchema } from "@/lib/schemas/api";
 
 export async function GET(request: Request) {
 	const { searchParams } = new URL(request.url);
