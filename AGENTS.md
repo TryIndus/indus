@@ -17,6 +17,7 @@ These apply to every task, every message, regardless of context.
 - Never batch multiple unrelated changes into a single commit.
 - Never amend a commit unless explicitly asked.
 - Always commit after completing a discrete piece of work — don't accumulate uncommitted changes.
+- At the end of every response, if there are any uncommitted changes, commit them following these same rules.
 
 ### Code Quality
 
