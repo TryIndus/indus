@@ -6,8 +6,7 @@ Indus is an intelligent financial analysis platform that provides comprehensive 
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) v20 or later
-- npm (comes with Node.js)
+- [Bun](https://bun.sh/) v1.0 or later
 - A [Supabase](https://supabase.com/) project (free tier works)
 - An [Alpaca](https://alpaca.markets/) account (paper trading is fine)
 - A [Google AI Studio](https://aistudio.google.com/) API key (for Gemini)
@@ -24,7 +23,7 @@ cd indus
 ### 2. Install dependencies
 
 ```bash
-npm install
+bun install
 ```
 
 ### 3. Set up environment variables
@@ -83,7 +82,7 @@ create policy "Users can manage their own reports"
 ### 5. Run the development server
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -92,14 +91,14 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 | Command | Description |
 |---|---|
-| `npm run dev` | Start the development server |
-| `npm run build` | Create a production build |
-| `npm start` | Run the production server |
-| `npm run lint` | Run Biome lint checks |
-| `npm run lint:fix` | Auto-fix lint issues |
-| `npm run format` | Format code with Biome |
-| `npm test` | Run unit tests (Vitest) |
-| `npm run test:watch` | Run tests in watch mode |
+| `bun run dev` | Start the development server |
+| `bun run build` | Create a production build |
+| `bun start` | Run the production server |
+| `bun run lint` | Run Biome lint checks |
+| `bun run lint:fix` | Auto-fix lint issues |
+| `bun run format` | Format code with Biome |
+| `bun test` | Run unit tests (Vitest) |
+| `bun run test:watch` | Run tests in watch mode |
 
 ## Features
 

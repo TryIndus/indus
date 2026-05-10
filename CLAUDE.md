@@ -46,7 +46,7 @@ These apply to every task, every message, regardless of context.
 
 ## Current Tech Stack
 
-- **Runtime**: Node.js (npm, switching to Bun)
+- **Runtime**: Bun
 - **Framework**: Next.js 15.4.10 (App Router) + React 19.1.0
 - **Language**: TypeScript 5 (strict mode)
 - **Styling**: Tailwind CSS v4 + shadcn/ui (Radix primitives) + Lucide icons + next-themes
