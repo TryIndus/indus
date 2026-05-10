@@ -8,7 +8,9 @@
 		"start": "next start",
 		"lint": "biome check .",
 		"lint:fix": "biome check --fix .",
-		"format": "biome format --write ."
+		"format": "biome format --write .",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"@alpacahq/alpaca-trade-api": "^3.1.3",
@@ -48,6 +50,7 @@
 		"@types/react-dom": "^19",
 		"tailwindcss": "^4",
 		"tw-animate-css": "^1.3.5",
-		"typescript": "^5"
+		"typescript": "^5",
+		"vitest": "3"
 	}
 }
