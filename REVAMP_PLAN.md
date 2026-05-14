@@ -361,6 +361,9 @@ During the rewrite, both old and new env vars must coexist:
 41. **Performance** — add `loading.tsx` skeletons for all routes, optimize TanStack Query stale times, verify no waterfall fetches
 42. **Final security audit** — verify no API keys in client bundle, all inputs validated, no `any` types on API boundaries, rate limits on AI endpoints are working
 43. **Supabase keepalive + cache cleanup** — add Vercel cron job (`vercel.json` + `/api/cron/keepalive` route) that pings Supabase daily to prevent 7-day auto-pause. The cron should also delete `metric_explanations` rows older than 24 hours to prevent unbounded table growth.
+44. **Sentry error tracking** — `bun add @sentry/nextjs`, run `npx @sentry/wizard@latest -i nextjs` to scaffold config. Configure: DSN via `NEXT_PUBLIC_SENTRY_DSN` env var, sample rate 1.0 for errors, 0.1 for performance transactions (stays well within free tier's 5K errors + 10K transactions/month). Sentry's Next.js SDK auto-instruments both server and client errors, route transitions, and API route performance. Free Developer plan — permanently free, 30-day retention, 1 user.
+45. **Vercel Analytics** — `bun add @vercel/analytics`, add `<Analytics />` component to root layout. Zero-config Web Vitals (LCP, FID, CLS) and page view tracking. Built into Vercel Hobby tier at no cost.
+46. **Vercel Speed Insights** — `bun add @vercel/speed-insights`, add `<SpeedInsights />` component to root layout. Provides real-user performance monitoring with percentile breakdowns per route. Free on Hobby tier.
 
 **Verification:**
 - `next build` output shows bundle sizes — compare against pre-rewrite baseline
@@ -369,6 +372,9 @@ During the rewrite, both old and new env vars must coexist:
 - `grep -r "NEXT_PUBLIC_ALPACA"` returns zero results
 - Vercel cron job configured in `vercel.json` and `/api/cron/keepalive` route exists
 - Deploy to Vercel preview branch to test cron execution
+- Sentry: trigger a test error (e.g., visit `/sentry-example-page` or throw in an API route) — verify it appears in Sentry dashboard
+- Vercel Analytics: deploy to Vercel, visit a few pages — verify Web Vitals data appears in Vercel dashboard → Analytics tab
+- Vercel Speed Insights: verify per-route performance data appears in Vercel dashboard → Speed Insights tab
 
 **Rollback:** Phase 6 changes are non-breaking polish. Individual commits can be reverted independently.
 
@@ -384,6 +390,7 @@ Items that cannot be done via code and require manual setup in external dashboar
 - [ ] **Vercel: Remove `GEMINI_API_KEY`** — after Phase 3 is complete and verified working.
 - [ ] **Vercel: Remove `NEXT_PUBLIC_ALPACA_*` vars** — after Phase 1 replaces them with server-only `ALPACA_*` vars.
 - [ ] **Supabase: Create `metric_explanations` table** — Supabase dashboard → SQL Editor. Run the migration SQL provided in Phase 3.
+- [ ] **Sentry: Create project and get DSN** — Create a free account at sentry.io, create a Next.js project, copy the DSN. Add `NEXT_PUBLIC_SENTRY_DSN` and `SENTRY_AUTH_TOKEN` to Vercel environment variables.
 
 ---
 
@@ -409,6 +416,7 @@ Items that cannot be done via code and require manual setup in external dashboar
 - `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_IS_PAPER` (server-only — fixed)
 - `GOOGLE_GENERATIVE_AI_API_KEY` (server-only — same Gemini API key, now used via Vercel AI SDK)
 - `NEXT_PUBLIC_VERCEL_URL`
+- `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN` (Sentry error tracking — Phase 6)
 - All validated at startup via Zod in `lib/env.ts`
 
 ---
@@ -448,3 +456,4 @@ Key architectural decisions to highlight in a project writeup:
 9. **Security hardening** — moved API keys server-side, enabled strict TypeScript builds, added input validation (contrast with the pre-rewrite state)
 10. **Fully serverless architecture** — zero always-on compute. Vercel serverless functions + cron, Supabase managed database, Gemini API pay-per-token. $0/month infrastructure cost.
 11. **CI/CD pipeline** — GitHub Actions runs lint, type check, unit tests, and build on every push. PRs get bundle size diff comments, Lighthouse performance scores, and Playwright E2E tests against Vercel preview deployments. Branch protection enforces all checks pass before merge. Renovate keeps dependencies current with automated PRs.
+12. **Observability stack** — Sentry for error tracking and server/client performance monitoring (free tier), Vercel Analytics for Web Vitals, Vercel Speed Insights for per-route real-user performance. Full production visibility at zero cost.
