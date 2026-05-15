@@ -5,6 +5,7 @@ import {
 	contextChatSchema,
 	generateReportSchema,
 	metricDefinitionQuerySchema,
+	reportIdSchema,
 	stockDataQuerySchema,
 } from "@/lib/schemas/api";
 
@@ -244,5 +245,27 @@ describe("generateReportSchema", () => {
 	it("rejects extra fields but still passes (Zod strips)", () => {
 		const result = generateReportSchema.safeParse({ symbol: "AAPL", extra: "field" });
 		expect(result.success).toBe(true);
+	});
+});
+
+describe("reportIdSchema", () => {
+	it("accepts valid UUID", () => {
+		const result = reportIdSchema.safeParse({ id: "550e8400-e29b-41d4-a716-446655440000" });
+		expect(result.success).toBe(true);
+	});
+
+	it("rejects non-UUID string", () => {
+		const result = reportIdSchema.safeParse({ id: "not-a-uuid" });
+		expect(result.success).toBe(false);
+	});
+
+	it("rejects empty string", () => {
+		const result = reportIdSchema.safeParse({ id: "" });
+		expect(result.success).toBe(false);
+	});
+
+	it("rejects missing id", () => {
+		const result = reportIdSchema.safeParse({});
+		expect(result.success).toBe(false);
 	});
 });

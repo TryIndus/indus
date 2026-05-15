@@ -64,6 +64,10 @@ export const generateReportSchema = z.object({
 	symbol: z.string().min(1),
 });
 
+export const reportIdSchema = z.object({
+	id: z.uuid(),
+});
+
 export const envSchema = z.object({
 	NEXT_PUBLIC_SUPABASE_URL: z.url(),
 	NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),

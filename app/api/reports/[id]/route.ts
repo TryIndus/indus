@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
+import { reportIdSchema } from "@/lib/schemas/api";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
 	try {
 		const resolvedParams = await params;
+		const parsed = reportIdSchema.safeParse(resolvedParams);
+		if (!parsed.success) {
+			return NextResponse.json({ error: "Invalid report ID" }, { status: 400 });
+		}
 		const supabase = await createClient();
 
 		// Get the current user
@@ -39,6 +44,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
 	try {
 		const resolvedParams = await params;
+		const parsed = reportIdSchema.safeParse(resolvedParams);
+		if (!parsed.success) {
+			return NextResponse.json({ error: "Invalid report ID" }, { status: 400 });
+		}
 		const supabase = await createClient();
 
 		// Get the current user
