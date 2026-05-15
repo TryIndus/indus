@@ -235,6 +235,7 @@ During the rewrite, both old and new env vars must coexist:
 10. **Add Zustand** — replace `AuthContext` with `useAuthStore`, replace `FavoritesContext` with `useFavoritesStore`
 11. **Remove React Context providers** from layout (replaced by Zustand + TanStack Query)
 12. **Add React error boundaries** — wrap major sections (charts, financial tables, chat) with error boundaries and `<Suspense>` fallbacks with skeleton loading states
+13. **Configure Google OAuth** — set up Google OAuth client in Google Cloud Console, add client ID and secret to Supabase Authentication → Providers → Google, set authorized redirect URI to `<SUPABASE_URL>/auth/v1/callback`
 
 **Verification:**
 - Auth flow works end-to-end: sign up, sign in (email + Google OAuth), sign out, session persistence
@@ -251,17 +252,17 @@ During the rewrite, both old and new env vars must coexist:
 
 ### Phase 3: AI Modernization
 
-13. **Add `GOOGLE_GENERATIVE_AI_API_KEY` to Vercel dashboard** before deploying any Phase 3 changes (same value as existing `GEMINI_API_KEY`)
-14. **Add Vercel AI SDK + @ai-sdk/google** — `bun add ai @ai-sdk/google`
-15. **Create `metric_explanations` table in Supabase** — run `supabase/migrations/00003_create_metric_explanations.sql` in the Supabase SQL Editor. Columns: `id`, `symbol`, `metric`, `explanation` (jsonb), `created_at` (timestamptz, default now()). Unique constraint on (symbol, metric). Index on created_at for TTL queries.
-16. **Rewrite `/api/context-chat`** → `/api/chat` using `streamText()` with Gemini 2.5 Pro + tool definitions
-17. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output + Supabase explanation cache (1h TTL)
-18. **Adapt `lib/prompts.ts` and `lib/system-prompts.ts`** — refactor prompt construction for Vercel AI SDK format (system prompt as separate parameter, tool descriptions as Zod schemas)
-19. **Rewrite `/api/reports/generate`** using `generateText()` with tools + `maxSteps` for multi-step autonomous research
-20. **Update chat frontend** — replace manual SSE parsing with `useChat()` from AI SDK. Clear legacy localStorage explanation cache keys on first load to prevent stale data from the old caching approach.
-21. **Add rate limiting to AI endpoints** — simple per-user rate limit on `/api/chat`, `/api/explain`, and `/api/reports/generate` (e.g., check request count per user_id in the last N seconds via Supabase or in-memory counter). Prevents a single user from exhausting Gemini API quota. Even a basic implementation (e.g., 20 chat requests/min, 5 report generations/hour) is better than none.
-22. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
-23. **Remove `GEMINI_API_KEY`** from `lib/env.ts` Zod schema and Vercel dashboard
+14. **Add `GOOGLE_GENERATIVE_AI_API_KEY` to Vercel dashboard** before deploying any Phase 3 changes (same value as existing `GEMINI_API_KEY`)
+15. **Add Vercel AI SDK + @ai-sdk/google** — `bun add ai @ai-sdk/google`
+16. **Create `metric_explanations` table in Supabase** — run `supabase/migrations/00003_create_metric_explanations.sql` in the Supabase SQL Editor. Columns: `id`, `symbol`, `metric`, `explanation` (jsonb), `created_at` (timestamptz, default now()). Unique constraint on (symbol, metric). Index on created_at for TTL queries.
+17. **Rewrite `/api/context-chat`** → `/api/chat` using `streamText()` with Gemini 2.5 Pro + tool definitions
+18. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output + Supabase explanation cache (1h TTL)
+19. **Adapt `lib/prompts.ts` and `lib/system-prompts.ts`** — refactor prompt construction for Vercel AI SDK format (system prompt as separate parameter, tool descriptions as Zod schemas)
+20. **Rewrite `/api/reports/generate`** using `generateText()` with tools + `maxSteps` for multi-step autonomous research
+21. **Update chat frontend** — replace manual SSE parsing with `useChat()` from AI SDK. Clear legacy localStorage explanation cache keys on first load to prevent stale data from the old caching approach.
+22. **Add rate limiting to AI endpoints** — simple per-user rate limit on `/api/chat`, `/api/explain`, and `/api/reports/generate` (e.g., check request count per user_id in the last N seconds via Supabase or in-memory counter). Prevents a single user from exhausting Gemini API quota. Even a basic implementation (e.g., 20 chat requests/min, 5 report generations/hour) is better than none.
+23. **Remove raw `@google/generative-ai`** and `lib/ai/geminiClient.ts` (replaced by Vercel AI SDK's Google provider)
+24. **Remove `GEMINI_API_KEY`** from `lib/env.ts` Zod schema and Vercel dashboard
 
 **Verification:**
 - Chat works: ask "What is Apple's P/E ratio?" — Gemini should call `getFinancialMetrics` tool, get data, synthesize answer
@@ -278,13 +279,13 @@ During the rewrite, both old and new env vars must coexist:
 
 ### Phase 4: Real-time Modernization
 
-24. **Create SSE endpoint** — `/api/stream/[symbol]/route.ts` that creates an Alpaca WebSocket connection per request, subscribes to the symbol, and streams bars as SSE events with event IDs for reconnection. Must detect stock vs. crypto symbols (crypto contains `/`, e.g., `ETH/USD`) and use the correct Alpaca stream: `data_stream_v2` for stocks, `crypto_stream_v1beta3` for crypto. **Note:** The current `alpaca-server.ts` has a bug where the crypto bar handler hardcodes `const symbol = "ETH/USD"` instead of extracting the symbol from the bar data — the SSE endpoint must fix this by properly reading the symbol from the Alpaca bar event.
-25. **Add SSE reconnection logic to client** — handle `EventSource.onerror`, use `Last-Event-ID`, show reconnecting indicator only after 3+ seconds. Account for the fact that reconnections involve a full cold start (new serverless function → new Alpaca WS → subscribe) which takes 2-5 seconds, not sub-second.
-26. **Update StockChart.tsx** — replace socket.io-client with native `EventSource`
-27. **Update CryptoChart.tsx** — same SSE migration
-28. **Remove Socket.io** — `bun remove socket.io socket.io-client`
-29. **Delete `pages/` directory entirely** — removes Pages Router Socket.io handler and eliminates mixed router architecture
-30. **Delete `lib/server/alpaca-server.ts`** — WebSocket manager class no longer needed (SSE route handler manages Alpaca connection directly). The `@alpacahq/alpaca-trade-api` SDK stays for REST calls.
+25. **Create SSE endpoint** — `/api/stream/[symbol]/route.ts` that creates an Alpaca WebSocket connection per request, subscribes to the symbol, and streams bars as SSE events with event IDs for reconnection. Must detect stock vs. crypto symbols (crypto contains `/`, e.g., `ETH/USD`) and use the correct Alpaca stream: `data_stream_v2` for stocks, `crypto_stream_v1beta3` for crypto. **Note:** The current `alpaca-server.ts` has a bug where the crypto bar handler hardcodes `const symbol = "ETH/USD"` instead of extracting the symbol from the bar data — the SSE endpoint must fix this by properly reading the symbol from the Alpaca bar event.
+26. **Add SSE reconnection logic to client** — handle `EventSource.onerror`, use `Last-Event-ID`, show reconnecting indicator only after 3+ seconds. Account for the fact that reconnections involve a full cold start (new serverless function → new Alpaca WS → subscribe) which takes 2-5 seconds, not sub-second.
+27. **Update StockChart.tsx** — replace socket.io-client with native `EventSource`
+28. **Update CryptoChart.tsx** — same SSE migration
+29. **Remove Socket.io** — `bun remove socket.io socket.io-client`
+30. **Delete `pages/` directory entirely** — removes Pages Router Socket.io handler and eliminates mixed router architecture
+31. **Delete `lib/server/alpaca-server.ts`** — WebSocket manager class no longer needed (SSE route handler manages Alpaca connection directly). The `@alpacahq/alpaca-trade-api` SDK stays for REST calls.
 
 **Verification:**
 - Open a stock chart — real-time bars should appear via SSE (check Network tab for `EventSource` connection to `/api/stream/[symbol]`)
@@ -304,44 +305,44 @@ During the rewrite, both old and new env vars must coexist:
 
 **Testing:**
 
-31. **Add Vitest** — config, first tests on API route handlers (mock Supabase/Alpaca/Gemini), test Zod schemas, test env validation
-32. **Add Playwright** — config, E2E tests for: auth flow (sign in, sign out, protected route redirect), dashboard load, company page with chart rendering, AI chat interaction, report generation
-33. **Add test scripts** to package.json: `bun test` (Vitest), `bun run test:e2e` (Playwright)
+32. **Add Vitest** — config, first tests on API route handlers (mock Supabase/Alpaca/Gemini), test Zod schemas, test env validation
+33. **Add Playwright** — config, E2E tests for: auth flow (sign in, sign out, protected route redirect), dashboard load, company page with chart rendering, AI chat interaction, report generation
+34. **Add test scripts** to package.json: `bun test` (Vitest), `bun run test:e2e` (Playwright)
 
 **CI/CD Pipeline (GitHub Actions):**
 
-34. **CI workflow** (`.github/workflows/ci.yml`) — runs on every push to `dev/revamp` and on PRs to `main`:
+35. **CI workflow** (`.github/workflows/ci.yml`) — runs on every push to `dev/revamp` and on PRs to `main`:
     - Biome lint check (`biome check`)
     - TypeScript type check (`tsc --noEmit`)
     - Vitest unit/integration tests (`bun test`)
     - Build verification (`next build`)
-35. **E2E workflow** (`.github/workflows/e2e.yml`) — runs on PRs to `main`:
+36. **E2E workflow** (`.github/workflows/e2e.yml`) — runs on PRs to `main`:
     - Waits for Vercel preview deployment to complete (uses `vercel-preview-url` action)
     - Runs Playwright against the Vercel preview URL
     - Reports pass/fail on the PR
-36. **Bundle size tracking** (`.github/workflows/ci.yml`) — added as a step in the CI workflow:
+37. **Bundle size tracking** (`.github/workflows/ci.yml`) — added as a step in the CI workflow:
     - Runs `next build` and extracts bundle sizes from the build output
     - Comments on PR with bundle size diff vs `main` (uses `actions/github-script` to post the comment)
-37. **Lighthouse CI** (`.github/workflows/lighthouse.yml`) — runs on PRs to `main`:
+38. **Lighthouse CI** (`.github/workflows/lighthouse.yml`) — runs on PRs to `main`:
     - Runs Lighthouse against the Vercel preview URL
     - Enforces thresholds: Performance > 90, Accessibility > 95, Best Practices > 90
     - Comments results on the PR
-38. **Renovate config** (`renovate.json`) — automated dependency update PRs:
+39. **Renovate config** (`renovate.json`) — automated dependency update PRs:
     - Groups minor/patch updates into a single weekly PR
     - Pins major versions (requires manual review)
     - Auto-merges devDependency patches if CI passes
 
 **Branch Protection (requires manual setup by user):**
 
-39. **Configure branch protection rules on `main`** via GitHub Settings → Branches → Add rule:
+40. **Configure branch protection rules on `main`** via GitHub Settings → Branches → Add rule:
     - Require status checks to pass (CI workflow)
     - Require branch to be up to date before merging
     - Require at least 1 approval on PRs (even self-approval — shows the pattern)
 
 **What requires manual action by the user:**
-- Step 35 (E2E workflow): Vercel automatically provides preview URLs on PRs, but if the repo is **private**, you need to add `VERCEL_TOKEN` as a GitHub Actions secret (Settings → Secrets → Actions → New secret). Get the token from https://vercel.com/account/tokens. If the repo is **public**, the preview URL is available without a token.
-- Step 39 (Branch protection): Must be done manually in GitHub UI — cannot be configured via code. Go to repo Settings → Branches → Add branch protection rule for `main`.
-- Everything else (steps 31-38) is fully code-based — I create the config files and workflow YAML, no manual setup needed.
+- Step 36 (E2E workflow): Vercel automatically provides preview URLs on PRs, but if the repo is **private**, you need to add `VERCEL_TOKEN` as a GitHub Actions secret (Settings → Secrets → Actions → New secret). Get the token from https://vercel.com/account/tokens. If the repo is **public**, the preview URL is available without a token.
+- Step 40 (Branch protection): Must be done manually in GitHub UI — cannot be configured via code. Go to repo Settings → Branches → Add branch protection rule for `main`.
+- Everything else (steps 32-39) is fully code-based — I create the config files and workflow YAML, no manual setup needed.
 
 **Verification:**
 - `bun test` passes — all Vitest unit/integration tests green
@@ -357,11 +358,11 @@ During the rewrite, both old and new env vars must coexist:
 
 ### Phase 6: Polish
 
-40. **Audit bundle size** — `next build` analysis, verify Socket.io is gone, check for unused deps (e.g., `@radix-ui/react-icons`, `tw-animate-css` if unused), remove any dead code
-41. **Performance** — add `loading.tsx` skeletons for all routes, optimize TanStack Query stale times, verify no waterfall fetches
-42. **Final security audit** — verify no API keys in client bundle, all inputs validated, no `any` types on API boundaries, rate limits on AI endpoints are working
-43. **Supabase keepalive + cache cleanup** — add Vercel cron job (`vercel.json` + `/api/cron/keepalive` route) that pings Supabase daily to prevent 7-day auto-pause. The cron should also delete `metric_explanations` rows older than 24 hours to prevent unbounded table growth.
-44. **Sentry error tracking** — `bun add @sentry/nextjs`, run `npx @sentry/wizard@latest -i nextjs` to scaffold config. Configure: DSN via `NEXT_PUBLIC_SENTRY_DSN` env var, sample rate 1.0 for errors, 0.1 for performance transactions (stays well within free tier's 5K errors + 10K transactions/month). Sentry's Next.js SDK auto-instruments both server and client errors, route transitions, and API route performance. Free Developer plan — permanently free, 30-day retention, 1 user.
+41. **Audit bundle size** — `next build` analysis, verify Socket.io is gone, check for unused deps (e.g., `@radix-ui/react-icons`, `tw-animate-css` if unused), remove any dead code
+42. **Performance** — add `loading.tsx` skeletons for all routes, optimize TanStack Query stale times, verify no waterfall fetches
+43. **Final security audit** — verify no API keys in client bundle, all inputs validated, no `any` types on API boundaries, rate limits on AI endpoints are working
+44. **Supabase keepalive + cache cleanup** — add Vercel cron job (`vercel.json` + `/api/cron/keepalive` route) that pings Supabase daily to prevent 7-day auto-pause. The cron should also delete `metric_explanations` rows older than 24 hours to prevent unbounded table growth.
+45. **Sentry error tracking** — `bun add @sentry/nextjs`, run `npx @sentry/wizard@latest -i nextjs` to scaffold config. Configure: DSN via `NEXT_PUBLIC_SENTRY_DSN` env var, sample rate 1.0 for errors, 0.1 for performance transactions (stays well within free tier's 5K errors + 10K transactions/month). Sentry's Next.js SDK auto-instruments both server and client errors, route transitions, and API route performance. Free Developer plan — permanently free, 30-day retention, 1 user.
 
 **Verification:**
 - `next build` output shows bundle sizes — compare against pre-rewrite baseline
