@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "./AuthContext";
 
@@ -25,9 +25,9 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 	const [favorites, setFavorites] = useState<FavoriteStock[]>([]);
 	const [loading, setLoading] = useState(true);
 	const { user } = useAuth();
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
 
-	const loadFavorites = async () => {
+	const loadFavorites = useCallback(async () => {
 		if (!user) return;
 
 		try {
@@ -56,7 +56,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [user, supabase]);
 
 	useEffect(() => {
 		if (user) {
