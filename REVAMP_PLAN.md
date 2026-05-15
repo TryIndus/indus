@@ -253,7 +253,7 @@ During the rewrite, both old and new env vars must coexist:
 
 13. **Add `GOOGLE_GENERATIVE_AI_API_KEY` to Vercel dashboard** before deploying any Phase 3 changes (same value as existing `GEMINI_API_KEY`)
 14. **Add Vercel AI SDK + @ai-sdk/google** — `bun add ai @ai-sdk/google`
-15. **Create `metric_explanations` table in Supabase** — columns: `id`, `symbol`, `metric`, `explanation` (jsonb), `created_at` (timestamptz, default now()). Add unique constraint on (symbol, metric). Add index on created_at for TTL queries.
+15. **Create `metric_explanations` table in Supabase** — run `supabase/migrations/00003_create_metric_explanations.sql` in the Supabase SQL Editor. Columns: `id`, `symbol`, `metric`, `explanation` (jsonb), `created_at` (timestamptz, default now()). Unique constraint on (symbol, metric). Index on created_at for TTL queries.
 16. **Rewrite `/api/context-chat`** → `/api/chat` using `streamText()` with Gemini 2.5 Pro + tool definitions
 17. **Rewrite `/api/batch-explain`** → `/api/explain` using `generateText()` with Gemini 2.5 Flash + Zod structured output + Supabase explanation cache (1h TTL)
 18. **Adapt `lib/prompts.ts` and `lib/system-prompts.ts`** — refactor prompt construction for Vercel AI SDK format (system prompt as separate parameter, tool descriptions as Zod schemas)
@@ -385,7 +385,7 @@ Items that cannot be done via code and require manual setup in external dashboar
 - [ ] **Vercel: Add `GOOGLE_GENERATIVE_AI_API_KEY`** — Vercel dashboard → project Settings → Environment Variables. Same value as existing `GEMINI_API_KEY`.
 - [ ] **Vercel: Remove `GEMINI_API_KEY`** — after Phase 3 is complete and verified working.
 - [ ] **Vercel: Remove `NEXT_PUBLIC_ALPACA_*` vars** — after Phase 1 replaces them with server-only `ALPACA_*` vars.
-- [ ] **Supabase: Create `metric_explanations` table** — Supabase dashboard → SQL Editor. Run the migration SQL provided in Phase 3.
+- [ ] **Supabase: Run initial migrations** — Supabase dashboard → SQL Editor. Run `supabase/migrations/00001_create_favorites.sql` and `supabase/migrations/00002_create_reports.sql` for initial setup. Run `supabase/migrations/00003_create_metric_explanations.sql` after Phase 3.
 - [ ] **Sentry: Create project and get DSN** — Create a free account at sentry.io, create a Next.js project, copy the DSN. Add `NEXT_PUBLIC_SENTRY_DSN` and `SENTRY_AUTH_TOKEN` to Vercel environment variables.
 
 ---

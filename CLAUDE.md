@@ -92,6 +92,8 @@ These apply to every task, every message, regardless of context.
 - `favorites` (user_id, symbol, created_at)
 - `reports` (id, user_id, symbol, company_name, status, report_content, summary, created_at)
 
+Schema migrations are tracked in `supabase/migrations/` and numbered sequentially. Run them manually in the Supabase SQL Editor when setting up a new project.
+
 ## Revamp Plan
 
 The detailed rewrite plan (phases, architecture, verification checklists) lives in [`REVAMP_PLAN.md`](./REVAMP_PLAN.md).
