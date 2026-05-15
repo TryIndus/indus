@@ -3,7 +3,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface AuthContextType {
@@ -19,7 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 	const [user, setUser] = useState<User | null>(null);
 	const [session, setSession] = useState<Session | null>(null);
 	const [loading, setLoading] = useState(true);
-	const supabase = createClient();
+	const supabase = useMemo(() => createClient(), []);
 	const router = useRouter();
 
 	useEffect(() => {
