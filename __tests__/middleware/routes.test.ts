@@ -27,12 +27,16 @@ describe("middleware route protection", () => {
 	});
 
 	describe("public routes", () => {
-		it.each(["/", "/auth", "/auth/callback", "/auth/auth-code-error", "/help", "/api/stock-data"])(
-			"marks %s as public",
-			(path) => {
-				expect(isProtectedRoute(path)).toBe(false);
-			},
-		);
+		it.each([
+			"/",
+			"/auth",
+			"/auth/callback",
+			"/auth/auth-code-error",
+			"/help",
+			"/api/stock-data",
+		])("marks %s as public", (path) => {
+			expect(isProtectedRoute(path)).toBe(false);
+		});
 	});
 
 	describe("security-critical routes are protected", () => {

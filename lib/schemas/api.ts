@@ -3,9 +3,7 @@ import { z } from "zod/v4";
 export const alpacaQuerySchema = z.object({
 	symbol: z.string().min(1),
 	type: z.enum(["stock", "crypto"]).default("stock"),
-	timeframe: z
-		.enum(["1Min", "5Min", "15Min", "1Hour", "1Day", "1Week", "1Month"])
-		.default("1Min"),
+	timeframe: z.enum(["1Min", "5Min", "15Min", "1Hour", "1Day", "1Week", "1Month"]).default("1Min"),
 	limit: z.coerce.number().int().positive().max(10000).default(2000),
 	start: z.coerce.number().optional(),
 	end: z.coerce.number().optional(),
