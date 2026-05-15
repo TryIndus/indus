@@ -34,8 +34,8 @@ export async function POST(request: Request) {
 		try {
 			const baseUrl =
 				process.env.NODE_ENV === "production"
-					? process.env.NEXT_PUBLIC_VERCEL_URL
-					: "http://localhost:3001";
+					? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+					: "http://localhost:3000";
 
 			const stockResponse = await fetch(`${baseUrl}/api/stock-data?symbol=${symbol}`);
 			if (stockResponse.ok) {
