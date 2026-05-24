@@ -229,7 +229,7 @@ During the rewrite, both old and new env vars must coexist:
 
 ---
 
-### Phase 2: Real-time Modernization
+### Phase 2: Real-time Modernization ✅ COMPLETE
 
 - **Create SSE endpoint** — `/api/stream/[symbol]/route.ts` that creates an Alpaca WebSocket connection per request, subscribes to the symbol, and streams bars as SSE events with event IDs for reconnection. Must detect stock vs. crypto symbols (crypto contains `/`, e.g., `ETH/USD`) and use the correct Alpaca stream: `data_stream_v2` for stocks, `crypto_stream_v1beta3` for crypto. **Note:** The current `alpaca-server.ts` has a bug where the crypto bar handler hardcodes `const symbol = "ETH/USD"` instead of extracting the symbol from the bar data — the SSE endpoint must fix this by properly reading the symbol from the Alpaca bar event.
 - **Add SSE reconnection logic to client** — handle `EventSource.onerror`, use `Last-Event-ID`, show reconnecting indicator only after 3+ seconds. Account for the fact that reconnections involve a full cold start (new serverless function → new Alpaca WS → subscribe) which takes 2-5 seconds, not sub-second.
@@ -253,13 +253,14 @@ During the rewrite, both old and new env vars must coexist:
 
 ---
 
-### Phase 3: State & Data Fetching
+### Phase 3: State & Data Fetching 🚧 IN PROGRESS
 
-- **Add TanStack Query** — create query client provider, convert all `useEffect` fetch patterns to `useQuery`/`useMutation`
-- **Add Zustand** — replace `AuthContext` with `useAuthStore`, replace `FavoritesContext` with `useFavoritesStore`
-- **Remove React Context providers** from layout (replaced by Zustand + TanStack Query)
+- **Add TanStack Query** ✅ — create query client provider, convert all `useEffect` fetch patterns to `useQuery`/`useMutation`
+- **Add Zustand** ✅ — replace `AuthContext` with `useAuthStore`, replace `FavoritesContext` with `useFavoritesStore`
+- **Remove React Context providers** ✅ from layout (replaced by Zustand + TanStack Query)
 - **Add React error boundaries** — wrap major sections (charts, financial tables, chat) with error boundaries and `<Suspense>` fallbacks with skeleton loading states
 - **Configure Google OAuth** — set up Google OAuth client in Google Cloud Console, add client ID and secret to Supabase Authentication → Providers → Google, set authorized redirect URI to `<SUPABASE_URL>/auth/v1/callback`
+- **Migrate chart historical data fetches to TanStack Query** — `PriceChart` still uses raw `useEffect` + `fetch` for `/api/alpaca`; convert to `useQuery` with `useInfiniteQuery` for the pagination on scroll-back
 
 **Verification:**
 - Auth flow works end-to-end: sign up, sign in (email + Google OAuth), sign out, session persistence
