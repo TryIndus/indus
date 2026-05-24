@@ -9,6 +9,10 @@ export const alpacaQuerySchema = z.object({
 	end: z.coerce.number().optional(),
 });
 
+export const streamParamsSchema = z.object({
+	symbol: z.string().min(1),
+});
+
 export const batchExplainSchema = z
 	.array(
 		z.object({

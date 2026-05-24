@@ -4,7 +4,7 @@ import { Loader2, Star } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useFavorites } from "@/lib/context/FavoritesContext";
+import { useFavorites } from "@/lib/stores/favorites-store";
 import { cn } from "@/lib/utils";
 
 interface FavoriteButtonProps {

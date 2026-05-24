@@ -4,10 +4,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies } from "next/headers";
 
+import { AppProviders } from "@/components/AppProviders";
 import { ConditionalLayout } from "@/components/ConditionalLayout";
-import { ThemeProvider } from "@/components/ThemeProvider";
-import { AuthProvider } from "@/lib/context/AuthContext";
-import { FavoritesProvider } from "@/lib/context/FavoritesContext";
 
 const geistSans = Geist({
 	variable: "--font-geist-sans",
@@ -56,13 +54,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<body className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}>
-				<ThemeProvider>
-					<AuthProvider>
-						<FavoritesProvider>
-							<ConditionalLayout defaultOpen={defaultOpen}>{children}</ConditionalLayout>
-						</FavoritesProvider>
-					</AuthProvider>
-				</ThemeProvider>
+				<AppProviders>
+					<ConditionalLayout defaultOpen={defaultOpen}>{children}</ConditionalLayout>
+				</AppProviders>
 			</body>
 		</html>
 	);

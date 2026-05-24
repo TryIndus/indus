@@ -1,9 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-	eslint: {
-		ignoreDuringBuilds: true,
-	},
 	serverExternalPackages: ["yahoo-finance2"],
 	// Disable image optimization for Vercel deployment unless you have a pro plan
 	images: {
