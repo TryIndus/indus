@@ -52,11 +52,11 @@ These apply to every task, every message, regardless of context.
 - **Language**: TypeScript 5 (strict mode)
 - **Styling**: Tailwind CSS v4 + shadcn/ui (Radix primitives) + Lucide icons + next-themes
 - **Auth & DB**: Supabase (PostgreSQL + Auth with Google OAuth + email/password)
-- **Real-time**: Socket.io v4.8.1 (relays Alpaca WebSocket bars to clients)
+- **Real-time**: SSE via Next.js Route Handlers (streams Alpaca WebSocket bars to clients)
 - **Charts**: TradingView Lightweight Charts v5
 - **AI**: Google Gemini 2.5 Flash (`@google/generative-ai`) — manual SSE streaming, no tool use
 - **Financial Data**: Alpaca Trade API (real-time + historical bars), Yahoo Finance 2 (fundamentals)
-- **State**: React Context API (AuthContext, FavoritesContext) + manual useEffect/useState fetch patterns
+- **State**: Zustand for client state + TanStack Query for async/server state
 - **Validation**: Zod (API inputs + environment variables)
 - **Testing**: Vitest
 - **Linting**: Biome
@@ -65,18 +65,20 @@ These apply to every task, every message, regardless of context.
 
 ## Key Files
 
-- `app/layout.tsx` — Root layout with AuthProvider > FavoritesProvider > ConditionalLayout
+- `app/layout.tsx` — Root layout with AppProviders > ConditionalLayout
+- `components/AppProviders.tsx` — TanStack Query, theme, and auth session bootstrap provider
 - `middleware.ts` — Supabase auth, protects /dashboard, /company, /search, /crypto, /reports, /settings
-- `pages/api/socket/index.ts` — Pages Router Socket.io handler (do not touch until Phase 4)
-- `lib/server/alpaca-server.ts` — Server-side Alpaca WebSocket manager
+- `app/api/stream/[symbol]/route.ts` — SSE endpoint for live stock and crypto bars
+- `lib/realtime/alpaca-stream.ts` — Shared Alpaca stream normalization and SSE helpers
 - `lib/ai/geminiClient.ts` — Gemini API wrapper
 - `lib/prompts.ts` — Prompt construction for batch explain
 - `lib/system-prompts.ts` — System prompts for AI
 - `lib/schemas/api.ts` — Shared Zod schemas for all API routes and env validation
 - `lib/env.ts` — Validated environment variables (imports schemas from `lib/schemas/api.ts`)
-- `lib/context/AuthContext.tsx` — Auth state provider
-- `lib/context/FavoritesContext.tsx` — Favorites CRUD
-- `components/StockChart.tsx` / `CryptoChart.tsx` — TradingView charts with socket.io
+- `lib/stores/auth-store.ts` — Zustand auth/session state and sign out
+- `lib/stores/favorites-store.ts` — Zustand favorites state with TanStack Query mutations
+- `components/PriceChart.tsx` — Shared TradingView chart with EventSource live updates
+- `components/StockChart.tsx` / `CryptoChart.tsx` — Stock/crypto chart wrappers
 - `next.config.ts` — Next.js config with `serverExternalPackages: ['yahoo-finance2']`, punycode warning suppression
 
 ## Environment Variables

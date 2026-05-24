@@ -33,7 +33,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { useAuth } from "@/lib/context/AuthContext";
+import { useAuth } from "@/lib/stores/auth-store";
 
 const mainItems = [
 	{ title: "Dashboard", url: "/dashboard", icon: FileBarChart },

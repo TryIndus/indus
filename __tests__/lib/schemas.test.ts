@@ -7,6 +7,7 @@ import {
 	metricDefinitionQuerySchema,
 	reportIdSchema,
 	stockDataQuerySchema,
+	streamParamsSchema,
 } from "@/lib/schemas/api";
 
 describe("alpacaQuerySchema", () => {
@@ -72,6 +73,23 @@ describe("alpacaQuerySchema", () => {
 		if (result.success) {
 			expect(result.data.limit).toBe(100);
 		}
+	});
+});
+
+describe("streamParamsSchema", () => {
+	it("accepts a stock stream symbol", () => {
+		const result = streamParamsSchema.safeParse({ symbol: "AAPL" });
+		expect(result.success).toBe(true);
+	});
+
+	it("accepts a crypto stream symbol", () => {
+		const result = streamParamsSchema.safeParse({ symbol: "BTC/USD" });
+		expect(result.success).toBe(true);
+	});
+
+	it("rejects an empty stream symbol", () => {
+		const result = streamParamsSchema.safeParse({ symbol: "" });
+		expect(result.success).toBe(false);
 	});
 });
 

@@ -2,7 +2,7 @@
 
 https://github.com/user-attachments/assets/82d2c5de-a971-4c8b-8481-fa68fcffc9e4
 
-Indus is an intelligent financial analysis platform that provides comprehensive stock market data, real-time charts, and AI-powered insights to help investors make informed decisions. Built with Next.js, TypeScript, Socket.io, Alpaca API, Yahoo Finance, Google Gemini, and TradingView.
+Indus is an intelligent financial analysis platform that provides comprehensive stock market data, real-time charts, and AI-powered insights to help investors make informed decisions. Built with Next.js, TypeScript, SSE, Alpaca API, Yahoo Finance, Google Gemini, and TradingView.
 
 ## Prerequisites
 
@@ -137,8 +137,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | Language | TypeScript 5 (strict mode) |
 | Styling | Tailwind CSS v4 + shadcn/ui (Radix) + Lucide icons + next-themes |
 | Auth & DB | Supabase (PostgreSQL + Auth with Google OAuth) |
+| State | Zustand + TanStack Query |
 | AI | Google Gemini via `@google/generative-ai` |
-| Real-time | Socket.io (relays Alpaca WebSocket bars to clients) |
+| Real-time | SSE via Next.js Route Handlers (streams Alpaca WebSocket bars to clients) |
 | Charts | TradingView Lightweight Charts v5 |
 | Financial Data | Alpaca Trade API + Yahoo Finance 2 |
 | Validation | Zod (API inputs + environment variables) |

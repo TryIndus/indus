@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
 	ArrowLeft,
@@ -15,14 +16,14 @@ import {
 	Trash2,
 	TrendingUp,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/lib/context/AuthContext";
+import { useAuth } from "@/lib/stores/auth-store";
 
 interface Report {
 	id: string;
@@ -96,100 +97,129 @@ const formatText = (text: string) => {
 };
 
 export default function ReportsPage() {
-	const [reports, setReports] = useState<Report[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [generating, setGenerating] = useState(false);
 	const [newReportSymbol, setNewReportSymbol] = useState("");
 	const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 	const [viewMode, setViewMode] = useState<"list" | "view">("list");
 	const { user } = useAuth();
+	const queryClient = useQueryClient();
+	const reportsQueryKey = useMemo(() => ["reports", user?.id ?? "anonymous"], [user?.id]);
 
-	const fetchReports = async () => {
-		try {
+	const reportsQuery = useQuery({
+		queryKey: reportsQueryKey,
+		enabled: !!user,
+		queryFn: async () => {
 			const response = await fetch("/api/reports");
-			if (response.ok) {
-				const data = await response.json();
-				setReports(data.reports || []);
+			if (!response.ok) {
+				throw new Error("Failed to fetch reports");
 			}
-		} catch (error) {
-			console.error("Error fetching reports:", error);
-		} finally {
-			setLoading(false);
-		}
-	};
 
-	useEffect(() => {
-		if (user) {
-			fetchReports();
-		}
-	}, [user, fetchReports]);
+			const data = await response.json();
+			return (data.reports || []) as Report[];
+		},
+	});
 
-	const generateReport = async () => {
-		if (!newReportSymbol.trim()) return;
+	const reports = reportsQuery.data ?? [];
+	const loading = reportsQuery.isLoading;
 
-		setGenerating(true);
-		try {
+	const pollReportStatus = useCallback(
+		(reportId: string) => {
+			const interval = setInterval(async () => {
+				try {
+					const response = await fetch(`/api/reports/${reportId}`);
+					if (response.ok) {
+						const data = await response.json();
+						if (data.report.status === "completed" || data.report.status === "error") {
+							queryClient.setQueryData<Report[]>(reportsQueryKey, (currentReports = []) =>
+								currentReports.map((report) => (report.id === reportId ? data.report : report)),
+							);
+							setSelectedReport((currentReport) =>
+								currentReport?.id === reportId ? data.report : currentReport,
+							);
+							clearInterval(interval);
+						}
+					}
+				} catch (error) {
+					console.error("Error polling report status:", error);
+					clearInterval(interval);
+				}
+			}, 3000);
+		},
+		[queryClient, reportsQueryKey],
+	);
+
+	const generateMutation = useMutation({
+		mutationFn: async (symbol: string) => {
 			const response = await fetch("/api/reports/generate", {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({
-					symbol: newReportSymbol.toUpperCase(),
-				}),
+				body: JSON.stringify({ symbol }),
 			});
 
-			if (response.ok) {
-				const newReport = await response.json();
-				setReports((prev) => [newReport.report, ...prev]);
-				setNewReportSymbol("");
-
-				// Poll for completion
-				pollReportStatus(newReport.report.id);
-			} else {
+			if (!response.ok) {
 				const error = await response.json();
-				console.error("Error generating report:", error);
+				throw new Error(error?.error ?? "Error generating report");
 			}
-		} catch (error) {
-			console.error("Error generating report:", error);
-		} finally {
-			setGenerating(false);
-		}
-	};
 
-	const pollReportStatus = async (reportId: string) => {
-		const interval = setInterval(async () => {
-			try {
-				const response = await fetch(`/api/reports/${reportId}`);
-				if (response.ok) {
-					const data = await response.json();
-					if (data.report.status === "completed" || data.report.status === "error") {
-						setReports((prev) =>
-							prev.map((report) => (report.id === reportId ? data.report : report)),
-						);
-						clearInterval(interval);
-					}
-				}
-			} catch (error) {
-				console.error("Error polling report status:", error);
-				clearInterval(interval);
-			}
-		}, 3000);
-	};
+			const newReport = await response.json();
+			return newReport.report as Report;
+		},
+		onSuccess: (report) => {
+			queryClient.setQueryData<Report[]>(reportsQueryKey, (currentReports = []) => [
+				report,
+				...currentReports,
+			]);
+			setNewReportSymbol("");
+			pollReportStatus(report.id);
+		},
+	});
 
-	const deleteReport = async (reportId: string) => {
-		try {
+	const deleteMutation = useMutation({
+		mutationFn: async (reportId: string) => {
 			const response = await fetch(`/api/reports/${reportId}`, {
 				method: "DELETE",
 			});
 
-			if (response.ok) {
-				setReports((prev) => prev.filter((report) => report.id !== reportId));
-				if (selectedReport?.id === reportId) {
-					setSelectedReport(null);
-					setViewMode("list");
-				}
+			if (!response.ok) {
+				throw new Error("Failed to delete report");
 			}
+		},
+		onMutate: async (reportId) => {
+			await queryClient.cancelQueries({ queryKey: reportsQueryKey });
+			const previousReports = queryClient.getQueryData<Report[]>(reportsQueryKey);
+			queryClient.setQueryData<Report[]>(reportsQueryKey, (currentReports = []) =>
+				currentReports.filter((report) => report.id !== reportId),
+			);
+			if (selectedReport?.id === reportId) {
+				setSelectedReport(null);
+				setViewMode("list");
+			}
+			return { previousReports };
+		},
+		onError: (_error, _reportId, context) => {
+			if (context?.previousReports) {
+				queryClient.setQueryData(reportsQueryKey, context.previousReports);
+			}
+		},
+		onSettled: () => {
+			void queryClient.invalidateQueries({ queryKey: reportsQueryKey });
+		},
+	});
+
+	const generateReport = async () => {
+		if (!newReportSymbol.trim()) return;
+
+		try {
+			await generateMutation.mutateAsync(newReportSymbol.toUpperCase());
+		} catch (error) {
+			console.error("Error generating report:", error);
+		}
+	};
+
+	const deleteReport = async (reportId: string) => {
+		try {
+			await deleteMutation.mutateAsync(reportId);
 		} catch (error) {
 			console.error("Error deleting report:", error);
 		}
@@ -393,11 +423,11 @@ export default function ReportsPage() {
 							/>
 							<Button
 								onClick={generateReport}
-								disabled={generating || !newReportSymbol.trim()}
+								disabled={generateMutation.isPending || !newReportSymbol.trim()}
 								className="h-12 px-8 text-base font-medium"
 								size="lg"
 							>
-								{generating ? (
+								{generateMutation.isPending ? (
 									<div className="flex items-center gap-2">
 										<div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
 										Analyzing...
