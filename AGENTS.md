@@ -31,13 +31,15 @@ These apply to every task, every message, regardless of context.
 
 ### Pull Requests
 
-- Open a PR after each phase is complete, but only when the user explicitly asks for it.
-- PRs go from `dev/revamp` to `main`.
+- Open a PR after each phase or feature is complete, but only when the user explicitly asks for it.
+- All PRs target `main`.
 
 ### Branch Strategy
 
-- All work happens on `dev/revamp`. Do not merge to `main` until the full rewrite is complete.
-- `main` remains the stable production deployment.
+- Ship work to `main` in small PRs — one per phase, or one per feature. Avoid large multi-phase PRs.
+- `main` is the production deployment. Every merge to `main` triggers a Vercel production deploy; treat each merge as a release.
+- Use short-lived topic branches per phase or feature; merge to `main` once the work's verification checklist passes.
+- Phase 1 is the trickiest cutover because it changes env vars, the package manager, and the lockfile — coordinate the Vercel env var changes with that merge.
 
 ### Documentation Sync
 
