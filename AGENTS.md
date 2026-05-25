@@ -12,12 +12,12 @@ These apply to every task, every message, regardless of context.
 
 ### Commits
 
-- Always make small, incremental commits. Each logical change gets its own commit.
+- Treat large feature work and small amendments differently:
+    - **Large work** (feature implementations, multi-file refactors, substantial research-backed changes): commit incrementally as you go. Break it into small, scoped, one-sentence commits per logical step — do not accumulate a giant uncommitted diff. Don't wait until the end of the response.
+    - **Small amendments** (status flips in docs, typos, one-line comment fixes, removing stray formatting, minor settings tweaks): `git add` only. Do not create a commit. Surface the staged change in the response so the user can commit when convenient.
 - One-sentence commit messages. Describe what changed, not why (the PR does that).
 - Never batch multiple unrelated changes into a single commit.
 - Never amend a commit unless explicitly asked.
-- Always commit after completing a discrete piece of work — don't accumulate uncommitted changes.
-- At the end of every response, if there are any uncommitted changes, commit them following these same rules.
 - Never mention AI, Claude, or any AI tool in commit messages, PR titles, PR descriptions, or co-author tags. All commits and PRs must read as if written by a human developer.
 
 ### Code Quality
