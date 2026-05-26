@@ -16,7 +16,7 @@ import {
 	Trash2,
 	TrendingUp,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,17 +35,50 @@ interface Report {
 	summary: string;
 }
 
-// Markdown-like text formatter
+const inlineRegex = /\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`/g;
+
+const renderInline = (text: string): ReactNode[] => {
+	const nodes: ReactNode[] = [];
+	let lastIndex = 0;
+	let key = 0;
+
+	for (const match of text.matchAll(inlineRegex)) {
+		const matchIndex = match.index ?? 0;
+		if (matchIndex > lastIndex) {
+			nodes.push(text.slice(lastIndex, matchIndex));
+		}
+
+		const [, bold, italic, code] = match;
+		if (bold) {
+			nodes.push(<strong key={key++}>{bold}</strong>);
+		} else if (italic) {
+			nodes.push(<em key={key++}>{italic}</em>);
+		} else if (code) {
+			nodes.push(
+				<code key={key++} className="bg-muted px-1 py-0.5 rounded text-sm">
+					{code}
+				</code>,
+			);
+		}
+
+		lastIndex = matchIndex + match[0].length;
+	}
+
+	if (lastIndex < text.length) {
+		nodes.push(text.slice(lastIndex));
+	}
+
+	return nodes;
+};
+
 const formatText = (text: string) => {
 	if (!text) return null;
 
-	// Split by paragraphs and process each
 	const paragraphs = text.split("\n\n");
 
 	return paragraphs.map((paragraph, pIndex) => {
 		if (!paragraph.trim()) return null;
 
-		// Check if it's a heading (starts with #)
 		if (paragraph.startsWith("#")) {
 			const level = paragraph.match(/^#+/)?.[0].length || 1;
 			const headingText = paragraph.replace(/^#+\s*/, "");
@@ -71,27 +104,10 @@ const formatText = (text: string) => {
 			}
 		}
 
-		// Process inline formatting
-		let processedText = paragraph;
-
-		// Bold text (**text**)
-		processedText = processedText.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-
-		// Italic text (*text*)
-		processedText = processedText.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
-		// Code text (`text`)
-		processedText = processedText.replace(
-			/`(.*?)`/g,
-			'<code class="bg-muted px-1 py-0.5 rounded text-sm">$1</code>',
-		);
-
 		return (
-			<p
-				key={pIndex}
-				className="mb-4 text-muted-foreground leading-relaxed"
-				dangerouslySetInnerHTML={{ __html: processedText }}
-			/>
+			<p key={pIndex} className="mb-4 text-muted-foreground leading-relaxed">
+				{renderInline(paragraph)}
+			</p>
 		);
 	});
 };

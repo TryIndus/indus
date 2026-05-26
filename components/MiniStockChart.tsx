@@ -6,7 +6,7 @@ import {
 	type IChartApi,
 	type ISeriesApi,
 } from "lightweight-charts";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface MiniStockChartProps {
 	symbol: string;
@@ -25,12 +25,11 @@ export default function MiniStockChart({
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	const loadHistoricalData = async (stockSymbol: string) => {
+	const loadHistoricalData = useCallback(async (stockSymbol: string) => {
 		setIsLoading(true);
 		setError(null);
 
 		try {
-			// Load 1 day timeframe for mini chart
 			const response = await fetch(`/api/alpaca?symbol=${stockSymbol}&timeframe=1Day`);
 			const result = await response.json();
 
@@ -47,7 +46,7 @@ export default function MiniStockChart({
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, []);
 
 	useEffect(() => {
 		if (!chartContainerRef.current) return;

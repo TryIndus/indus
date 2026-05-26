@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useContextChat } from "@/components/chat/useContextChat";
 import { FavoriteButtonCompact } from "@/components/FavoriteButton";
@@ -105,7 +105,7 @@ const CompanyPage: React.FC = () => {
 		return value.toFixed(0);
 	};
 
-	const fetchStockData = async (stockSymbol: string) => {
+	const fetchStockData = useCallback(async (stockSymbol: string) => {
 		setIsLoading(true);
 		setError(null);
 
@@ -269,7 +269,7 @@ const CompanyPage: React.FC = () => {
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, []);
 
 	useEffect(() => {
 		if (symbol) {

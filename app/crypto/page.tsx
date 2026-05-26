@@ -3,7 +3,7 @@
 import { ArrowLeft, ChevronDown, ChevronUp, Coins, DollarSign, TrendingUp } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import CryptoChart from "@/components/CryptoChart";
 import CryptoFinancialTable from "@/components/CryptoFinancialTable";
 import { Button } from "@/components/ui/button";
@@ -57,7 +57,7 @@ const CryptoPage: React.FC = () => {
 	const [error, setError] = useState<string | null>(null);
 	const [showFullDescription, setShowFullDescription] = useState(false);
 
-	const fetchCryptoData = async (cryptoSymbol: string) => {
+	const fetchCryptoData = useCallback(async (cryptoSymbol: string) => {
 		setIsLoading(true);
 		setError(null);
 
@@ -151,7 +151,7 @@ const CryptoPage: React.FC = () => {
 		} finally {
 			setIsLoading(false);
 		}
-	};
+	}, []);
 
 	useEffect(() => {
 		if (query) {

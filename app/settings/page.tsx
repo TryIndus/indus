@@ -442,6 +442,7 @@ export default function Settings() {
 							{settingSections.map((section) => (
 								<button
 									key={section.id}
+									type="button"
 									onClick={() => setActiveSection(section.id)}
 									className={`w-full text-left p-3 rounded-md transition-colors ${
 										activeSection === section.id
