@@ -77,6 +77,7 @@ These apply to every task, every message, regardless of context.
 - `lib/system-prompts.ts` — System prompts for AI
 - `lib/schemas/api.ts` — Shared Zod schemas for all API routes and env validation
 - `lib/env.ts` — Validated environment variables (imports schemas from `lib/schemas/api.ts`)
+- `lib/env-legacy.ts` — Temporary shim mapping `NEXT_PUBLIC_ALPACA_*` to the server-only equivalents; remove once all deployments are migrated
 - `lib/stores/auth-store.ts` — Zustand auth/session state and sign out
 - `lib/stores/favorites-store.ts` — Zustand favorites state with TanStack Query mutations
 - `components/PriceChart.tsx` — Shared TradingView chart with EventSource live updates
@@ -90,6 +91,7 @@ These apply to every task, every message, regardless of context.
 - `GEMINI_API_KEY` (server-only)
 - `NEXT_PUBLIC_VERCEL_URL` (optional)
 - All validated at startup via Zod in `lib/env.ts`
+- Legacy `NEXT_PUBLIC_ALPACA_API_KEY` / `_SECRET_KEY` / `_IS_PAPER` are coalesced to the server-only names by `lib/env-legacy.ts` for backward compatibility; tracked for removal
 
 ## Database Tables (Supabase)
 
