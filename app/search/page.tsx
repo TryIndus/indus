@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import { AlertCircle, Building, Heart, Search, TrendingUp, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type React from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Search, AlertCircle, Building, Heart, Zap, TrendingUp } from "lucide-react";
 
 export default function SearchPage() {
 	const router = useRouter();
@@ -114,7 +115,10 @@ export default function SearchPage() {
 			{/* Header */}
 			<div className="space-y-2">
 				<h1 className="text-3xl font-bold tracking-tight">Discover</h1>
-				<p className="text-muted-foreground">Search for any publicly traded stock on Yahoo Finance. Enter a ticker symbol to get comprehensive financial analysis.</p>
+				<p className="text-muted-foreground">
+					Search for any publicly traded stock on Yahoo Finance. Enter a ticker symbol to get
+					comprehensive financial analysis.
+				</p>
 			</div>
 
 			{/* Main Search Card */}
@@ -129,7 +133,15 @@ export default function SearchPage() {
 				<CardContent className="space-y-4">
 					<form onSubmit={handleSearchSubmit} className="flex gap-4">
 						<div className="flex-1">
-							<Input id="stock-search" type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value.toUpperCase())} placeholder="Type any stock symbol..." className="text-lg font-mono" disabled={isSearching} />
+							<Input
+								id="stock-search"
+								type="text"
+								value={searchTerm}
+								onChange={(e) => setSearchTerm(e.target.value.toUpperCase())}
+								placeholder="Type any stock symbol..."
+								className="text-lg font-mono"
+								disabled={isSearching}
+							/>
 						</div>
 						<Button type="submit" disabled={isSearching || !searchTerm.trim()} className="px-8">
 							{isSearching ? "Searching..." : "Search"}
@@ -190,7 +202,12 @@ export default function SearchPage() {
 							<CardContent>
 								<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 									{category.stocks.map((stock) => (
-										<Button key={stock.symbol} variant="outline" className="h-auto flex-col items-start space-y-2 p-4" onClick={() => handleQuickSearch(stock.symbol)}>
+										<Button
+											key={stock.symbol}
+											variant="outline"
+											className="h-auto flex-col items-start space-y-2 p-4"
+											onClick={() => handleQuickSearch(stock.symbol)}
+										>
 											<div className="flex w-full items-center justify-between">
 												<span className="font-semibold">{stock.symbol}</span>
 												<span className="text-muted-foreground">→</span>
@@ -213,11 +230,19 @@ export default function SearchPage() {
 				</CardHeader>
 				<CardContent>
 					<div className="flex flex-wrap gap-2">
-						{["AAPL", "TSLA", "GOOGL", "AMZN", "MSFT", "NVDA", "META", "NFLX", "UBER", "SPOT"].map((symbol) => (
-							<Button key={symbol} variant="secondary" size="sm" onClick={() => handleQuickSearch(symbol)} className="font-mono">
-								{symbol}
-							</Button>
-						))}
+						{["AAPL", "TSLA", "GOOGL", "AMZN", "MSFT", "NVDA", "META", "NFLX", "UBER", "SPOT"].map(
+							(symbol) => (
+								<Button
+									key={symbol}
+									variant="secondary"
+									size="sm"
+									onClick={() => handleQuickSearch(symbol)}
+									className="font-mono"
+								>
+									{symbol}
+								</Button>
+							),
+						)}
 					</div>
 				</CardContent>
 			</Card>

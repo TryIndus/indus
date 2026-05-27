@@ -1,104 +1,111 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from "next/server";
+import { env } from "@/lib/env";
+import { generateReportSchema } from "@/lib/schemas/api";
+import { createClient } from "@/lib/supabase/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 
 export async function POST(request: Request) {
-  try {
-    const { symbol } = await request.json();
-    
-    if (!symbol) {
-      return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
-    }
+	try {
+		const body = await request.json();
+		const parsed = generateReportSchema.safeParse(body);
 
-    const supabase = await createClient();
-    
-    // Get the current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+		if (!parsed.success) {
+			return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
+		}
 
-    // First, get stock data for the symbol
-    let stockData = null;
-    try {
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? process.env.NEXT_PUBLIC_VERCEL_URL 
-        : 'http://localhost:3001';
-      
-      const stockResponse = await fetch(`${baseUrl}/api/stock-data?symbol=${symbol}`);
-      if (stockResponse.ok) {
-        const stockResult = await stockResponse.json();
-        stockData = stockResult.data;
-      }
-    } catch (error) {
-      console.warn('Could not fetch stock data:', error);
-    }
+		const { symbol } = parsed.data;
 
-    // Create a new report record with 'generating' status
-    const { data: report, error: insertError } = await supabase
-      .from('reports')
-      .insert({
-        user_id: user.id,
-        symbol: symbol.toUpperCase(),
-        company_name: stockData?.longName || stockData?.shortName || symbol,
-        status: 'generating',
-        summary: `Research report for ${symbol.toUpperCase()}`,
-        report_content: ''
-      })
-      .select()
-      .single();
+		const supabase = await createClient();
 
-    if (insertError) {
-      console.error('Error creating report:', insertError);
-      return NextResponse.json(
-        { error: "Failed to create report" },
-        { status: 500 }
-      );
-    }
+		// Get the current user
+		const {
+			data: { user },
+			error: userError,
+		} = await supabase.auth.getUser();
 
-    // Start generating the report asynchronously
-    generateReportContent(report.id, symbol, stockData);
+		if (userError || !user) {
+			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		}
 
-    return NextResponse.json({ 
-      report,
-      message: "Report generation started" 
-    });
-  } catch (error) {
-    console.error("Generate report API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+		// First, get stock data for the symbol
+		let stockData = null;
+		try {
+			const baseUrl =
+				process.env.NODE_ENV === "production"
+					? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+					: "http://localhost:3000";
+
+			const stockResponse = await fetch(`${baseUrl}/api/stock-data?symbol=${symbol}`);
+			if (stockResponse.ok) {
+				const stockResult = await stockResponse.json();
+				stockData = stockResult.data;
+			}
+		} catch (error) {
+			console.warn("Could not fetch stock data:", error);
+		}
+
+		// Create a new report record with 'generating' status
+		const { data: report, error: insertError } = await supabase
+			.from("reports")
+			.insert({
+				user_id: user.id,
+				symbol: symbol.toUpperCase(),
+				company_name: stockData?.longName || stockData?.shortName || symbol,
+				status: "generating",
+				summary: `Research report for ${symbol.toUpperCase()}`,
+				report_content: "",
+			})
+			.select()
+			.single();
+
+		if (insertError) {
+			console.error("Error creating report:", insertError);
+			return NextResponse.json({ error: "Failed to create report" }, { status: 500 });
+		}
+
+		// Start generating the report asynchronously
+		generateReportContent(report.id, symbol, stockData);
+
+		return NextResponse.json({
+			report,
+			message: "Report generation started",
+		});
+	} catch (error) {
+		console.error("Generate report API error:", error);
+		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+	}
 }
 
 async function generateReportContent(reportId: string, symbol: string, stockData: any) {
-  try {
-    const supabase = await createClient();
-    
-    // Prepare the prompt with stock data
-    const prompt = `
+	try {
+		const supabase = await createClient();
+
+		// Prepare the prompt with stock data
+		const prompt = `
 Generate a comprehensive, professional research report for ${symbol.toUpperCase()}. Use proper markdown formatting for structure and readability.
 
-${stockData ? `
+${
+	stockData
+		? `
 **Company Financial Data:**
 - Company: ${stockData.longName || stockData.shortName}
 - Current Price: $${stockData.regularMarketPrice}
 - Price Change: ${stockData.regularMarketChange} (${stockData.regularMarketChangePercent}%)
-- Market Cap: ${stockData.marketCap ? `$${(stockData.marketCap / 1e9).toFixed(2)}B` : 'N/A'}
-- P/E Ratio: ${stockData.peRatio || 'N/A'}
-- Sector: ${stockData.sector || 'N/A'}
-- Industry: ${stockData.industry || 'N/A'}
-- Beta: ${stockData.beta || 'N/A'}
-- 52-Week Range: $${stockData.fiftyTwoWeekLow || 'N/A'} - $${stockData.fiftyTwoWeekHigh || 'N/A'}
-- Revenue Growth: ${stockData.revenueGrowth ? `${(stockData.revenueGrowth * 100).toFixed(2)}%` : 'N/A'}
-- Profit Margins: ${stockData.netProfitMargins ? `${(stockData.netProfitMargins * 100).toFixed(2)}%` : 'N/A'}
-- Return on Equity: ${stockData.returnOnEquity ? `${(stockData.returnOnEquity * 100).toFixed(2)}%` : 'N/A'}
-- Debt to Equity: ${stockData.debtToEquity || 'N/A'}
-` : 'Note: Limited financial data available for analysis.'}
+- Market Cap: ${stockData.marketCap ? `$${(stockData.marketCap / 1e9).toFixed(2)}B` : "N/A"}
+- P/E Ratio: ${stockData.peRatio || "N/A"}
+- Sector: ${stockData.sector || "N/A"}
+- Industry: ${stockData.industry || "N/A"}
+- Beta: ${stockData.beta || "N/A"}
+- 52-Week Range: $${stockData.fiftyTwoWeekLow || "N/A"} - $${stockData.fiftyTwoWeekHigh || "N/A"}
+- Revenue Growth: ${stockData.revenueGrowth ? `${(stockData.revenueGrowth * 100).toFixed(2)}%` : "N/A"}
+- Profit Margins: ${stockData.netProfitMargins ? `${(stockData.netProfitMargins * 100).toFixed(2)}%` : "N/A"}
+- Return on Equity: ${stockData.returnOnEquity ? `${(stockData.returnOnEquity * 100).toFixed(2)}%` : "N/A"}
+- Debt to Equity: ${stockData.debtToEquity || "N/A"}
+`
+		: "Note: Limited financial data available for analysis."
+}
 
 **FORMATTING REQUIREMENTS:**
 - Use ## for main section headers (e.g., ## Executive Summary)
@@ -174,53 +181,48 @@ Discuss appropriate position sizing and investment timeframe.
 
 Write the report now:`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    
-    const result = await model.generateContent(prompt);
-    const reportContent = result.response.text();
+		const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Extract a summary from the executive summary
-    const lines = reportContent.split('\n');
-    const execSummaryIndex = lines.findIndex((line: string) => 
-      line.toLowerCase().includes('executive summary')
-    );
-    
-    let summary = `Research report for ${symbol.toUpperCase()}`;
-    if (execSummaryIndex !== -1) {
-      const summaryLines = lines.slice(execSummaryIndex + 1, execSummaryIndex + 4)
-        .filter((line: string) => line.trim() && !line.includes('*'))
-        .join(' ');
-      if (summaryLines.length > 20) {
-        summary = summaryLines.substring(0, 150) + '...';
-      }
-    }
+		const result = await model.generateContent(prompt);
+		const reportContent = result.response.text();
 
-    // Update the report with the generated content
-    const { error: updateError } = await supabase
-      .from('reports')
-      .update({
-        report_content: reportContent,
-        summary: summary,
-        status: 'completed'
-      })
-      .eq('id', reportId);
+		// Extract a summary from the executive summary
+		const lines = reportContent.split("\n");
+		const execSummaryIndex = lines.findIndex((line: string) =>
+			line.toLowerCase().includes("executive summary"),
+		);
 
-    if (updateError) {
-      console.error('Error updating report:', updateError);
-      // Mark as error
-      await supabase
-        .from('reports')
-        .update({ status: 'error' })
-        .eq('id', reportId);
-    }
-  } catch (error) {
-    console.error('Error generating report content:', error);
-    
-    // Mark report as error
-    const supabase = await createClient();
-    await supabase
-      .from('reports')
-      .update({ status: 'error' })
-      .eq('id', reportId);
-  }
+		let summary = `Research report for ${symbol.toUpperCase()}`;
+		if (execSummaryIndex !== -1) {
+			const summaryLines = lines
+				.slice(execSummaryIndex + 1, execSummaryIndex + 4)
+				.filter((line: string) => line.trim() && !line.includes("*"))
+				.join(" ");
+			if (summaryLines.length > 20) {
+				summary = `${summaryLines.substring(0, 150)}...`;
+			}
+		}
+
+		// Update the report with the generated content
+		const { error: updateError } = await supabase
+			.from("reports")
+			.update({
+				report_content: reportContent,
+				summary: summary,
+				status: "completed",
+			})
+			.eq("id", reportId);
+
+		if (updateError) {
+			console.error("Error updating report:", updateError);
+			// Mark as error
+			await supabase.from("reports").update({ status: "error" }).eq("id", reportId);
+		}
+	} catch (error) {
+		console.error("Error generating report content:", error);
+
+		// Mark report as error
+		const supabase = await createClient();
+		await supabase.from("reports").update({ status: "error" }).eq("id", reportId);
+	}
 }

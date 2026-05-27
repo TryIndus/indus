@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Star, TrendingUp, TrendingDown, X } from "lucide-react";
-import { useFavorites } from "@/lib/context/FavoritesContext";
+import { Star, TrendingDown, TrendingUp, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type React from "react";
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useFavorites } from "@/lib/stores/favorites-store";
 import { cn } from "@/lib/utils";
 
 interface StockData {
@@ -159,7 +160,12 @@ function FavoriteStockCard({ symbol, index }: FavoriteStockCardProps) {
 				<CardContent className="p-4">
 					<div className="text-center">
 						<p className="text-sm text-destructive">Failed to load {symbol}</p>
-						<Button variant="ghost" size="sm" onClick={handleRemove} className="mt-2 text-destructive hover:text-destructive">
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={handleRemove}
+							className="mt-2 text-destructive hover:text-destructive"
+						>
 							Remove
 						</Button>
 					</div>
@@ -169,7 +175,13 @@ function FavoriteStockCard({ symbol, index }: FavoriteStockCardProps) {
 	}
 
 	return (
-		<Card className={cn("min-w-[280px] cursor-pointer transition-all duration-500 hover:shadow-lg hover:scale-[1.02] group relative overflow-hidden", isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4")} onClick={handleClick}>
+		<Card
+			className={cn(
+				"min-w-[280px] cursor-pointer transition-all duration-500 hover:shadow-lg hover:scale-[1.02] group relative overflow-hidden",
+				isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4",
+			)}
+			onClick={handleClick}
+		>
 			{/* Gradient background on hover */}
 			<div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
@@ -179,7 +191,12 @@ function FavoriteStockCard({ symbol, index }: FavoriteStockCardProps) {
 						<h3 className="font-bold text-lg tracking-tight">{symbol}</h3>
 						<p className="text-sm text-muted-foreground truncate">{companyName}</p>
 					</div>
-					<Button variant="ghost" size="sm" onClick={handleRemove} className="opacity-0 group-hover:opacity-100 transition-all duration-200 h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/20 hover:scale-110">
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={handleRemove}
+						className="opacity-0 group-hover:opacity-100 transition-all duration-200 h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/20 hover:scale-110"
+					>
 						<X className="h-4 w-4 text-muted-foreground hover:text-red-500" />
 					</Button>
 				</div>
@@ -187,14 +204,31 @@ function FavoriteStockCard({ symbol, index }: FavoriteStockCardProps) {
 				<div className="space-y-3">
 					<div className="flex items-center justify-between">
 						<div className="text-2xl font-bold tracking-tight">${price.toFixed(2)}</div>
-						<Badge variant={isPositive ? "default" : "destructive"} className={cn("flex items-center gap-1 transition-all duration-200", isPositive ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400" : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400")}>
-							{isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+						<Badge
+							variant={isPositive ? "default" : "destructive"}
+							className={cn(
+								"flex items-center gap-1 transition-all duration-200",
+								isPositive
+									? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+									: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
+							)}
+						>
+							{isPositive ? (
+								<TrendingUp className="h-3 w-3" />
+							) : (
+								<TrendingDown className="h-3 w-3" />
+							)}
 							{isPositive ? "+" : ""}
 							{changePercent.toFixed(2)}%
 						</Badge>
 					</div>
 
-					<div className={cn("text-sm font-medium", isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
+					<div
+						className={cn(
+							"text-sm font-medium",
+							isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400",
+						)}
+					>
 						{isPositive ? "+" : ""}${change.toFixed(2)} today
 					</div>
 				</div>
@@ -206,7 +240,13 @@ function FavoriteStockCard({ symbol, index }: FavoriteStockCardProps) {
 							{/* Background grid */}
 							<defs>
 								<pattern id={`grid-${symbol}`} width="10" height="10" patternUnits="userSpaceOnUse">
-									<path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.1" />
+									<path
+										d="M 10 0 L 0 0 0 10"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="0.5"
+										opacity="0.1"
+									/>
 								</pattern>
 							</defs>
 							<rect width="100" height="40" fill={`url(#grid-${symbol})`} />
@@ -236,20 +276,26 @@ function FavoriteStockCard({ symbol, index }: FavoriteStockCardProps) {
 							{/* Gradient fill under the line */}
 							<defs>
 								<linearGradient id={`gradient-${symbol}`} x1="0%" y1="0%" x2="0%" y2="100%">
-									<stop offset="0%" stopColor={isPositive ? "#22c55e" : "#ef4444"} stopOpacity="0.3" />
-									<stop offset="100%" stopColor={isPositive ? "#22c55e" : "#ef4444"} stopOpacity="0" />
+									<stop
+										offset="0%"
+										stopColor={isPositive ? "#22c55e" : "#ef4444"}
+										stopOpacity="0.3"
+									/>
+									<stop
+										offset="100%"
+										stopColor={isPositive ? "#22c55e" : "#ef4444"}
+										stopOpacity="0"
+									/>
 								</linearGradient>
 							</defs>
 							<path
-								d={
-									chartData
-										.map((pricePoint, i) => {
-											const x = (i / (chartData.length - 1)) * 100;
-											const y = 35 - ((pricePoint - minPrice) / (maxPrice - minPrice)) * 30;
-											return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-										})
-										.join(" ") + " L 100 40 L 0 40 Z"
-								}
+								d={`${chartData
+									.map((pricePoint, i) => {
+										const x = (i / (chartData.length - 1)) * 100;
+										const y = 35 - ((pricePoint - minPrice) / (maxPrice - minPrice)) * 30;
+										return `${i === 0 ? "M" : "L"} ${x} ${y}`;
+									})
+									.join(" ")} L 100 40 L 0 40 Z`}
 								fill={`url(#gradient-${symbol})`}
 								className="opacity-60"
 							/>
@@ -316,7 +362,10 @@ export function FavoritesSection() {
 							<Star className="h-8 w-8 text-muted-foreground" />
 						</div>
 						<h3 className="text-lg font-semibold mb-2">No favorites yet</h3>
-						<p className="text-muted-foreground max-w-sm">Add stocks to your favorites by clicking the star icon on any company page. They&apos;ll appear here for quick access.</p>
+						<p className="text-muted-foreground max-w-sm">
+							Add stocks to your favorites by clicking the star icon on any company page.
+							They&apos;ll appear here for quick access.
+						</p>
 					</CardContent>
 				</Card>
 			</div>
