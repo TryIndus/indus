@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { coalesceLegacyEnv } from "@/lib/env-legacy";
 import { envSchema } from "@/lib/schemas/api";
 
 const validEnv = {
@@ -83,5 +84,39 @@ describe("envSchema", () => {
 	it("rejects invalid ALPACA_IS_PAPER value", () => {
 		const result = envSchema.safeParse({ ...validEnv, ALPACA_IS_PAPER: "yes" });
 		expect(result.success).toBe(false);
+	});
+});
+
+describe("coalesceLegacyEnv", () => {
+	it("falls back to NEXT_PUBLIC_ALPACA_* when canonical names are unset", () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const result = coalesceLegacyEnv({
+			NEXT_PUBLIC_ALPACA_API_KEY: "legacy-key",
+			NEXT_PUBLIC_ALPACA_SECRET_KEY: "legacy-secret",
+			NEXT_PUBLIC_ALPACA_IS_PAPER: "false",
+		});
+		expect(result.ALPACA_API_KEY).toBe("legacy-key");
+		expect(result.ALPACA_SECRET_KEY).toBe("legacy-secret");
+		expect(result.ALPACA_IS_PAPER).toBe("false");
+		expect(warn).toHaveBeenCalledOnce();
+		warn.mockRestore();
+	});
+
+	it("prefers canonical names when both are set", () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const result = coalesceLegacyEnv({
+			ALPACA_API_KEY: "new-key",
+			NEXT_PUBLIC_ALPACA_API_KEY: "legacy-key",
+		});
+		expect(result.ALPACA_API_KEY).toBe("new-key");
+		expect(warn).not.toHaveBeenCalled();
+		warn.mockRestore();
+	});
+
+	it("does not warn when no legacy keys are present", () => {
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		coalesceLegacyEnv({ ALPACA_API_KEY: "new-key" });
+		expect(warn).not.toHaveBeenCalled();
+		warn.mockRestore();
 	});
 });
