@@ -4,6 +4,7 @@ import type {
 	CryptoBar,
 } from "@alpacahq/alpaca-trade-api/dist/resources/datav2/entityv2";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/observability/logger";
 import {
 	extractBarSymbol,
 	formatSseMessage,
@@ -26,10 +27,6 @@ type AlpacaCryptoStream = AlpacaInstance["crypto_stream_v1beta3"];
 type AlpacaStream = AlpacaStockStream | AlpacaCryptoStream;
 
 const encoder = new TextEncoder();
-
-function streamErrorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
 
 export async function GET(request: Request, { params }: { params: Promise<{ symbol: string }> }) {
 	let decodedSymbol: string;
@@ -82,13 +79,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ symb
 						(alpacaStream as AlpacaStockStream | null)?.unsubscribeFromBars([symbol]);
 					}
 				} catch (error) {
-					console.error(`Error unsubscribing from ${symbol}:`, error);
+					logger.error("market_stream.unsubscribe_failed", error, { symbol, assetType });
 				}
 
 				try {
 					alpacaStream?.disconnect();
 				} catch (error) {
-					console.error(`Error disconnecting stream for ${symbol}:`, error);
+					logger.error("market_stream.disconnect_failed", error, { symbol, assetType });
 				}
 
 				try {
@@ -100,8 +97,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ symb
 
 			cleanup = close;
 
-			const sendStreamError = (message: string) => {
-				enqueue(formatSseMessage({ id: eventId++, event: "stream-error", data: { message } }));
+			const sendStreamError = () => {
+				enqueue(
+					formatSseMessage({
+						id: eventId++,
+						event: "stream-error",
+						data: { message: "Live market data is temporarily unavailable" },
+					}),
+				);
 				close();
 			};
 
@@ -141,8 +144,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ symb
 						cryptoStream.onCryptoBar((bar: CryptoBar) => sendBar(bar));
 						cryptoStream.onDisconnect(close);
 						cryptoStream.onError((error: Error) => {
-							console.error(`Crypto stream error for ${symbol}:`, error);
-							sendStreamError(streamErrorMessage(error));
+							logger.error("market_stream.provider_failed", error, { symbol, assetType });
+							sendStreamError();
 						});
 						cryptoStream.connect();
 					} else {
@@ -156,14 +159,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ symb
 						stockStream.onStockBar((bar: AlpacaBar) => sendBar(bar));
 						stockStream.onDisconnect(close);
 						stockStream.onError((error: Error) => {
-							console.error(`Stock stream error for ${symbol}:`, error);
-							sendStreamError(streamErrorMessage(error));
+							logger.error("market_stream.provider_failed", error, { symbol, assetType });
+							sendStreamError();
 						});
 						stockStream.connect();
 					}
 				} catch (error) {
-					console.error(`Failed to start stream for ${symbol}:`, error);
-					sendStreamError(streamErrorMessage(error));
+					logger.error("market_stream.start_failed", error, { symbol, assetType });
+					sendStreamError();
 				}
 			};
 

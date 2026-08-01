@@ -143,6 +143,29 @@ export const stockDataQuerySchema = z.object({
 	symbol: symbolSchema,
 });
 
+const nullableFiniteNumberSchema = finiteNumberSchema.nullable().optional();
+
+export const reportStockDataResponseSchema = z.object({
+	data: z.object({
+		shortName: z.string().optional(),
+		longName: z.string().optional(),
+		regularMarketPrice: finiteNumberSchema.optional(),
+		regularMarketChange: finiteNumberSchema.optional(),
+		regularMarketChangePercent: finiteNumberSchema.optional(),
+		marketCap: nullableFiniteNumberSchema,
+		peRatio: nullableFiniteNumberSchema,
+		sector: z.string().nullable().optional(),
+		industry: z.string().nullable().optional(),
+		beta: nullableFiniteNumberSchema,
+		fiftyTwoWeekLow: nullableFiniteNumberSchema,
+		fiftyTwoWeekHigh: nullableFiniteNumberSchema,
+		revenueGrowth: nullableFiniteNumberSchema,
+		netProfitMargins: nullableFiniteNumberSchema,
+		returnOnEquity: nullableFiniteNumberSchema,
+		debtToEquity: nullableFiniteNumberSchema,
+	}),
+});
+
 export const generateReportSchema = z
 	.object({
 		symbol: symbolSchema,
@@ -151,6 +174,18 @@ export const generateReportSchema = z
 
 export const reportIdSchema = z.object({
 	id: z.uuid(),
+});
+
+export const geminiTextResponseSchema = z.object({
+	candidates: z
+		.array(
+			z.object({
+				content: z.object({
+					parts: z.array(z.object({ text: z.string() })).min(1),
+				}),
+			}),
+		)
+		.min(1),
 });
 
 export const envSchema = z.object({

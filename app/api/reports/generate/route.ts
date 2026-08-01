@@ -1,15 +1,38 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import type { z } from "zod/v4";
 import { env } from "@/lib/env";
-import { generateReportSchema } from "@/lib/schemas/api";
+import { logger } from "@/lib/observability/logger";
+import { generateReportSchema, reportStockDataResponseSchema } from "@/lib/schemas/api";
 import { type AiAccessClient, checkAiAccess, getAiQuotaHeaders } from "@/lib/security/ai-access";
 import { createClient } from "@/lib/supabase/server";
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+type ReportStockData = z.infer<typeof reportStockDataResponseSchema>["data"];
+
+async function fetchStockData(requestUrl: string, symbol: string): Promise<ReportStockData | null> {
+	try {
+		const url = new URL("/api/stock-data", requestUrl);
+		url.searchParams.set("symbol", symbol);
+		const response = await fetch(url);
+		if (!response.ok) {
+			return null;
+		}
+
+		const parsed = reportStockDataResponseSchema.safeParse(await response.json());
+		return parsed.success ? parsed.data.data : null;
+	} catch (error) {
+		logger.warn("report.stock_data_unavailable", {
+			symbol,
+			errorMessage: error instanceof Error ? error.message : String(error),
+		});
+		return null;
+	}
+}
 
 export async function POST(request: Request) {
 	try {
-		const body = await request.json();
+		const body = await request.json().catch(() => null);
 		const parsed = generateReportSchema.safeParse(body);
 
 		if (!parsed.success) {
@@ -27,24 +50,8 @@ export async function POST(request: Request) {
 			);
 		}
 
-		// First, get stock data for the symbol
-		let stockData = null;
-		try {
-			const baseUrl =
-				process.env.NODE_ENV === "production"
-					? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-					: "http://localhost:3000";
+		const stockData = await fetchStockData(request.url, symbol);
 
-			const stockResponse = await fetch(`${baseUrl}/api/stock-data?symbol=${symbol}`);
-			if (stockResponse.ok) {
-				const stockResult = await stockResponse.json();
-				stockData = stockResult.data;
-			}
-		} catch (error) {
-			console.warn("Could not fetch stock data:", error);
-		}
-
-		// Create a new report record with 'generating' status
 		const { data: report, error: insertError } = await supabase
 			.from("reports")
 			.insert({
@@ -59,12 +66,11 @@ export async function POST(request: Request) {
 			.single();
 
 		if (insertError) {
-			console.error("Error creating report:", insertError);
+			logger.error("report.create_failed", insertError, { symbol, userId: access.userId });
 			return NextResponse.json({ error: "Failed to create report" }, { status: 500 });
 		}
 
-		// Start generating the report asynchronously
-		generateReportContent(report.id, symbol, stockData);
+		void generateReportContent(report.id, symbol, stockData);
 
 		return NextResponse.json(
 			{
@@ -74,16 +80,19 @@ export async function POST(request: Request) {
 			{ headers: getAiQuotaHeaders(access) },
 		);
 	} catch (error) {
-		console.error("Generate report API error:", error);
+		logger.error("report.request_failed", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 	}
 }
 
-async function generateReportContent(reportId: string, symbol: string, stockData: any) {
+async function generateReportContent(
+	reportId: string,
+	symbol: string,
+	stockData: ReportStockData | null,
+): Promise<void> {
 	try {
 		const supabase = await createClient();
 
-		// Prepare the prompt with stock data
 		const prompt = `
 Generate a comprehensive, professional research report for ${symbol.toUpperCase()}. Use proper markdown formatting for structure and readability.
 
@@ -187,7 +196,6 @@ Write the report now:`;
 		const result = await model.generateContent(prompt);
 		const reportContent = result.response.text();
 
-		// Extract a summary from the executive summary
 		const lines = reportContent.split("\n");
 		const execSummaryIndex = lines.findIndex((line: string) =>
 			line.toLowerCase().includes("executive summary"),
@@ -204,7 +212,6 @@ Write the report now:`;
 			}
 		}
 
-		// Update the report with the generated content
 		const { error: updateError } = await supabase
 			.from("reports")
 			.update({
@@ -215,14 +222,11 @@ Write the report now:`;
 			.eq("id", reportId);
 
 		if (updateError) {
-			console.error("Error updating report:", updateError);
-			// Mark as error
+			logger.error("report.update_failed", updateError, { reportId, symbol });
 			await supabase.from("reports").update({ status: "error" }).eq("id", reportId);
 		}
 	} catch (error) {
-		console.error("Error generating report content:", error);
-
-		// Mark report as error
+		logger.error("report.generation_failed", error, { reportId, symbol });
 		const supabase = await createClient();
 		await supabase.from("reports").update({ status: "error" }).eq("id", reportId);
 	}
