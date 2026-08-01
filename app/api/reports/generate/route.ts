@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { generateReportSchema } from "@/lib/schemas/api";
+import { type AiAccessClient, checkAiAccess, getAiQuotaHeaders } from "@/lib/security/ai-access";
 import { createClient } from "@/lib/supabase/server";
 
 const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
@@ -18,15 +19,12 @@ export async function POST(request: Request) {
 		const { symbol } = parsed.data;
 
 		const supabase = await createClient();
-
-		// Get the current user
-		const {
-			data: { user },
-			error: userError,
-		} = await supabase.auth.getUser();
-
-		if (userError || !user) {
-			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+		const access = await checkAiAccess(supabase as unknown as AiAccessClient, "generate-report");
+		if (!access.allowed) {
+			return NextResponse.json(
+				{ error: access.error },
+				{ status: access.status, headers: getAiQuotaHeaders(access) },
+			);
 		}
 
 		// First, get stock data for the symbol
@@ -50,7 +48,7 @@ export async function POST(request: Request) {
 		const { data: report, error: insertError } = await supabase
 			.from("reports")
 			.insert({
-				user_id: user.id,
+				user_id: access.userId,
 				symbol: symbol.toUpperCase(),
 				company_name: stockData?.longName || stockData?.shortName || symbol,
 				status: "generating",
@@ -68,10 +66,13 @@ export async function POST(request: Request) {
 		// Start generating the report asynchronously
 		generateReportContent(report.id, symbol, stockData);
 
-		return NextResponse.json({
-			report,
-			message: "Report generation started",
-		});
+		return NextResponse.json(
+			{
+				report,
+				message: "Report generation started",
+			},
+			{ headers: getAiQuotaHeaders(access) },
+		);
 	} catch (error) {
 		console.error("Generate report API error:", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });

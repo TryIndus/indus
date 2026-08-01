@@ -3,6 +3,8 @@ import { GeminiClient } from "@/lib/ai/geminiClient";
 import { GEMINI_SYSTEM_PROMPT } from "@/lib/ai/geminiSystemPrompt";
 import { env } from "@/lib/env";
 import { contextChatSchema } from "@/lib/schemas/api";
+import { type AiAccessClient, checkAiAccess, getAiQuotaHeaders } from "@/lib/security/ai-access";
+import { createClient } from "@/lib/supabase/server";
 import type { ChatMessage, PageContext } from "@/lib/types";
 
 interface RequestBody {
@@ -56,6 +58,15 @@ export async function POST(request: NextRequest) {
 		const parsed = contextChatSchema.safeParse(body);
 		if (!parsed.success) {
 			return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+		}
+
+		const supabase = await createClient();
+		const access = await checkAiAccess(supabase as unknown as AiAccessClient, "context-chat");
+		if (!access.allowed) {
+			return NextResponse.json(
+				{ error: access.error },
+				{ status: access.status, headers: getAiQuotaHeaders(access) },
+			);
 		}
 
 		const { context, messages, newMessage } = parsed.data as RequestBody;
@@ -148,12 +159,13 @@ export async function POST(request: NextRequest) {
 					"Content-Type": "text/event-stream",
 					"Cache-Control": "no-cache",
 					Connection: "keep-alive",
+					...getAiQuotaHeaders(access),
 				},
 			});
 		} else {
 			// Non-streaming response
 			const response = await geminiClient.generateContent(allMessages);
-			return NextResponse.json({ response });
+			return NextResponse.json({ response }, { headers: getAiQuotaHeaders(access) });
 		}
 	} catch (error: any) {
 		console.error("Context chat API error:", error);

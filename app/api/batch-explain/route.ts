@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { type Item, makeBatchPrompt } from "@/lib/prompts";
 import { batchExplainSchema } from "@/lib/schemas/api";
+import { type AiAccessClient, checkAiAccess, getAiQuotaHeaders } from "@/lib/security/ai-access";
+import { createClient } from "@/lib/supabase/server";
 import { VALUE_ANALYSIS_SYSTEM_PROMPT } from "@/lib/system-prompts";
 
 // UPDATED: Using gemini-2.5-flash which is the current stable release (June 2025)
@@ -15,6 +17,15 @@ export async function POST(req: Request) {
 
 		if (!parsed.success) {
 			return NextResponse.json({ error: "Invalid input." }, { status: 400 });
+		}
+
+		const supabase = await createClient();
+		const access = await checkAiAccess(supabase as unknown as AiAccessClient, "batch-explain");
+		if (!access.allowed) {
+			return NextResponse.json(
+				{ error: access.error },
+				{ status: access.status, headers: getAiQuotaHeaders(access) },
+			);
 		}
 
 		const items: Item[] = parsed.data;
@@ -81,7 +92,7 @@ export async function POST(req: Request) {
 				}
 			});
 
-			return NextResponse.json({ explanations: result });
+			return NextResponse.json({ explanations: result }, { headers: getAiQuotaHeaders(access) });
 		} catch (parseError) {
 			console.error(
 				"Failed to parse structured response, falling back to text parsing:",
@@ -114,7 +125,7 @@ export async function POST(req: Request) {
 				result[key] = fallbackExplanations[idx] || "No explanation available.";
 			});
 
-			return NextResponse.json({ explanations: result });
+			return NextResponse.json({ explanations: result }, { headers: getAiQuotaHeaders(access) });
 		}
 	} catch (err) {
 		console.error("Batch explain error:", err);
