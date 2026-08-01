@@ -99,6 +99,15 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `bun run format` | Format code with Biome |
 | `bun test` | Run unit tests (Vitest) |
 | `bun run test:watch` | Run tests in watch mode |
+| `bun run test:unit:coverage` | Run unit tests with enforced coverage thresholds |
+| `bun run test:database` | Replay migrations and run local pgTAP security tests |
+| `bun run test:integration` | Run local HTTP and auth-boundary integration tests |
+| `bun run test:browser` | Run desktop and mobile cross-browser checks |
+| `bun run test:accessibility` | Run WCAG A/AA accessibility checks |
+| `bun run test:performance` | Run production-mode local performance budgets |
+| `bun run test:local` | Run the complete local quality sequence |
+
+See [Local Security and Quality Verification](./docs/LOCAL_QUALITY.md) for prerequisites, security boundaries, quota policy, and troubleshooting.
 
 ## Features
 
@@ -144,7 +153,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | Financial Data | Alpaca Trade API + Yahoo Finance 2 |
 | Validation | Zod (API inputs + environment variables) |
 | Linting | Biome |
-| Testing | Vitest |
+| Testing | Vitest + pgTAP + Playwright + axe-core |
 | Deployment | Vercel |
 
 ## License
