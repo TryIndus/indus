@@ -9,53 +9,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import type { FinancialData } from "@/lib/types";
+import { formatCurrency, formatLargeNumber, formatPercent, formatRatio } from "@/lib/utils";
 import Hoverable from "./Hoverable";
 import MetricNameHover from "./MetricNameHover";
-
-type FinancialData = {
-	symbol: string;
-	shortName?: string;
-	longName?: string;
-	regularMarketPrice?: number;
-	currency?: string;
-	longBusinessSummary?: string;
-	website?: string;
-	sector?: string;
-	industry?: string;
-	country?: string;
-	city?: string;
-	state?: string;
-	marketCap?: number;
-	enterpriseValue?: number;
-	sharesOutstanding?: number;
-	revenue?: number;
-	employees?: number;
-	peRatio?: number;
-	priceToBook?: number;
-	evToSales?: number;
-	evToEbitda?: number;
-	priceToCashFlow?: number;
-	forwardPE?: number;
-	pegRatio?: number;
-	grossMargins?: number;
-	ebitdaMargins?: number;
-	operatingMargins?: number;
-	netProfitMargins?: number;
-	returnOnAssets?: number;
-	returnOnEquity?: number;
-	totalCash?: number;
-	totalDebt?: number;
-	debtToEquity?: number;
-	revenueGrowth?: number;
-	earningsGrowth?: number;
-	dividendYield?: number;
-	dividendRate?: number;
-	payoutRatio?: number;
-	volume?: number;
-	beta?: number;
-	bookValue?: number;
-	priceToSales?: number;
-};
 
 interface FinancialTableProps {
 	data: FinancialData;
@@ -63,37 +20,8 @@ interface FinancialTableProps {
 }
 
 const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) => {
-	// Helper function to check if a value should be displayed
 	const hasValidData = (value?: number) => {
 		return value !== undefined && value !== null && value !== 0;
-	};
-
-	const formatCurrency = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		if (value >= 1e12) return `$${(value / 1e12).toFixed(1)}T`;
-		if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
-		if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-		if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
-		return `$${value.toFixed(2)}`;
-	};
-
-	const formatNumber = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		if (value >= 1e12) return `${(value / 1e12).toFixed(1)}T`;
-		if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
-		if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
-		if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
-		return value.toFixed(0);
-	};
-
-	const formatPercentage = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		return `${(value * 100).toFixed(1)}%`;
-	};
-
-	const formatRatio = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		return value.toFixed(1);
 	};
 
 	return (
@@ -155,7 +83,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 									onChatTrigger={onChatTrigger}
 									metricLabel="Shares Outstanding"
 								>
-									<span>{formatNumber(data.sharesOutstanding)}</span>
+									<span>{formatLargeNumber(data.sharesOutstanding)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -187,7 +115,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 									onChatTrigger={onChatTrigger}
 									metricLabel="Employees"
 								>
-									<span>{formatNumber(data.employees)}</span>
+									<span>{formatLargeNumber(data.employees)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -216,7 +144,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 									onChatTrigger={onChatTrigger}
 									metricLabel="Gross Margin"
 								>
-									<span>{formatPercentage(data.grossMargins)}</span>
+									<span>{formatPercent(data.grossMargins)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -232,7 +160,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 									onChatTrigger={onChatTrigger}
 									metricLabel="EBITDA Margin"
 								>
-									<span>{formatPercentage(data.ebitdaMargins)}</span>
+									<span>{formatPercent(data.ebitdaMargins)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -248,7 +176,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 									onChatTrigger={onChatTrigger}
 									metricLabel="Operating Margin"
 								>
-									<span>{formatPercentage(data.operatingMargins)}</span>
+									<span>{formatPercent(data.operatingMargins)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -264,7 +192,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 									onChatTrigger={onChatTrigger}
 									metricLabel="Net Margin"
 								>
-									<span>{formatPercentage(data.netProfitMargins)}</span>
+									<span>{formatPercent(data.netProfitMargins)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -280,7 +208,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 									onChatTrigger={onChatTrigger}
 									metricLabel="ROA"
 								>
-									<span>{formatPercentage(data.returnOnAssets)}</span>
+									<span>{formatPercent(data.returnOnAssets)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -296,7 +224,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 									onChatTrigger={onChatTrigger}
 									metricLabel="ROE"
 								>
-									<span>{formatPercentage(data.returnOnEquity)}</span>
+									<span>{formatPercent(data.returnOnEquity)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -455,7 +383,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 										onChatTrigger={onChatTrigger}
 										metricLabel="Revenue Growth"
 									>
-										<span>{formatPercentage(data.revenueGrowth)}</span>
+										<span>{formatPercent(data.revenueGrowth)}</span>
 									</Hoverable>
 								</TableCell>
 							</TableRow>
@@ -473,7 +401,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 										onChatTrigger={onChatTrigger}
 										metricLabel="Earnings Growth"
 									>
-										<span>{formatPercentage(data.earningsGrowth)}</span>
+										<span>{formatPercent(data.earningsGrowth)}</span>
 									</Hoverable>
 								</TableCell>
 							</TableRow>
@@ -581,7 +509,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 										onChatTrigger={onChatTrigger}
 										metricLabel="Dividend Yield"
 									>
-										<span>{formatPercentage(data.dividendYield)}</span>
+										<span>{formatPercent(data.dividendYield)}</span>
 									</Hoverable>
 								</TableCell>
 							</TableRow>
@@ -605,7 +533,7 @@ const FinancialTable: React.FC<FinancialTableProps> = ({ data, onChatTrigger }) 
 										onChatTrigger={onChatTrigger}
 										metricLabel="Payout Ratio"
 									>
-										<span>{formatPercentage(data.payoutRatio)}</span>
+										<span>{formatPercent(data.payoutRatio)}</span>
 									</Hoverable>
 								</TableCell>
 							</TableRow>

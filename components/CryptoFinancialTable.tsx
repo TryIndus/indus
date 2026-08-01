@@ -9,45 +9,15 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import type { CryptoData } from "@/lib/types";
+import {
+	formatCurrency,
+	formatLargeNumber,
+	formatPercentagePoints,
+	formatRatio,
+} from "@/lib/utils";
 import Hoverable from "./Hoverable";
 import MetricNameHover from "./MetricNameHover";
-
-type CryptoData = {
-	symbol: string;
-	shortName?: string;
-	longName?: string;
-	regularMarketPrice?: number;
-	currency?: string;
-	longBusinessSummary?: string;
-	website?: string;
-	category?: string;
-	algorithm?: string;
-	marketCap?: number;
-	circulatingSupply?: number;
-	totalSupply?: number;
-	maxSupply?: number;
-	volume?: number;
-	volume24h?: number;
-	percentChange24h?: number;
-	percentChange7d?: number;
-	percentChange30d?: number;
-	allTimeHigh?: number;
-	allTimeLow?: number;
-	ath24hChange?: number;
-	atl24hChange?: number;
-	rank?: number;
-	dominance?: number;
-	volatility?: number;
-	beta?: number;
-	sharpeRatio?: number;
-	tradingPairs?: number;
-	githubActivity?: number;
-	communityScore?: number;
-	developerScore?: number;
-	liquidityScore?: number;
-	fiftyTwoWeekHigh?: number;
-	fiftyTwoWeekLow?: number;
-};
 
 interface CryptoFinancialTableProps {
 	data: CryptoData;
@@ -55,37 +25,8 @@ interface CryptoFinancialTableProps {
 }
 
 const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onChatTrigger }) => {
-	// Helper function to check if a value should be displayed
 	const hasValidData = (value?: number) => {
 		return value !== undefined && value !== null && value !== 0;
-	};
-
-	const formatCurrency = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		if (value >= 1e12) return `$${(value / 1e12).toFixed(1)}T`;
-		if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
-		if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-		if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
-		return `$${value.toFixed(2)}`;
-	};
-
-	const formatNumber = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		if (value >= 1e12) return `${(value / 1e12).toFixed(1)}T`;
-		if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
-		if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
-		if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
-		return value.toFixed(0);
-	};
-
-	const formatPercentage = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		return `${value.toFixed(2)}%`;
-	};
-
-	const formatRatio = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		return value.toFixed(2);
 	};
 
 	return (
@@ -148,7 +89,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										onChatTrigger={onChatTrigger}
 										metricLabel="Market Dominance"
 									>
-										<span>{formatPercentage(data.dominance)}</span>
+										<span>{formatPercentagePoints(data.dominance)}</span>
 									</Hoverable>
 								</TableCell>
 							</TableRow>
@@ -196,7 +137,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									onChatTrigger={onChatTrigger}
 									metricLabel="Circulating Supply"
 								>
-									<span>{formatNumber(data.circulatingSupply)}</span>
+									<span>{formatLargeNumber(data.circulatingSupply)}</span>
 								</Hoverable>
 							</TableCell>
 						</TableRow>
@@ -213,7 +154,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										onChatTrigger={onChatTrigger}
 										metricLabel="Total Supply"
 									>
-										<span>{formatNumber(data.totalSupply)}</span>
+										<span>{formatLargeNumber(data.totalSupply)}</span>
 									</Hoverable>
 								</TableCell>
 							</TableRow>
@@ -231,7 +172,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										onChatTrigger={onChatTrigger}
 										metricLabel="Max Supply"
 									>
-										<span>{formatNumber(data.maxSupply)}</span>
+										<span>{formatLargeNumber(data.maxSupply)}</span>
 									</Hoverable>
 								</TableCell>
 							</TableRow>
@@ -268,7 +209,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 												: "text-red-600"
 										}
 									>
-										{formatPercentage(data.percentChange24h)}
+										{formatPercentagePoints(data.percentChange24h)}
 									</span>
 								</Hoverable>
 							</TableCell>
@@ -293,7 +234,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 													: "text-red-600"
 											}
 										>
-											{formatPercentage(data.percentChange7d)}
+											{formatPercentagePoints(data.percentChange7d)}
 										</span>
 									</Hoverable>
 								</TableCell>
@@ -319,7 +260,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 													: "text-red-600"
 											}
 										>
-											{formatPercentage(data.percentChange30d)}
+											{formatPercentagePoints(data.percentChange30d)}
 										</span>
 									</Hoverable>
 								</TableCell>
@@ -433,7 +374,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 											onChatTrigger={onChatTrigger}
 											metricLabel="GitHub Activity"
 										>
-											<span>{formatRatio(data.githubActivity)}</span>
+											<span>{formatRatio(data.githubActivity, 2)}</span>
 										</Hoverable>
 									</TableCell>
 								</TableRow>
@@ -451,7 +392,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 											onChatTrigger={onChatTrigger}
 											metricLabel="Community Score"
 										>
-											<span>{formatRatio(data.communityScore)}</span>
+											<span>{formatRatio(data.communityScore, 2)}</span>
 										</Hoverable>
 									</TableCell>
 								</TableRow>
@@ -469,7 +410,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 											onChatTrigger={onChatTrigger}
 											metricLabel="Developer Score"
 										>
-											<span>{formatRatio(data.developerScore)}</span>
+											<span>{formatRatio(data.developerScore, 2)}</span>
 										</Hoverable>
 									</TableCell>
 								</TableRow>
@@ -505,7 +446,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 											onChatTrigger={onChatTrigger}
 											metricLabel="Volatility"
 										>
-											<span>{formatPercentage(data.volatility)}</span>
+											<span>{formatPercentagePoints(data.volatility)}</span>
 										</Hoverable>
 									</TableCell>
 								</TableRow>
@@ -523,7 +464,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 											onChatTrigger={onChatTrigger}
 											metricLabel="Beta"
 										>
-											<span>{formatRatio(data.beta)}</span>
+											<span>{formatRatio(data.beta, 2)}</span>
 										</Hoverable>
 									</TableCell>
 								</TableRow>
@@ -541,7 +482,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 											onChatTrigger={onChatTrigger}
 											metricLabel="Sharpe Ratio"
 										>
-											<span>{formatRatio(data.sharpeRatio)}</span>
+											<span>{formatRatio(data.sharpeRatio, 2)}</span>
 										</Hoverable>
 									</TableCell>
 								</TableRow>
@@ -559,7 +500,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 											onChatTrigger={onChatTrigger}
 											metricLabel="Liquidity Score"
 										>
-											<span>{formatRatio(data.liquidityScore)}</span>
+											<span>{formatRatio(data.liquidityScore, 2)}</span>
 										</Hoverable>
 									</TableCell>
 								</TableRow>

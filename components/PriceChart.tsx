@@ -13,6 +13,14 @@ type AssetType = "stock" | "crypto";
 type BarData = CandlestickData<Time> & { volume?: number };
 type RealtimeStatus = "connecting" | "connected" | "reconnecting" | "disabled";
 
+interface HistoricalDataResponse {
+	data: BarData[];
+	isEmpty: boolean;
+	earliestTimestamp: number | null;
+	totalBars: number;
+	error?: string;
+}
+
 export interface PriceChartProps {
 	symbol: string;
 	type: AssetType;
@@ -30,6 +38,42 @@ const timeframes = [
 	{ value: "1Week", label: "1 Week" },
 	{ value: "1Month", label: "1 Month" },
 ];
+
+function isBarData(value: unknown): value is BarData {
+	if (!value || typeof value !== "object") {
+		return false;
+	}
+
+	const bar = value as Record<string, unknown>;
+	return ["time", "open", "high", "low", "close"].every(
+		(key) => typeof bar[key] === "number" && Number.isFinite(bar[key]),
+	);
+}
+
+function parseHistoricalResponse(value: unknown): HistoricalDataResponse | null {
+	if (!value || typeof value !== "object") {
+		return null;
+	}
+
+	const response = value as Record<string, unknown>;
+	if (
+		!Array.isArray(response.data) ||
+		!response.data.every(isBarData) ||
+		typeof response.isEmpty !== "boolean" ||
+		typeof response.totalBars !== "number" ||
+		(response.earliestTimestamp !== null && typeof response.earliestTimestamp !== "number")
+	) {
+		return null;
+	}
+
+	return {
+		data: response.data,
+		isEmpty: response.isEmpty,
+		earliestTimestamp: response.earliestTimestamp,
+		totalBars: response.totalBars,
+		error: typeof response.error === "string" ? response.error : undefined,
+	};
+}
 
 function buildHistoricalUrl(
 	symbol: string,
@@ -79,12 +123,6 @@ export default function PriceChart({
 	const historicalDataRef = useRef<BarData[]>([]);
 	const hasReachedDataLimitRef = useRef(false);
 
-	const addDebugInfo = useCallback((message: string) => {
-		if (process.env.NODE_ENV === "development") {
-			console.log(`DEBUG: ${message}`);
-		}
-	}, []);
-
 	const clearReconnectTimer = useCallback(() => {
 		if (reconnectTimerRef.current) {
 			clearTimeout(reconnectTimerRef.current);
@@ -106,28 +144,24 @@ export default function PriceChart({
 
 	const loadHistoricalData = useCallback(
 		async (symbol: string, timeframe: string) => {
-			addDebugInfo(`Loading historical ${type} data for ${symbol} (${timeframe})...`);
 			setError(null);
 
 			try {
 				const response = await fetch(buildHistoricalUrl(symbol, timeframe, type));
-				const result = await response.json();
+				const result = parseHistoricalResponse(await response.json());
 
-				if (response.ok && result.data && !result.isEmpty) {
+				if (response.ok && result && !result.isEmpty) {
 					historicalDataRef.current = result.data;
 					earliestLoadedTimestampRef.current = result.earliestTimestamp;
 					candlestickSeriesRef.current?.setData(result.data);
-					addDebugInfo(`Loaded ${result.totalBars} historical bars for ${symbol}`);
 				} else {
-					addDebugInfo(`Failed to load historical data: ${result.error}`);
-					setError(result.error ?? "Failed to load historical data");
+					setError(result?.error ?? "Failed to load historical data");
 				}
-			} catch (error) {
-				addDebugInfo(`Error loading historical data: ${error}`);
+			} catch {
 				setError("Internal server error");
 			}
 		},
-		[addDebugInfo, type],
+		[type],
 	);
 
 	const loadMoreHistoricalData = useCallback(async () => {
@@ -147,9 +181,9 @@ export default function PriceChart({
 					earliestLoadedTimestampRef.current,
 				),
 			);
-			const result = await response.json();
+			const result = parseHistoricalResponse(await response.json());
 
-			if (response.ok && result.data && !result.isEmpty) {
+			if (response.ok && result && !result.isEmpty) {
 				const firstLoadedBar = historicalDataRef.current[0];
 				const filteredNewData = firstLoadedBar
 					? result.data.filter((bar: BarData) => bar.time < firstLoadedBar.time)
@@ -159,7 +193,6 @@ export default function PriceChart({
 				historicalDataRef.current = combinedData;
 				earliestLoadedTimestampRef.current = result.earliestTimestamp;
 				candlestickSeriesRef.current?.setData(combinedData);
-				addDebugInfo(`Loaded ${filteredNewData.length} new bars, total: ${combinedData.length}`);
 			} else {
 				hasReachedDataLimitRef.current = true;
 				setHasReachedDataLimit(true);
@@ -174,13 +207,13 @@ export default function PriceChart({
 					);
 				}
 			}
-		} catch (error) {
-			addDebugInfo(`Error loading more historical data: ${error}`);
+		} catch {
+			setDataLimitMessage("Unable to load additional historical data");
 		} finally {
 			setIsLoadingMoreData(false);
 			isLoadingMoreDataRef.current = false;
 		}
-	}, [addDebugInfo, type]);
+	}, [type]);
 
 	useEffect(() => {
 		if (!chartContainerRef.current) {
@@ -311,22 +344,24 @@ export default function PriceChart({
 			clearReconnectTimer();
 			setRealtimeStatus("connected");
 			setShowReconnecting(false);
-			addDebugInfo(`Connected to SSE stream for ${selectedSymbol}`);
 		};
 
 		const handleBar = (event: MessageEvent<string>) => {
 			try {
-				const data = JSON.parse(event.data) as BarData;
-				if (candlestickSeriesRef.current && selectedTimeframeRef.current === "1Min") {
+				const data: unknown = JSON.parse(event.data);
+				if (
+					isBarData(data) &&
+					candlestickSeriesRef.current &&
+					selectedTimeframeRef.current === "1Min"
+				) {
 					candlestickSeriesRef.current.update(data);
 				}
-			} catch (error) {
-				addDebugInfo(`Failed to parse SSE bar data: ${error}`);
+			} catch {
+				return;
 			}
 		};
 
-		const handleStreamError = (event: MessageEvent<string>) => {
-			addDebugInfo(`SSE stream error for ${selectedSymbol}: ${event.data}`);
+		const handleStreamError = () => {
 			setRealtimeStatus("disabled");
 			setShowReconnecting(false);
 			clearReconnectTimer();
@@ -360,7 +395,7 @@ export default function PriceChart({
 				eventSourceRef.current = null;
 			}
 		};
-	}, [addDebugInfo, clearReconnectTimer, selectedSymbol]);
+	}, [clearReconnectTimer, selectedSymbol]);
 
 	return (
 		<div className={`bg-card rounded-lg border border-border ${className}`}>

@@ -36,8 +36,6 @@ const Hoverable: React.FC<HoverableProps> = ({
 	const [explanation, setExplanation] = useState<string | undefined>();
 	const [loading, setLoading] = useState(false);
 
-	const key = `${symbol}_${metric}`;
-
 	const updateExplanation = useCallback(() => {
 		const cached = getCachedExplanation(symbol, metric);
 		const currentlyLoading = isLoading(symbol, metric);
@@ -60,20 +58,17 @@ const Hoverable: React.FC<HoverableProps> = ({
 
 		if (!cached && !currentlyLoading) {
 			setLoading(true);
-			fetchExplanation(symbol, metric, value).catch((err) => {
-				console.error(`Fetch error for ${key}:`, err);
+			fetchExplanation(symbol, metric, value).catch(() => {
 				setLoading(false);
 			});
 		}
-	}, [symbol, metric, value, key]);
+	}, [symbol, metric, value]);
 
-	// Parse the explanation if it's structured JSON
 	const parseExplanation = useCallback((rawExplanation: string) => {
 		try {
 			const parsed: ValueAnalysis = JSON.parse(rawExplanation);
 			return parsed;
 		} catch {
-			// If it's not JSON, treat as plain text (fallback)
 			return null;
 		}
 	}, []);

@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { formatCurrency, formatLargeNumber } from "@/lib/utils";
 import Hoverable from "./Hoverable";
 import MetricNameHover from "./MetricNameHover";
 
@@ -29,25 +30,6 @@ const STOCKS = [
 ];
 
 const StockTable: React.FC = () => {
-	// Standardized formatting functions
-	const formatCurrency = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		if (value >= 1e12) return `$${(value / 1e12).toFixed(1)}T`;
-		if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
-		if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-		if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
-		return `$${value.toFixed(2)}`;
-	};
-
-	const formatNumber = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		if (value >= 1e12) return `${(value / 1e12).toFixed(1)}T`;
-		if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
-		if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
-		if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
-		return value.toFixed(0);
-	};
-
 	return (
 		<div
 			className="overflow-x-hidden text-black"
@@ -86,7 +68,7 @@ const StockTable: React.FC = () => {
 							</td>
 							<td className="px-4 py-2 border-b">
 								<Hoverable symbol={stock.symbol} metric="volume" value={stock.volume}>
-									{formatNumber(stock.volume)}
+									{formatLargeNumber(stock.volume)}
 								</Hoverable>
 							</td>
 						</tr>

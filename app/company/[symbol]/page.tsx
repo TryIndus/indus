@@ -22,53 +22,8 @@ import StockChart from "@/components/StockChart";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { batchPreload } from "@/hooks/useExplanation";
-
-type FinancialData = {
-	symbol: string;
-	shortName?: string;
-	longName?: string;
-	regularMarketPrice?: number;
-	regularMarketChange?: number;
-	regularMarketChangePercent?: number;
-	currency?: string;
-	longBusinessSummary?: string;
-	website?: string;
-	sector?: string;
-	industry?: string;
-	country?: string;
-	city?: string;
-	state?: string;
-	marketCap?: number;
-	enterpriseValue?: number;
-	sharesOutstanding?: number;
-	revenue?: number;
-	employees?: number;
-	peRatio?: number;
-	priceToBook?: number;
-	evToSales?: number;
-	evToEbitda?: number;
-	priceToCashFlow?: number;
-	forwardPE?: number;
-	pegRatio?: number;
-	grossMargins?: number;
-	ebitdaMargins?: number;
-	operatingMargins?: number;
-	netProfitMargins?: number;
-	returnOnAssets?: number;
-	returnOnEquity?: number;
-	totalCash?: number;
-	totalDebt?: number;
-	debtToEquity?: number;
-	revenueGrowth?: number;
-	earningsGrowth?: number;
-	dividendYield?: number;
-	dividendRate?: number;
-	payoutRatio?: number;
-	volume?: number;
-	beta?: number;
-	bookValue?: number;
-	priceToSales?: number;
-};
+import type { FinancialData } from "@/lib/types";
+import { formatCurrency, formatLargeNumber } from "@/lib/utils";
 
 const CompanyPage: React.FC = () => {
 	const params = useParams();
@@ -80,30 +35,10 @@ const CompanyPage: React.FC = () => {
 	const [error, setError] = useState<string | null>(null);
 	const [showFullDescription, setShowFullDescription] = useState(false);
 
-	// Contextual chat integration
 	const contextChat = useContextChat({
 		getFinancialData: () => financialData,
-		getChartData: () => undefined, // Chart data would be integrated here if available
+		getChartData: () => undefined,
 	});
-
-	// Standardized formatting functions
-	const formatCurrency = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		if (value >= 1e12) return `$${(value / 1e12).toFixed(1)}T`;
-		if (value >= 1e9) return `$${(value / 1e9).toFixed(1)}B`;
-		if (value >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
-		if (value >= 1e3) return `$${(value / 1e3).toFixed(1)}K`;
-		return `$${value.toFixed(2)}`;
-	};
-
-	const formatNumber = (value?: number) => {
-		if (value === undefined || value === null) return "—";
-		if (value >= 1e12) return `${(value / 1e12).toFixed(1)}T`;
-		if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`;
-		if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
-		if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
-		return value.toFixed(0);
-	};
 
 	const fetchStockData = useCallback(async (stockSymbol: string) => {
 		setIsLoading(true);
@@ -264,7 +199,6 @@ const CompanyPage: React.FC = () => {
 				batchPreload(items);
 			}
 		} catch (err) {
-			console.error("Error fetching stock data:", err);
 			setError(err instanceof Error ? err.message : "An error occurred");
 		} finally {
 			setIsLoading(false);
@@ -357,6 +291,7 @@ const CompanyPage: React.FC = () => {
 												</CardTitle>
 												<FavoriteButtonCompact
 													symbol={financialData.symbol}
+													companyName={financialData.longName ?? financialData.shortName}
 													className="hover:bg-yellow-100 dark:hover:bg-yellow-900/20"
 												/>
 											</div>
@@ -520,7 +455,7 @@ const CompanyPage: React.FC = () => {
 							</CardHeader>
 							<CardContent className="text-center">
 								<div className="text-2xl font-bold metric-tile-value">
-									{formatNumber(financialData.sharesOutstanding)}
+									{formatLargeNumber(financialData.sharesOutstanding)}
 								</div>
 							</CardContent>
 						</Card>
@@ -548,7 +483,7 @@ const CompanyPage: React.FC = () => {
 							</CardHeader>
 							<CardContent className="text-center">
 								<div className="text-2xl font-bold metric-tile-value">
-									{formatNumber(financialData.employees)}
+									{formatLargeNumber(financialData.employees)}
 								</div>
 							</CardContent>
 						</Card>
