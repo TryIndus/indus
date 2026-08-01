@@ -102,4 +102,4 @@ Schema migrations are tracked in `supabase/migrations/` and numbered sequentiall
 
 ## Revamp Plan
 
-The detailed rewrite plan (phases, architecture, verification checklists) lives in [`REVAMP_PLAN.md`](./REVAMP_PLAN.md).
+The detailed rewrite plan (phases, architecture, verification checklists) lives in [`docs/REVAMP_PLAN.md`](./docs/REVAMP_PLAN.md).
