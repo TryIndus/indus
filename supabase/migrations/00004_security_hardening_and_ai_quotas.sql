@@ -18,6 +18,16 @@ ALTER TABLE public.metric_explanations
   ADD CONSTRAINT metric_explanations_metric_length
   CHECK (char_length(metric) BETWEEN 1 AND 80) NOT VALID;
 
+ALTER TABLE public.favorites
+  VALIDATE CONSTRAINT favorites_symbol_format;
+ALTER TABLE public.reports
+  VALIDATE CONSTRAINT reports_symbol_format,
+  VALIDATE CONSTRAINT reports_company_name_length,
+  VALIDATE CONSTRAINT reports_status_values;
+ALTER TABLE public.metric_explanations
+  VALIDATE CONSTRAINT metric_explanations_symbol_format,
+  VALIDATE CONSTRAINT metric_explanations_metric_length;
+
 ALTER TABLE public.metric_explanations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users can manage their own favorites" ON public.favorites;
@@ -125,10 +135,12 @@ BEGIN
     RETURN QUERY SELECT
       false,
       GREATEST(LEAST(v_hour_limit - v_hour_count, v_day_limit - v_day_count), 0),
-      CASE
-        WHEN v_hour_count >= v_hour_limit THEN v_hour_start + interval '1 hour'
-        ELSE v_day_start + interval '1 day'
-      END;
+	      CASE
+	        WHEN v_hour_count >= v_hour_limit AND v_day_count >= v_day_limit THEN
+	          GREATEST(v_hour_start + interval '1 hour', v_day_start + interval '1 day')
+	        WHEN v_hour_count >= v_hour_limit THEN v_hour_start + interval '1 hour'
+	        ELSE v_day_start + interval '1 day'
+	      END;
     RETURN;
   END IF;
 

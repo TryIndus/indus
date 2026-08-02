@@ -77,7 +77,7 @@ Run the full sequence with:
 bun run test:local
 ```
 
-The full command owns a disposable Supabase stack when one is not already running. It preserves an existing local stack and stops only the stack that it started.
+The database layer always uses a temporary Supabase project on dedicated test ports. It resets and removes only that isolated project, so an existing local Supabase stack and its data are not modified.
 
 ## Enforced budgets
 
