@@ -86,6 +86,7 @@ export function AppSidebar() {
 										<SidebarMenuButton asChild>
 											<a
 												href={item.url}
+												aria-label={item.title}
 												className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
 													isActive
 														? "bg-muted text-foreground"
@@ -126,6 +127,7 @@ export function AppSidebar() {
 										<SidebarMenuButton asChild>
 											<a
 												href={item.url}
+												aria-label={item.title}
 												className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted text-muted-foreground"
 											>
 												<item.icon className="w-5 h-5" />
@@ -153,6 +155,7 @@ export function AppSidebar() {
 							<SidebarMenuButton asChild>
 								<a
 									href={item.url}
+									aria-label={item.title}
 									className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted text-muted-foreground"
 								>
 									<item.icon className="w-5 h-5" />
