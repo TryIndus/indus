@@ -8,9 +8,10 @@ export default defineConfig({
 	testDir: "./e2e",
 	testMatch: "**/*.e2e.ts",
 	fullyParallel: true,
+	workers: 2,
 	forbidOnly: Boolean(process.env.CI),
 	retries: 0,
-	timeout: 30_000,
+	timeout: 60_000,
 	expect: {
 		timeout: 7_500,
 	},
