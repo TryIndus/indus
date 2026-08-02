@@ -32,4 +32,13 @@ describe("extractReportSummary", () => {
 		expect(summary).toHaveLength(160);
 		expect(summary.endsWith("...")).toBe(true);
 	});
+
+	test("keeps short summaries and supplies a fallback for an empty section", () => {
+		expect(extractReportSummary("## Executive Summary\nShort summary", "AAPL")).toBe(
+			"Short summary",
+		);
+		expect(extractReportSummary("## Executive Summary\n## Data Limitations", "AAPL")).toBe(
+			"Financial snapshot for AAPL",
+		);
+	});
 });

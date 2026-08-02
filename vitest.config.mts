@@ -17,6 +17,9 @@ export default defineConfig({
 		coverage: {
 			provider: "v8",
 			include: [
+				"lib/ai/geminiClient.ts",
+				"lib/ai/report.ts",
+				"lib/chat/messages.ts",
 				"lib/env-legacy.ts",
 				"lib/realtime/alpaca-stream.ts",
 				"lib/schemas/api.ts",

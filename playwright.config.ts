@@ -28,7 +28,7 @@ export default defineConfig({
 			? `bun run start --hostname 127.0.0.1 --port ${port}`
 			: `bun run dev --hostname 127.0.0.1 --port ${port}`,
 		url: baseURL,
-		reuseExistingServer: !process.env.CI,
+		reuseExistingServer: false,
 		timeout: 120_000,
 		env: {
 			...process.env,
