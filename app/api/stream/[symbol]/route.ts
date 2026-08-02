@@ -1,8 +1,4 @@
-import Alpaca from "@alpacahq/alpaca-trade-api";
-import type {
-	AlpacaBar,
-	CryptoBar,
-} from "@alpacahq/alpaca-trade-api/dist/resources/datav2/entityv2";
+import { Alpaca } from "@alpacahq/alpaca-trade-api";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/observability/logger";
 import {
@@ -20,10 +16,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-type AlpacaInstance = InstanceType<typeof Alpaca>;
-type AlpacaStockStream = AlpacaInstance["data_stream_v2"];
-type AlpacaCryptoStream = AlpacaInstance["crypto_stream_v1beta3"];
-
+type AlpacaStockStream = ReturnType<Alpaca["marketData"]["stockStream"]>;
+type AlpacaCryptoStream = ReturnType<Alpaca["marketData"]["cryptoStream"]>;
 type AlpacaStream = AlpacaStockStream | AlpacaCryptoStream;
 
 const encoder = new TextEncoder();
@@ -127,38 +121,38 @@ export async function GET(request: Request, { params }: { params: Promise<{ symb
 				try {
 					const alpaca = new Alpaca({
 						keyId: env.ALPACA_API_KEY,
-						secretKey: env.ALPACA_SECRET_KEY,
+						secret: env.ALPACA_SECRET_KEY,
 						paper: env.ALPACA_IS_PAPER,
 					});
 
 					heartbeat = setInterval(() => enqueue(": keep-alive\n\n"), 15_000);
 
 					if (assetType === "crypto") {
-						const cryptoStream = alpaca.crypto_stream_v1beta3;
+						const cryptoStream = alpaca.marketData.cryptoStream();
 						alpacaStream = cryptoStream;
 
 						cryptoStream.onConnect(() => {
 							sendReady();
 							cryptoStream.subscribeForBars([symbol]);
 						});
-						cryptoStream.onCryptoBar((bar: CryptoBar) => sendBar(bar));
+						cryptoStream.onBar((bar) => sendBar(bar));
 						cryptoStream.onDisconnect(close);
-						cryptoStream.onError((error: Error) => {
+						cryptoStream.onError((error) => {
 							logger.error("market_stream.provider_failed", error, { symbol, assetType });
 							sendStreamError();
 						});
 						cryptoStream.connect();
 					} else {
-						const stockStream = alpaca.data_stream_v2;
+						const stockStream = alpaca.marketData.stockStream({ feed: "iex" });
 						alpacaStream = stockStream;
 
 						stockStream.onConnect(() => {
 							sendReady();
 							stockStream.subscribeForBars([symbol]);
 						});
-						stockStream.onStockBar((bar: AlpacaBar) => sendBar(bar));
+						stockStream.onBar((bar) => sendBar(bar));
 						stockStream.onDisconnect(close);
-						stockStream.onError((error: Error) => {
+						stockStream.onError((error) => {
 							logger.error("market_stream.provider_failed", error, { symbol, assetType });
 							sendStreamError();
 						});

@@ -131,7 +131,7 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 | Styling | Tailwind CSS v4 + shadcn/ui (Radix) + Lucide icons + next-themes |
 | Auth & DB | Supabase (PostgreSQL + Auth with Google OAuth) |
 | State | Zustand + TanStack Query |
-| AI | Google Gemini via `@google/generative-ai` |
+| AI | Google Gemini 2.5 Flash via the REST API |
 | Real-time | SSE via Next.js Route Handlers (streams Alpaca WebSocket bars to clients) |
 | Charts | TradingView Lightweight Charts v5 |
 | Financial Data | Alpaca Trade API + Yahoo Finance 2 |

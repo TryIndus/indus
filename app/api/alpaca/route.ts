@@ -1,12 +1,10 @@
-import Alpaca from "@alpacahq/alpaca-trade-api";
+import { Alpaca, TimeFrame, timeFrame, TimeFrameUnit } from "@alpacahq/alpaca-trade-api";
 import { type NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/observability/logger";
 import { alpacaQuerySchema } from "@/lib/schemas/api";
 
-const EST_TIMEZONE_OFFSET_SECONDS = 5 * 60 * 60;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const MAX_BAR_COUNT = 1_000_000;
 const RANGE_DAYS_BY_TIMEFRAME = {
 	"1Min": 5,
 	"5Min": 14,
@@ -26,17 +24,27 @@ interface BarData {
 	volume: number;
 }
 
-function convertToESTTimestamp(timestamp: string | Date): number {
-	const date = new Date(timestamp);
-	return Math.floor((date.getTime() - EST_TIMEZONE_OFFSET_SECONDS * 1000) / 1000);
-}
-
-function convertToUTCTimestamp(estTimestamp: number): number {
-	return estTimestamp + EST_TIMEZONE_OFFSET_SECONDS;
-}
-
 function getStartDate(timeframe: keyof typeof RANGE_DAYS_BY_TIMEFRAME, endDate: Date): Date {
 	return new Date(endDate.getTime() - RANGE_DAYS_BY_TIMEFRAME[timeframe] * DAY_IN_MS);
+}
+
+function toAlpacaTimeframe(timeframe: keyof typeof RANGE_DAYS_BY_TIMEFRAME) {
+	switch (timeframe) {
+		case "1Min":
+			return TimeFrame.Minute;
+		case "5Min":
+			return timeFrame(5, TimeFrameUnit.Minute);
+		case "15Min":
+			return timeFrame(15, TimeFrameUnit.Minute);
+		case "1Hour":
+			return TimeFrame.Hour;
+		case "1Day":
+			return TimeFrame.Day;
+		case "1Week":
+			return TimeFrame.Week;
+		case "1Month":
+			return TimeFrame.Month;
+	}
 }
 
 export async function GET(request: NextRequest) {
@@ -64,75 +72,38 @@ export async function GET(request: NextRequest) {
 	try {
 		const alpaca = new Alpaca({
 			keyId: env.ALPACA_API_KEY,
-			secretKey: env.ALPACA_SECRET_KEY,
+			secret: env.ALPACA_SECRET_KEY,
 			paper: env.ALPACA_IS_PAPER,
-			usePolygon: false,
 		});
 
 		const endDate: Date = endParam ? new Date(endParam * 1000) : new Date();
 		const startDate = startParam ? new Date(startParam * 1000) : getStartDate(timeframe, endDate);
 
 		const historicalData: BarData[] = [];
-		let pageToken: string | undefined;
-		let totalFetched = 0;
+		const request = {
+			start: startDate,
+			end: endDate,
+			timeframe: toAlpacaTimeframe(timeframe),
+			limit,
+		};
+		const bars =
+			type === "crypto"
+				? await alpaca.marketData.getCryptoBarsFor(symbol, { ...request, loc: "us" }, { maxPerSymbol: limit })
+				: await alpaca.marketData.getStockBarsFor(
+						symbol,
+						{ ...request, feed: "iex", adjustment: "split" },
+						{ maxPerSymbol: limit },
+					);
 
-		if (type === "crypto") {
-			const barsResponse = await alpaca.getCryptoBars([symbol.toUpperCase()], {
-				start: startDate,
-				end: endDate,
-				timeframe: timeframe,
-				limit: limit,
+		for (const bar of bars) {
+			historicalData.push({
+				time: Math.floor(bar.timestamp.getTime() / 1000),
+				open: bar.open,
+				high: bar.high,
+				low: bar.low,
+				close: bar.close,
+				volume: bar.volume,
 			});
-
-			for await (const [, bars] of barsResponse) {
-				if (bars && Array.isArray(bars)) {
-					for (const bar of bars) {
-						const processedBar = {
-							time: convertToESTTimestamp(bar.Timestamp),
-							open: bar.Open,
-							high: bar.High,
-							low: bar.Low,
-							close: bar.Close,
-							volume: bar.Volume,
-						};
-						historicalData.push(processedBar);
-						totalFetched++;
-					}
-				}
-			}
-		} else {
-			do {
-				const barsResponse = await alpaca.getBarsV2(symbol.toUpperCase(), {
-					start: startDate,
-					end: endDate,
-					timeframe: timeframe,
-					limit: limit,
-					feed: "iex",
-					adjustment: "split",
-					page_token: pageToken,
-				});
-
-				let batchCount = 0;
-				for await (const bar of barsResponse) {
-					const processedBar = {
-						time: convertToESTTimestamp(bar.Timestamp),
-						open: bar.OpenPrice,
-						high: bar.HighPrice,
-						low: bar.LowPrice,
-						close: bar.ClosePrice,
-						volume: bar.Volume,
-					};
-					historicalData.push(processedBar);
-					batchCount++;
-				}
-
-				totalFetched += batchCount;
-				pageToken = (barsResponse as { next_page_token?: string }).next_page_token;
-
-				if (!pageToken || batchCount === 0 || totalFetched > MAX_BAR_COUNT) {
-					break;
-				}
-			} while (pageToken);
 		}
 
 		const sortedData = historicalData.sort((a, b) => a.time - b.time);
@@ -143,11 +114,9 @@ export async function GET(request: NextRequest) {
 			symbol: symbol.toUpperCase(),
 			timeframe: timeframe,
 			totalBars: sortedData.length,
-			earliestTimestamp: sortedData.length > 0 ? convertToUTCTimestamp(sortedData[0].time) : null,
+			earliestTimestamp: sortedData.length > 0 ? sortedData[0].time : null,
 			latestTimestamp:
-				sortedData.length > 0
-					? convertToUTCTimestamp(sortedData[sortedData.length - 1].time)
-					: null,
+				sortedData.length > 0 ? sortedData[sortedData.length - 1].time : null,
 		});
 	} catch (error) {
 		logger.error("alpaca.history_failed", error, { symbol, timeframe, type });
