@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { prepareRegeneration } from "@/lib/chat/messages";
 import { buildPageContext, trimContextIfNeeded } from "@/lib/context/buildPageContext";
 import type { ChatMessage, ContextChatState, FinancialData, PageChartData } from "@/lib/types";
 
@@ -126,9 +127,10 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 	}, []);
 
 	const sendMessage = useCallback(
-		async (content: string) => {
+		async (content: string, historyOverride?: ChatMessage[]) => {
 			const trimmedContent = content.trim();
 			if (!trimmedContent || state.sending || !state.initialContext) return;
+			const conversationHistory = historyOverride ?? state.messages;
 
 			if (!checkRateLimit()) {
 				setState((prev) => ({
@@ -156,7 +158,7 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 
 			setState((prev) => ({
 				...prev,
-				messages: [...prev.messages, userMessage, assistantMessage],
+				messages: [...conversationHistory, userMessage, assistantMessage],
 				sending: true,
 				error: null,
 			}));
@@ -172,7 +174,7 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 					},
 					body: JSON.stringify({
 						context: state.initialContext,
-						messages: state.messages,
+						messages: conversationHistory,
 						newMessage: trimmedContent,
 					}),
 					signal: abortControllerRef.current.signal,
@@ -258,27 +260,10 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 
 	const regenerateLast = useCallback(async () => {
 		if (state.messages.length < 2 || state.sending) return;
+		const regeneration = prepareRegeneration(state.messages);
+		if (!regeneration) return;
 
-		let lastUserMessage: ChatMessage | null = null;
-		for (let i = state.messages.length - 1; i >= 0; i--) {
-			if (state.messages[i].role === "user") {
-				lastUserMessage = state.messages[i];
-				break;
-			}
-		}
-
-		if (!lastUserMessage) return;
-
-		const messagesWithoutLastAssistant = state.messages.filter(
-			(msg) => !(msg.role === "assistant" && msg.createdAt > lastUserMessage!.createdAt),
-		);
-
-		setState((prev) => ({
-			...prev,
-			messages: messagesWithoutLastAssistant,
-		}));
-
-		await sendMessage(lastUserMessage.content);
+		await sendMessage(regeneration.content, regeneration.history);
 	}, [state.messages, state.sending, sendMessage]);
 
 	const clearError = useCallback(() => {

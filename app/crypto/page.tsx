@@ -14,8 +14,8 @@ import type { CryptoData } from "@/lib/types";
 const CryptoPage: React.FC = () => {
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	const query = searchParams!.get("query"); // e.g., "BTC-USD"
-	const [coin, cur] = query!.split("-"); // Parse crypto symbol (e.g., "BTC-USD" -> coin=BTC, cur=USD)
+	const query = searchParams.get("query");
+	const [coin, cur] = query?.split("-") ?? ["", ""];
 
 	const [cryptoData, setCryptoData] = useState<CryptoData | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
