@@ -166,6 +166,8 @@ export const reportStockDataResponseSchema = z.object({
 	}),
 });
 
+export type ReportStockData = z.infer<typeof reportStockDataResponseSchema>["data"];
+
 export const generateReportSchema = z
 	.object({
 		symbol: symbolSchema,
