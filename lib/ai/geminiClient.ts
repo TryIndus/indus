@@ -21,14 +21,24 @@ const GENERATION_CONFIG = {
 	maxOutputTokens: 2048,
 };
 
-function toGeminiMessages(messages: GeminiMessage[]) {
-	return messages.map((message) => ({
-		role: message.role === "system" ? ("user" as const) : message.role,
-		parts:
-			message.role === "system"
-				? [{ text: `[SYSTEM INSTRUCTIONS]\n${message.parts[0]?.text ?? ""}` }]
-				: message.parts,
-	}));
+export function createGeminiRequestBody(messages: GeminiMessage[]) {
+	const systemParts = messages
+		.filter((message) => message.role === "system")
+		.flatMap((message) => message.parts);
+	const contents = messages
+		.filter((message) => message.role !== "system")
+		.map((message) => ({ role: message.role, parts: message.parts }));
+
+	return {
+		contents,
+		...(systemParts.length > 0 ? { systemInstruction: { parts: systemParts } } : {}),
+		generationConfig: GENERATION_CONFIG,
+	};
+}
+
+export interface ParsedSseBuffer {
+	texts: string[];
+	remainder: string;
 }
 
 export class GeminiApiError extends Error {
@@ -49,16 +59,16 @@ export class GeminiClient {
 	}
 
 	async generateStreamingContent(messages: GeminiMessage[]): Promise<ReadableStream<Uint8Array>> {
-		const url = `${BASE_URL}/models/${MODEL}:streamGenerateContent?key=${this.apiKey}`;
+		const url = `${BASE_URL}/models/${MODEL}:streamGenerateContent?alt=sse`;
 
 		const response = await fetch(url, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				"x-goog-api-key": this.apiKey,
 			},
 			body: JSON.stringify({
-				contents: toGeminiMessages(messages),
-				generationConfig: GENERATION_CONFIG,
+				...createGeminiRequestBody(messages),
 				safetySettings: [
 					{
 						category: "HARM_CATEGORY_HARASSMENT",
@@ -92,17 +102,15 @@ export class GeminiClient {
 	}
 
 	async generateContent(messages: GeminiMessage[]): Promise<string> {
-		const url = `${BASE_URL}/models/${MODEL}:generateContent?key=${this.apiKey}`;
+		const url = `${BASE_URL}/models/${MODEL}:generateContent`;
 
 		const response = await fetch(url, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				"x-goog-api-key": this.apiKey,
 			},
-			body: JSON.stringify({
-				contents: toGeminiMessages(messages),
-				generationConfig: GENERATION_CONFIG,
-			}),
+			body: JSON.stringify(createGeminiRequestBody(messages)),
 		});
 
 		if (!response.ok) {
@@ -125,5 +133,32 @@ export class GeminiClient {
 		} catch {
 			return null;
 		}
+	}
+
+	static parseSseBuffer(buffer: string, flush = false): ParsedSseBuffer {
+		const normalized = buffer.replace(/\r\n/g, "\n");
+		const events = normalized.split("\n\n");
+		const remainder = flush ? "" : (events.pop() ?? "");
+		const completeEvents = flush ? events : events;
+		const texts: string[] = [];
+
+		for (const event of completeEvents) {
+			const payload = event
+				.split("\n")
+				.filter((line) => line.startsWith("data:"))
+				.map((line) => line.slice(5).trimStart())
+				.join("\n");
+
+			if (!payload || payload === "[DONE]") {
+				continue;
+			}
+
+			const text = GeminiClient.parseStreamChunk(payload);
+			if (text) {
+				texts.push(text);
+			}
+		}
+
+		return { texts, remainder };
 	}
 }
