@@ -69,6 +69,7 @@ bunx supabase --version
 | Integration | `bun run test:integration` | Public navigation, auth redirects, and HTTP boundary behavior |
 | Browser | `bun run test:browser` | Chromium, Firefox, WebKit, and mobile Chromium product paths |
 | Accessibility | `bun run test:accessibility` | WCAG A/AA serious and critical violations on public pages |
+| Authenticated browser | `bun run test:authenticated` | Real local sign-in, protected product routes, tenant API access, and authenticated WCAG checks |
 | Performance | `bun run test:performance` | Production-mode navigation and JavaScript transfer budgets |
 
 Run the full sequence with:
@@ -78,6 +79,8 @@ bun run test:local
 ```
 
 The database layer always uses a temporary Supabase project on dedicated test ports. It resets and removes only that isolated project, so an existing local Supabase stack and its data are not modified.
+
+The authenticated browser layer follows the same isolation model. It starts a temporary Supabase Auth, API, and database stack on ports `55521` and `55522`, applies every migration, provisions a confirmed test user through the local admin API, and removes the stack on exit. Docker must be available, and no deployed credentials are required.
 
 ## Enforced budgets
 

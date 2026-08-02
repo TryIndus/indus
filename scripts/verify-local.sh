@@ -16,6 +16,9 @@ bun run test:integration
 echo "Running accessibility checks"
 bun run test:accessibility
 
+echo "Running authenticated browser and accessibility checks"
+bun run test:authenticated
+
 echo "Preparing the production server for browser and performance checks"
 bun run build
 

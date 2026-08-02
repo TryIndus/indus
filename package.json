@@ -24,6 +24,7 @@
 		"test:browser": "bun run build && E2E_USE_PRODUCTION=true playwright test --grep @browser",
 		"test:browser:run": "E2E_USE_PRODUCTION=true playwright test --grep @browser",
 		"test:accessibility": "playwright test --grep @accessibility --project=chromium",
+		"test:authenticated": "bash scripts/test-authenticated.sh",
 		"test:performance": "bun run build && E2E_USE_PRODUCTION=true playwright test --grep @performance --project=chromium",
 		"test:performance:run": "E2E_USE_PRODUCTION=true playwright test --grep @performance --project=chromium",
 		"test:local": "bash scripts/verify-local.sh"
