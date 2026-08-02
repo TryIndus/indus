@@ -18,7 +18,7 @@
 				"noDocumentCookie": "off"
 			},
 			"style": {
-				"noNonNullAssertion": "off",
+				"noNonNullAssertion": "error",
 				"useNodejsImportProtocol": "off"
 			},
 			"security": {

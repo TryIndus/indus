@@ -61,7 +61,7 @@ export function subscribeToCacheUpdates(symbol: string, metric: string, callback
 	if (!cacheListeners.has(key)) {
 		cacheListeners.set(key, new Set());
 	}
-	cacheListeners.get(key)!.add(callback);
+	cacheListeners.get(key)?.add(callback);
 	return () => {
 		const listeners = cacheListeners.get(key);
 		if (listeners) {
