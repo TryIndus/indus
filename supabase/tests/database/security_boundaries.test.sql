@@ -2,7 +2,7 @@ BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
-SELECT plan(23);
+SELECT plan(27);
 
 SELECT ok(
   (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.favorites'::regclass),
@@ -43,20 +43,70 @@ SELECT is(
 );
 
 SELECT ok(
-  NOT has_table_privilege('anon', 'public.favorites', 'SELECT'),
-  'anonymous users cannot read favorites'
+  NOT (
+    has_table_privilege('anon', 'public.favorites', 'SELECT')
+    OR has_table_privilege('anon', 'public.favorites', 'INSERT')
+    OR has_table_privilege('anon', 'public.favorites', 'UPDATE')
+    OR has_table_privilege('anon', 'public.favorites', 'DELETE')
+  ),
+  'anonymous users have no favorites privileges'
 );
 SELECT ok(
-  NOT has_table_privilege('anon', 'public.reports', 'SELECT'),
-  'anonymous users cannot read reports'
+  NOT (
+    has_table_privilege('anon', 'public.reports', 'SELECT')
+    OR has_table_privilege('anon', 'public.reports', 'INSERT')
+    OR has_table_privilege('anon', 'public.reports', 'UPDATE')
+    OR has_table_privilege('anon', 'public.reports', 'DELETE')
+  ),
+  'anonymous users have no reports privileges'
 );
 SELECT ok(
-  has_table_privilege('authenticated', 'public.metric_explanations', 'SELECT'),
-  'authenticated users can read shared explanations'
+  NOT (
+    has_table_privilege('anon', 'public.metric_explanations', 'SELECT')
+    OR has_table_privilege('anon', 'public.metric_explanations', 'INSERT')
+    OR has_table_privilege('anon', 'public.metric_explanations', 'UPDATE')
+    OR has_table_privilege('anon', 'public.metric_explanations', 'DELETE')
+  ),
+  'anonymous users have no metric explanation privileges'
 );
 SELECT ok(
-  NOT has_table_privilege('authenticated', 'public.metric_explanations', 'INSERT'),
-  'authenticated users cannot poison shared explanations'
+  NOT (
+    has_table_privilege('anon', 'public.ai_usage_windows', 'SELECT')
+    OR has_table_privilege('anon', 'public.ai_usage_windows', 'INSERT')
+    OR has_table_privilege('anon', 'public.ai_usage_windows', 'UPDATE')
+    OR has_table_privilege('anon', 'public.ai_usage_windows', 'DELETE')
+  ),
+  'anonymous users have no quota storage privileges'
+);
+SELECT ok(
+  has_table_privilege('authenticated', 'public.favorites', 'SELECT')
+    AND has_table_privilege('authenticated', 'public.favorites', 'INSERT')
+    AND NOT has_table_privilege('authenticated', 'public.favorites', 'UPDATE')
+    AND has_table_privilege('authenticated', 'public.favorites', 'DELETE'),
+  'authenticated users receive only the required favorites privileges'
+);
+SELECT ok(
+  has_table_privilege('authenticated', 'public.reports', 'SELECT')
+    AND has_table_privilege('authenticated', 'public.reports', 'INSERT')
+    AND has_table_privilege('authenticated', 'public.reports', 'UPDATE')
+    AND has_table_privilege('authenticated', 'public.reports', 'DELETE'),
+  'authenticated users receive the required reports privileges'
+);
+SELECT ok(
+  has_table_privilege('authenticated', 'public.metric_explanations', 'SELECT')
+    AND NOT has_table_privilege('authenticated', 'public.metric_explanations', 'INSERT')
+    AND NOT has_table_privilege('authenticated', 'public.metric_explanations', 'UPDATE')
+    AND NOT has_table_privilege('authenticated', 'public.metric_explanations', 'DELETE'),
+  'authenticated users receive read-only metric explanation access'
+);
+SELECT ok(
+  NOT (
+    has_table_privilege('authenticated', 'public.ai_usage_windows', 'SELECT')
+    OR has_table_privilege('authenticated', 'public.ai_usage_windows', 'INSERT')
+    OR has_table_privilege('authenticated', 'public.ai_usage_windows', 'UPDATE')
+    OR has_table_privilege('authenticated', 'public.ai_usage_windows', 'DELETE')
+  ),
+  'authenticated users have no direct quota storage privileges'
 );
 
 SELECT is(
