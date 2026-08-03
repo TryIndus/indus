@@ -92,8 +92,7 @@ export default function SearchPage() {
 				// Stock doesn't exist or API error
 				setError(`"${symbol.toUpperCase()}" is not a valid stock symbol or data is not available.`);
 			}
-		} catch (err) {
-			console.error("Search error:", err);
+		} catch {
 			setError("Search failed. Please check your internet connection and try again.");
 		} finally {
 			setIsSearching(false);

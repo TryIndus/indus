@@ -1,9 +1,19 @@
-import Alpaca from "@alpacahq/alpaca-trade-api";
+import { Alpaca, TimeFrame, TimeFrameUnit, timeFrame } from "@alpacahq/alpaca-trade-api";
 import { type NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/observability/logger";
 import { alpacaQuerySchema } from "@/lib/schemas/api";
 
-const EST_TIMEZONE_OFFSET = 5 * 60 * 60; // 5 hours in seconds
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const RANGE_DAYS_BY_TIMEFRAME = {
+	"1Min": 5,
+	"5Min": 14,
+	"15Min": 45,
+	"1Hour": 180,
+	"1Day": 4 * 365,
+	"1Week": 20 * 365,
+	"1Month": 20 * 365,
+} as const;
 
 interface BarData {
 	time: number;
@@ -14,17 +24,27 @@ interface BarData {
 	volume: number;
 }
 
-// Helper function to convert timestamp to EST timezone
-// DO NOT REMOVE THIS FUNCTION: Lightweight Charts does not support local timezones so the timezone is always EST
-function convertToESTTimestamp(timestamp: string | Date): number {
-	const date = new Date(timestamp);
-	return Math.floor((date.getTime() - EST_TIMEZONE_OFFSET * 1000) / 1000);
+function getStartDate(timeframe: keyof typeof RANGE_DAYS_BY_TIMEFRAME, endDate: Date): Date {
+	return new Date(endDate.getTime() - RANGE_DAYS_BY_TIMEFRAME[timeframe] * DAY_IN_MS);
 }
 
-// Helper function to revert the EST timestamp conversion to UTC
-// DO NOT REMOVE THIS FUNCTION: Lightweight Charts does not support local timezones so the timezone is always EST
-function convertToUTCTimestamp(estTimestamp: number): number {
-	return estTimestamp + EST_TIMEZONE_OFFSET;
+function toAlpacaTimeframe(timeframe: keyof typeof RANGE_DAYS_BY_TIMEFRAME) {
+	switch (timeframe) {
+		case "1Min":
+			return TimeFrame.Minute;
+		case "5Min":
+			return timeFrame(5, TimeFrameUnit.Minute);
+		case "15Min":
+			return timeFrame(15, TimeFrameUnit.Minute);
+		case "1Hour":
+			return TimeFrame.Hour;
+		case "1Day":
+			return TimeFrame.Day;
+		case "1Week":
+			return TimeFrame.Week;
+		case "1Month":
+			return TimeFrame.Month;
+	}
 }
 
 export async function GET(request: NextRequest) {
@@ -52,131 +72,45 @@ export async function GET(request: NextRequest) {
 	try {
 		const alpaca = new Alpaca({
 			keyId: env.ALPACA_API_KEY,
-			secretKey: env.ALPACA_SECRET_KEY,
+			secret: env.ALPACA_SECRET_KEY,
 			paper: env.ALPACA_IS_PAPER,
-			usePolygon: false,
 		});
 
-		console.log(`📊 Fetching historical data for ${symbol} (${timeframe})`);
-
-		// Calculate start and end dates
-		let startDate: Date;
 		const endDate: Date = endParam ? new Date(endParam * 1000) : new Date();
+		const startDate = startParam ? new Date(startParam * 1000) : getStartDate(timeframe, endDate);
 
-		if (startParam) {
-			startDate = new Date(startParam * 1000);
-		} else {
-			// Date ranges optimized for ~1000 bars with clean calendar intervals
-			switch (timeframe) {
-				case "1Min":
-					startDate = new Date(endDate.getTime() - 5 * 24 * 60 * 60 * 1000); // 5 days
-					break;
-				case "5Min":
-					startDate = new Date(endDate.getTime() - 14 * 24 * 60 * 60 * 1000); // 2 weeks
-					break;
-				case "15Min":
-					startDate = new Date(endDate.getTime() - 45 * 24 * 60 * 60 * 1000); // 45 days
-					break;
-				case "1Hour":
-					startDate = new Date(endDate.getTime() - 180 * 24 * 60 * 60 * 1000); // 6 months
-					break;
-				case "1Day":
-					startDate = new Date(endDate.getTime() - 4 * 365 * 24 * 60 * 60 * 1000); // 4 years
-					break;
-				case "1Week":
-					startDate = new Date(endDate.getTime() - 20 * 365 * 24 * 60 * 60 * 1000); // 20 years
-					break;
-				case "1Month":
-					startDate = new Date(endDate.getTime() - 20 * 365 * 24 * 60 * 60 * 1000); // 20 years
-					break;
-				default:
-					startDate = new Date(endDate.getTime() - 5 * 24 * 60 * 60 * 1000); // 5 days
-			}
-		}
-
-		// Get historical bars - fetch ALL available history using pagination
 		const historicalData: BarData[] = [];
-		let pageToken: string | undefined;
-		let totalFetched = 0;
+		const request = {
+			start: startDate,
+			end: endDate,
+			timeframe: toAlpacaTimeframe(timeframe),
+			limit,
+		};
+		const bars =
+			type === "crypto"
+				? await alpaca.marketData.getCryptoBarsFor(
+						symbol,
+						{ ...request, loc: "us" },
+						{ maxPerSymbol: limit },
+					)
+				: await alpaca.marketData.getStockBarsFor(
+						symbol,
+						{ ...request, feed: "iex", adjustment: "split" },
+						{ maxPerSymbol: limit },
+					);
 
-		console.log(
-			`📊 Fetching stock bars for ${symbol} from ${startDate.toLocaleString()} to ${endDate.toLocaleString()}`,
-		);
-
-		if (type === "crypto") {
-			// Use getCryptoBars for crypto symbols
-			const barsResponse = await alpaca.getCryptoBars([symbol.toUpperCase()], {
-				start: startDate,
-				end: endDate,
-				timeframe: timeframe,
-				limit: limit,
+		for (const bar of bars) {
+			historicalData.push({
+				time: Math.floor(bar.timestamp.getTime() / 1000),
+				open: bar.open,
+				high: bar.high,
+				low: bar.low,
+				close: bar.close,
+				volume: bar.volume,
 			});
-
-			// getCryptoBars returns different format - handle the response properly
-			for await (const [, bars] of barsResponse) {
-				if (bars && Array.isArray(bars)) {
-					for (const bar of bars) {
-						const processedBar = {
-							time: convertToESTTimestamp(bar.Timestamp),
-							open: bar.Open,
-							high: bar.High,
-							low: bar.Low,
-							close: bar.Close,
-							volume: bar.Volume,
-						};
-						historicalData.push(processedBar);
-						totalFetched++;
-					}
-				}
-			}
-
-			console.log(`📊 Fetched ${totalFetched} crypto bars for ${symbol}`);
-		} else {
-			// Use getBarsV2 for stock symbols (existing logic)
-			do {
-				const barsResponse = await alpaca.getBarsV2(symbol.toUpperCase(), {
-					start: startDate,
-					end: endDate,
-					timeframe: timeframe,
-					limit: limit,
-					feed: "iex",
-					adjustment: "split", // Adjust for stock splits to prevent price discontinuities
-					page_token: pageToken,
-				});
-
-				let batchCount = 0;
-				for await (const bar of barsResponse) {
-					const processedBar = {
-						time: convertToESTTimestamp(bar.Timestamp),
-						open: bar.OpenPrice,
-						high: bar.HighPrice,
-						low: bar.LowPrice,
-						close: bar.ClosePrice,
-						volume: bar.Volume,
-					};
-					historicalData.push(processedBar);
-					batchCount++;
-				}
-
-				totalFetched += batchCount;
-				console.log(`📊 Fetched ${batchCount} stock bars (total: ${totalFetched}) for ${symbol}`);
-
-				// Get the next page token if available
-				pageToken = (barsResponse as { next_page_token?: string }).next_page_token;
-
-				// Break if no more data or we hit a reasonable limit to prevent infinite loops
-				if (!pageToken || batchCount === 0 || totalFetched > 1000000) {
-					break;
-				}
-			} while (pageToken);
 		}
 
-		// Sort data by time to ensure proper ordering (keep this for chart compatibility)
 		const sortedData = historicalData.sort((a, b) => a.time - b.time);
-
-		console.log(
-			`📊 Retrieved ${sortedData.length} historical bars for ${symbol} (${startDate.toLocaleString()} to ${endDate.toLocaleString()})`,
-		);
 
 		return NextResponse.json({
 			data: sortedData,
@@ -184,21 +118,11 @@ export async function GET(request: NextRequest) {
 			symbol: symbol.toUpperCase(),
 			timeframe: timeframe,
 			totalBars: sortedData.length,
-			// Convert back from EST to UTC
-			earliestTimestamp: sortedData.length > 0 ? convertToUTCTimestamp(sortedData[0].time) : null,
-			latestTimestamp:
-				sortedData.length > 0
-					? convertToUTCTimestamp(sortedData[sortedData.length - 1].time)
-					: null,
+			earliestTimestamp: sortedData.length > 0 ? sortedData[0].time : null,
+			latestTimestamp: sortedData.length > 0 ? sortedData[sortedData.length - 1].time : null,
 		});
 	} catch (error) {
-		console.error(`❌ Error fetching historical data for ${symbol}:`, error);
-		return NextResponse.json(
-			{
-				error: "Failed to fetch historical data",
-				details: error instanceof Error ? error.message : String(error),
-			},
-			{ status: 500 },
-		);
+		logger.error("alpaca.history_failed", error, { symbol, timeframe, type });
+		return NextResponse.json({ error: "Failed to fetch historical data" }, { status: 502 });
 	}
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import YahooFinance from "yahoo-finance2";
+import { logger } from "@/lib/observability/logger";
 import { stockDataQuerySchema } from "@/lib/schemas/api";
 
 const yahooFinance = new YahooFinance({
@@ -19,7 +20,6 @@ export async function GET(request: Request) {
 	const { symbol } = parsed.data;
 
 	try {
-		// Try to fetch real Yahoo Finance data first
 		let quote = null;
 		let quoteSummary = null;
 		let currentPrice = 0;
@@ -29,7 +29,6 @@ export async function GET(request: Request) {
 		let longName = symbol;
 
 		try {
-			// Fetch quote data and summary data in parallel
 			[quote, quoteSummary] = await Promise.all([
 				yahooFinance.quote(symbol),
 				yahooFinance.quoteSummary(symbol, {
@@ -37,23 +36,14 @@ export async function GET(request: Request) {
 				}),
 			]);
 
-			// Get basic price data
 			currentPrice = quote.regularMarketPrice || 0;
 			change = quote.regularMarketChange || 0;
 			changePercent = quote.regularMarketChangePercent || 0;
 			shortName = quote.shortName || quote.displayName || symbol;
 			longName = quote.longName || shortName;
-
-			//   console.log(`Yahoo Finance data for ${symbol}:`, {
-			//     price: currentPrice,
-			//     change: change,
-			//     changePercent: changePercent,
-			//     hasQuoteSummary: !!quoteSummary,
-			//     quoteType: quote.quoteType,
-			//   });
 		} catch (apiError) {
-			console.error(`Yahoo Finance API failed for ${symbol}:`, apiError);
-			return NextResponse.json({ error: `Failed to fetch data for ${symbol}` }, { status: 500 });
+			logger.error("stock_data.provider_failed", apiError, { symbol });
+			return NextResponse.json({ error: `Failed to fetch data for ${symbol}` }, { status: 502 });
 		}
 
 		// Check if this is a cryptocurrency
@@ -189,7 +179,7 @@ export async function GET(request: Request) {
 
 		return NextResponse.json({ data });
 	} catch (error) {
-		console.error("Error fetching stock data:", error);
+		logger.error("stock_data.request_failed", error, { symbol });
 		return NextResponse.json({ error: "Failed to fetch stock data" }, { status: 500 });
 	}
 }

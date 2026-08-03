@@ -23,7 +23,7 @@ cd indus
 ### 2. Install dependencies
 
 ```bash
-bun install
+bun install --frozen-lockfile
 ```
 
 ### 3. Set up environment variables
@@ -45,38 +45,15 @@ Edit `.env.local` with your credentials:
 | `ALPACA_IS_PAPER` | Set to `true` for paper trading (recommended) |
 | `GEMINI_API_KEY` | Google AI Studio > Get API key |
 
-### 4. Set up Supabase tables
+### 4. Set up the database
 
-In your Supabase SQL Editor, run:
+Database schema, constraints, grants, row-level security policies, and AI quotas are versioned in `supabase/migrations/`. Apply the migrations in order through the Supabase CLI or your normal database migration process. Do not recreate tables from copied SQL snippets.
 
-```sql
-create table favorites (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users not null,
-  symbol text not null,
-  created_at timestamptz default now(),
-  unique(user_id, symbol)
-);
+For a disposable local database:
 
-create table reports (
-  id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users not null,
-  symbol text not null,
-  company_name text,
-  status text default 'pending',
-  report_content text,
-  summary text,
-  created_at timestamptz default now()
-);
-
-alter table favorites enable row level security;
-alter table reports enable row level security;
-
-create policy "Users can manage their own favorites"
-  on favorites for all using (auth.uid() = user_id);
-
-create policy "Users can manage their own reports"
-  on reports for all using (auth.uid() = user_id);
+```bash
+bun run db:start
+bun run db:reset
 ```
 
 ### 5. Run the development server
@@ -99,6 +76,22 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `bun run format` | Format code with Biome |
 | `bun test` | Run unit tests (Vitest) |
 | `bun run test:watch` | Run tests in watch mode |
+| `bun run test:unit:coverage` | Run unit tests with enforced coverage thresholds |
+| `bun run test:database` | Replay migrations and run local pgTAP security tests |
+| `bun run test:integration` | Run local HTTP and auth-boundary integration tests |
+| `bun run test:browser` | Run desktop and mobile cross-browser checks |
+| `bun run test:accessibility` | Run WCAG A/AA accessibility checks |
+| `bun run test:performance` | Run production-mode local performance budgets |
+| `bun run test:local` | Run the complete local quality sequence |
+
+See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, security boundaries, quota policy, and troubleshooting.
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [Quality and Security Verification](./docs/QUALITY.md) | Security boundaries, local verification layers, budgets, and troubleshooting |
+| [Revamp Plan](./docs/REVAMP_PLAN.md) | In-progress application modernization plan retained during the revamp |
 
 ## Features
 
@@ -138,14 +131,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | Styling | Tailwind CSS v4 + shadcn/ui (Radix) + Lucide icons + next-themes |
 | Auth & DB | Supabase (PostgreSQL + Auth with Google OAuth) |
 | State | Zustand + TanStack Query |
-| AI | Google Gemini via `@google/generative-ai` |
+| AI | Google Gemini 2.5 Flash via the REST API |
 | Real-time | SSE via Next.js Route Handlers (streams Alpaca WebSocket bars to clients) |
 | Charts | TradingView Lightweight Charts v5 |
 | Financial Data | Alpaca Trade API + Yahoo Finance 2 |
 | Validation | Zod (API inputs + environment variables) |
 | Linting | Biome |
-| Testing | Vitest |
-| Deployment | Vercel |
+| Testing | Vitest + pgTAP + Playwright + axe-core |
 
 ## License
 

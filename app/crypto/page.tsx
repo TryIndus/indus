@@ -9,48 +9,13 @@ import CryptoFinancialTable from "@/components/CryptoFinancialTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { batchPreload } from "@/hooks/useExplanation";
-
-type CryptoData = {
-	symbol: string;
-	name?: string;
-	fullName?: string;
-	regularMarketPrice?: number;
-	currency?: string;
-	description?: string;
-	website?: string;
-	category?: string;
-	algorithm?: string;
-	marketCap?: number;
-	totalSupply?: number;
-	circulatingSupply?: number;
-	maxSupply?: number;
-	volume?: number;
-	percentChange24h?: number;
-	percentChange7d?: number;
-	percentChange30d?: number;
-	allTimeHigh?: number;
-	allTimeLow?: number;
-	ath24hChange?: number;
-	atl24hChange?: number;
-	rank?: number;
-	dominance?: number;
-	priceToSales?: number;
-	// Additional crypto-specific metrics
-	volatility?: number;
-	beta?: number;
-	sharpeRatio?: number;
-	tradingPairs?: number;
-	githubActivity?: number;
-	communityScore?: number;
-	developerScore?: number;
-	liquidityScore?: number;
-};
+import type { CryptoData } from "@/lib/types";
 
 const CryptoPage: React.FC = () => {
 	const router = useRouter();
 	const searchParams = useSearchParams();
-	const query = searchParams!.get("query"); // e.g., "BTC-USD"
-	const [coin, cur] = query!.split("-"); // Parse crypto symbol (e.g., "BTC-USD" -> coin=BTC, cur=USD)
+	const query = searchParams.get("query");
+	const [coin, cur] = query?.split("-") ?? ["", ""];
 
 	const [cryptoData, setCryptoData] = useState<CryptoData | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
@@ -146,7 +111,6 @@ const CryptoPage: React.FC = () => {
 				batchPreload(items);
 			}
 		} catch (err) {
-			console.error("Error fetching crypto data:", err);
 			setError(err instanceof Error ? err.message : "An error occurred");
 		} finally {
 			setIsLoading(false);
@@ -161,7 +125,6 @@ const CryptoPage: React.FC = () => {
 		}
 	}, [query, fetchCryptoData]);
 
-	// Helper function to get display symbol (e.g., "BTC" from "BTC/USD")
 	const getDisplaySymbol = (fullSymbol: string) => {
 		return fullSymbol?.split("/")[0] || fullSymbol;
 	};
@@ -238,13 +201,13 @@ const CryptoPage: React.FC = () => {
 									<Coins className="h-6 w-6" />
 									<div className="flex-1">
 										<CardTitle className="text-2xl">
-											{cryptoData.fullName || cryptoData.name || getDisplaySymbol(query)}
+											{cryptoData.longName || cryptoData.shortName || getDisplaySymbol(query)}
 										</CardTitle>
 										<CardDescription className="text-lg font-mono">{query}</CardDescription>
 									</div>
 								</div>
 							</CardHeader>
-							{cryptoData.description && (
+							{cryptoData.longBusinessSummary && (
 								<CardContent className="space-y-4">
 									{/* Crypto Overview */}
 									<div>
@@ -252,10 +215,10 @@ const CryptoPage: React.FC = () => {
 										<div className="space-y-2">
 											<p className="text-muted-foreground text-sm leading-relaxed">
 												{showFullDescription
-													? cryptoData.description
-													: `${cryptoData.description.slice(0, 600)}${cryptoData.description.length > 300 ? "..." : ""}`}
+													? cryptoData.longBusinessSummary
+													: `${cryptoData.longBusinessSummary.slice(0, 600)}${cryptoData.longBusinessSummary.length > 600 ? "..." : ""}`}
 											</p>
-											{cryptoData.description.length > 600 && (
+											{cryptoData.longBusinessSummary.length > 600 && (
 												<Button
 													variant="ghost"
 													size="sm"

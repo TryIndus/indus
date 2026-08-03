@@ -43,7 +43,28 @@ describe("alpaca stream helpers", () => {
 			close: 102,
 			volume: 1000,
 		});
-		expect(typeof result.time).toBe("number");
+		expect(result.time).toBe(Date.parse("2026-05-24T15:00:00.000Z") / 1000);
+	});
+
+	it("supports the normalized Alpaca v4 bar shape", () => {
+		const result = toStockCandlestickData({
+			symbol: "AAPL",
+			timestamp: new Date("2026-05-24T15:00:00.000Z"),
+			open: 100,
+			high: 105,
+			low: 99,
+			close: 102,
+			volume: 1000,
+		});
+
+		expect(result).toEqual({
+			time: Date.parse("2026-05-24T15:00:00.000Z") / 1000,
+			open: 100,
+			high: 105,
+			low: 99,
+			close: 102,
+			volume: 1000,
+		});
 	});
 
 	it("converts crypto bars to chart candlesticks without hardcoding ETH/USD", () => {

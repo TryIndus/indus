@@ -14,5 +14,26 @@ export default defineConfig({
 		environment: "node",
 		include: ["__tests__/**/*.test.ts", "__tests__/**/*.test.tsx"],
 		globals: true,
+		coverage: {
+			provider: "v8",
+			include: [
+				"lib/ai/geminiClient.ts",
+				"lib/ai/report.ts",
+				"lib/chat/messages.ts",
+				"lib/env-legacy.ts",
+				"lib/realtime/alpaca-stream.ts",
+				"lib/schemas/api.ts",
+				"lib/security/ai-access.ts",
+				"lib/server/report-stock-data.ts",
+			],
+			reporter: ["text", "html", "json-summary"],
+			reportsDirectory: "coverage",
+			thresholds: {
+				lines: 85,
+				functions: 85,
+				branches: 80,
+				statements: 85,
+			},
+		},
 	},
 });

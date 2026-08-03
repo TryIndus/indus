@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/observability/logger";
 import { reportIdSchema } from "@/lib/schemas/api";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,7 +12,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 		}
 		const supabase = await createClient();
 
-		// Get the current user
 		const {
 			data: { user },
 			error: userError,
@@ -21,7 +21,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		// Fetch the specific report
 		const { data: report, error } = await supabase
 			.from("reports")
 			.select("*")
@@ -30,13 +29,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 			.single();
 
 		if (error) {
-			console.error("Error fetching report:", error);
+			logger.error("report.fetch_failed", error, { reportId: parsed.data.id, userId: user.id });
 			return NextResponse.json({ error: "Report not found" }, { status: 404 });
 		}
 
 		return NextResponse.json({ report });
 	} catch (error) {
-		console.error("Report API error:", error);
+		logger.error("report.fetch_request_failed", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 	}
 }
@@ -50,7 +49,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 		}
 		const supabase = await createClient();
 
-		// Get the current user
 		const {
 			data: { user },
 			error: userError,
@@ -60,7 +58,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		// Delete the report
 		const { error } = await supabase
 			.from("reports")
 			.delete()
@@ -68,13 +65,13 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 			.eq("user_id", user.id);
 
 		if (error) {
-			console.error("Error deleting report:", error);
+			logger.error("report.delete_failed", error, { reportId: parsed.data.id, userId: user.id });
 			return NextResponse.json({ error: "Failed to delete report" }, { status: 500 });
 		}
 
 		return NextResponse.json({ message: "Report deleted successfully" });
 	} catch (error) {
-		console.error("Delete report API error:", error);
+		logger.error("report.delete_request_failed", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 	}
 }

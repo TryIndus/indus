@@ -1,5 +1,6 @@
 import { type CookieOptions, createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { getPublicSupabaseConfig } from "@/lib/supabase/config";
 
 const PROTECTED_ROUTES = ["/dashboard", "/company", "/search", "/crypto", "/reports", "/settings"];
 
@@ -7,27 +8,24 @@ export async function middleware(request: NextRequest) {
 	let supabaseResponse = NextResponse.next({
 		request,
 	});
+	const { url, anonKey } = getPublicSupabaseConfig();
 
-	const supabase = createServerClient(
-		process.env.NEXT_PUBLIC_SUPABASE_URL!,
-		process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-		{
-			cookies: {
-				getAll() {
-					return request.cookies.getAll();
-				},
-				setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-					cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-					supabaseResponse = NextResponse.next({
-						request,
-					});
-					cookiesToSet.forEach(({ name, value, options }) =>
-						supabaseResponse.cookies.set(name, value, options),
-					);
-				},
+	const supabase = createServerClient(url, anonKey, {
+		cookies: {
+			getAll() {
+				return request.cookies.getAll();
+			},
+			setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+				cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+				supabaseResponse = NextResponse.next({
+					request,
+				});
+				cookiesToSet.forEach(({ name, value, options }) =>
+					supabaseResponse.cookies.set(name, value, options),
+				);
 			},
 		},
-	);
+	});
 
 	const {
 		data: { user },

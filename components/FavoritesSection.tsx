@@ -44,8 +44,7 @@ async function fetchStockData(symbol: string): Promise<StockData | null> {
 		};
 
 		return stockData;
-	} catch (error) {
-		console.error(`Error fetching stock data for ${symbol}:`, error);
+	} catch {
 		return null;
 	}
 }

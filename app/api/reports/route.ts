@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/observability/logger";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
 	try {
 		const supabase = await createClient();
 
-		// Get the current user
 		const {
 			data: { user },
 			error: userError,
@@ -15,7 +15,6 @@ export async function GET() {
 			return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 		}
 
-		// Fetch reports for the current user
 		const { data: reports, error } = await supabase
 			.from("reports")
 			.select("*")
@@ -23,13 +22,13 @@ export async function GET() {
 			.order("created_at", { ascending: false });
 
 		if (error) {
-			console.error("Error fetching reports:", error);
+			logger.error("reports.list_failed", error, { userId: user.id });
 			return NextResponse.json({ error: "Failed to fetch reports" }, { status: 500 });
 		}
 
 		return NextResponse.json({ reports: reports || [] });
 	} catch (error) {
-		console.error("Reports API error:", error);
+		logger.error("reports.request_failed", error);
 		return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 	}
 }

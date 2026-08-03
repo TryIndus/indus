@@ -20,14 +20,123 @@ export type MetricDefinition = {
 	learn_more_url: string;
 };
 
-// New types for contextual chat
+export interface FinancialData {
+	symbol: string;
+	shortName?: string;
+	longName?: string;
+	regularMarketPrice?: number;
+	regularMarketChange?: number;
+	regularMarketChangePercent?: number;
+	currency?: string;
+	longBusinessSummary?: string;
+	website?: string;
+	sector?: string;
+	industry?: string;
+	country?: string;
+	city?: string;
+	state?: string;
+	marketCap?: number;
+	enterpriseValue?: number;
+	sharesOutstanding?: number;
+	revenue?: number;
+	employees?: number;
+	peRatio?: number;
+	priceToBook?: number;
+	evToSales?: number;
+	evToEbitda?: number;
+	priceToCashFlow?: number;
+	forwardPE?: number;
+	pegRatio?: number;
+	grossMargins?: number;
+	ebitdaMargins?: number;
+	operatingMargins?: number;
+	netProfitMargins?: number;
+	returnOnAssets?: number;
+	returnOnEquity?: number;
+	totalCash?: number;
+	totalDebt?: number;
+	debtToEquity?: number;
+	revenueGrowth?: number;
+	earningsGrowth?: number;
+	dividendYield?: number;
+	dividendRate?: number;
+	payoutRatio?: number;
+	volume?: number;
+	beta?: number;
+	bookValue?: number;
+	priceToSales?: number;
+}
+
+export interface ReportStockData {
+	shortName?: string;
+	longName?: string;
+	regularMarketPrice?: number;
+	regularMarketChange?: number;
+	regularMarketChangePercent?: number;
+	marketCap?: number;
+	peRatio?: number;
+	sector?: string;
+	industry?: string;
+	beta?: number;
+	fiftyTwoWeekLow?: number;
+	fiftyTwoWeekHigh?: number;
+	revenueGrowth?: number;
+	netProfitMargins?: number;
+	returnOnEquity?: number;
+	debtToEquity?: number;
+}
+
+export interface CryptoData {
+	symbol: string;
+	shortName?: string;
+	longName?: string;
+	regularMarketPrice?: number;
+	currency?: string;
+	longBusinessSummary?: string;
+	website?: string;
+	category?: string;
+	algorithm?: string;
+	marketCap?: number;
+	circulatingSupply?: number;
+	totalSupply?: number;
+	maxSupply?: number;
+	volume?: number;
+	volume24h?: number;
+	percentChange24h?: number;
+	percentChange7d?: number;
+	percentChange30d?: number;
+	allTimeHigh?: number;
+	allTimeLow?: number;
+	ath24hChange?: number;
+	atl24hChange?: number;
+	rank?: number;
+	dominance?: number;
+	volatility?: number;
+	beta?: number;
+	sharpeRatio?: number;
+	tradingPairs?: number;
+	githubActivity?: number;
+	communityScore?: number;
+	developerScore?: number;
+	liquidityScore?: number;
+	fiftyTwoWeekHigh?: number;
+	fiftyTwoWeekLow?: number;
+}
+
 export interface ChartPoint {
-	t: number; // timestamp
-	o: number; // open
-	h: number; // high
-	l: number; // low
-	c: number; // close
-	v: number; // volume
+	t: number;
+	o: number;
+	h: number;
+	l: number;
+	c: number;
+	v: number;
+}
+
+export interface PageChartData {
+	interval?: string;
+	points?: ChartPoint[];
+	latestPrice?: number;
+	dayChangePct?: number;
 }
 
 export interface MetricGroups {
@@ -93,7 +202,7 @@ export interface PageContext {
 
 export interface ChatMessage {
 	id: string;
-	role: "user" | "assistant" | "system";
+	role: "user" | "assistant";
 	content: string;
 	createdAt: number;
 	streaming?: boolean;

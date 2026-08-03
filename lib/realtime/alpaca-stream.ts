@@ -1,5 +1,3 @@
-const EST_TIMEZONE_OFFSET = 5 * 60 * 60;
-
 export interface StreamCandlestickData {
 	time: number;
 	open: number;
@@ -46,9 +44,9 @@ function readNumber(source: BarLike, keys: string[]): number {
 	return 0;
 }
 
-function convertToESTTimestamp(timestamp: string | Date | number): number {
+function toUnixTimestamp(timestamp: string | Date | number): number {
 	const date = new Date(timestamp);
-	return Math.floor((date.getTime() - EST_TIMEZONE_OFFSET * 1000) / 1000);
+	return Math.floor(date.getTime() / 1000);
 }
 
 export function normalizeStreamSymbol(symbol: string): string {
@@ -78,7 +76,7 @@ export function toStockCandlestickData(bar: unknown): StreamCandlestickData {
 	const source = asRecord(bar);
 
 	return {
-		time: convertToESTTimestamp(source.Timestamp as string | Date | number),
+		time: toUnixTimestamp((source.Timestamp ?? source.timestamp) as string | Date | number),
 		open: readNumber(source, ["OpenPrice", "openPrice", "Open", "open"]),
 		high: readNumber(source, ["HighPrice", "highPrice", "High", "high"]),
 		low: readNumber(source, ["LowPrice", "lowPrice", "Low", "low"]),
@@ -91,7 +89,7 @@ export function toCryptoCandlestickData(bar: unknown): StreamCandlestickData {
 	const source = asRecord(bar);
 
 	return {
-		time: convertToESTTimestamp(source.Timestamp as string | Date | number),
+		time: toUnixTimestamp((source.Timestamp ?? source.timestamp) as string | Date | number),
 		open: readNumber(source, ["Open", "open"]),
 		high: readNumber(source, ["High", "high"]),
 		low: readNumber(source, ["Low", "low"]),

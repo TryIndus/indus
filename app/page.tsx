@@ -1,5 +1,3 @@
-"use client";
-
 import {
 	Activity,
 	ArrowRight,
@@ -13,14 +11,12 @@ import {
 	Zap,
 } from "lucide-react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function LandingPage() {
-	const router = useRouter();
-
 	const features = [
 		{
 			icon: BarChart3,
@@ -82,12 +78,14 @@ export default function LandingPage() {
 						<span className="text-xl font-bold">Indus</span>
 					</div>
 					<div className="flex items-center space-x-4">
-						<Button variant="ghost" onClick={() => router.push("/auth")}>
-							Sign In
+						<Button variant="ghost" asChild>
+							<Link href="/auth">Sign In</Link>
 						</Button>
-						<Button onClick={() => router.push("/auth")}>
-							Get Started
-							<ArrowRight className="ml-2 h-4 w-4" />
+						<Button asChild>
+							<Link href="/auth">
+								Get Started
+								<ArrowRight className="ml-2 h-4 w-4" />
+							</Link>
 						</Button>
 					</div>
 				</div>
@@ -112,17 +110,14 @@ export default function LandingPage() {
 					</div>
 
 					<div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-						<Button size="lg" onClick={() => router.push("/auth")} className="text-lg px-8 py-6">
-							Explore Dashboard
-							<ArrowRight className="ml-2 h-5 w-5" />
+						<Button size="lg" className="text-lg px-8 py-6" asChild>
+							<Link href="/auth">
+								Explore Dashboard
+								<ArrowRight className="ml-2 h-5 w-5" />
+							</Link>
 						</Button>
-						<Button
-							size="lg"
-							variant="outline"
-							onClick={() => router.push("/auth")}
-							className="text-lg px-8 py-6"
-						>
-							View Sample (AAPL)
+						<Button size="lg" variant="outline" className="text-lg px-8 py-6" asChild>
+							<Link href="/auth">View Sample (AAPL)</Link>
 						</Button>
 					</div>
 
@@ -183,17 +178,14 @@ export default function LandingPage() {
 						data-driven decision making.
 					</p>
 					<div className="flex flex-col sm:flex-row gap-4 justify-center">
-						<Button size="lg" onClick={() => router.push("/auth")} className="text-lg px-8 py-6">
-							Start Analyzing
-							<TrendingUp className="ml-2 h-5 w-5" />
+						<Button size="lg" className="text-lg px-8 py-6" asChild>
+							<Link href="/auth">
+								Start Analyzing
+								<TrendingUp className="ml-2 h-5 w-5" />
+							</Link>
 						</Button>
-						<Button
-							size="lg"
-							variant="outline"
-							onClick={() => router.push("/auth")}
-							className="text-lg px-8 py-6"
-						>
-							View Live Demo
+						<Button size="lg" variant="outline" className="text-lg px-8 py-6" asChild>
+							<Link href="/auth">View Live Demo</Link>
 						</Button>
 					</div>
 				</div>

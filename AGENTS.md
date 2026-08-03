@@ -50,13 +50,13 @@ These apply to every task, every message, regardless of context.
 ## Current Tech Stack
 
 - **Runtime**: Bun
-- **Framework**: Next.js 15.4.10 (App Router) + React 19.1.0
+- **Framework**: Next.js 15.5.22 (App Router) + React 19.1.0
 - **Language**: TypeScript 5 (strict mode)
 - **Styling**: Tailwind CSS v4 + shadcn/ui (Radix primitives) + Lucide icons + next-themes
 - **Auth & DB**: Supabase (PostgreSQL + Auth with Google OAuth + email/password)
 - **Real-time**: SSE via Next.js Route Handlers (streams Alpaca WebSocket bars to clients)
 - **Charts**: TradingView Lightweight Charts v5
-- **AI**: Google Gemini 2.5 Flash (`@google/generative-ai`) — manual SSE streaming, no tool use
+- **AI**: Google Gemini 2.5 Flash through the REST API — manual SSE streaming, no tool use
 - **Financial Data**: Alpaca Trade API (real-time + historical bars), Yahoo Finance 2 (fundamentals)
 - **State**: Zustand for client state + TanStack Query for async/server state
 - **Validation**: Zod (API inputs + environment variables)
@@ -102,4 +102,4 @@ Schema migrations are tracked in `supabase/migrations/` and numbered sequentiall
 
 ## Revamp Plan
 
-The detailed rewrite plan (phases, architecture, verification checklists) lives in [`REVAMP_PLAN.md`](./REVAMP_PLAN.md).
+The detailed rewrite plan (phases, architecture, verification checklists) lives in [`docs/REVAMP_PLAN.md`](./docs/REVAMP_PLAN.md).

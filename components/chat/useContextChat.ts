@@ -1,14 +1,50 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { prepareRegeneration } from "@/lib/chat/messages";
 import { buildPageContext, trimContextIfNeeded } from "@/lib/context/buildPageContext";
-import type { ChatMessage, ContextChatState } from "@/lib/types";
+import type { ChatMessage, ContextChatState, FinancialData, PageChartData } from "@/lib/types";
 
-// Get the current financial data from the page context
-// This will be passed in when the hook is used
 interface UseContextChatParams {
-	getFinancialData: () => any;
-	getChartData?: () => any;
+	getFinancialData: () => FinancialData | null;
+	getChartData?: () => PageChartData | undefined;
+}
+
+interface StreamPayload {
+	delta?: string;
+	done?: boolean;
+	error?: string;
+}
+
+const RATE_LIMIT_WINDOW_MS = 30_000;
+const MAX_REQUESTS_PER_WINDOW = 5;
+
+function isAbortError(error: unknown): boolean {
+	return error instanceof Error && error.name === "AbortError";
+}
+
+function parseStreamPayload(line: string): StreamPayload | null {
+	if (!line.startsWith("data: ")) {
+		return null;
+	}
+
+	try {
+		const value: unknown = JSON.parse(line.slice(6));
+		return value && typeof value === "object" ? (value as StreamPayload) : null;
+	} catch {
+		return null;
+	}
+}
+
+function readTextResponse(value: unknown): string {
+	if (value && typeof value === "object" && "response" in value) {
+		const response = (value as { response?: unknown }).response;
+		if (typeof response === "string") {
+			return response;
+		}
+	}
+
+	return "No response received.";
 }
 
 export function useContextChat({ getFinancialData, getChartData }: UseContextChatParams) {
@@ -21,7 +57,6 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 
 	const abortControllerRef = useRef<AbortController | null>(null);
 
-	// Rate limiting state
 	const requestCountRef = useRef(0);
 	const lastRequestWindowRef = useRef(Date.now());
 
@@ -52,8 +87,7 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 					error: null,
 					messages: [], // Reset messages for new metric
 				}));
-			} catch (error) {
-				console.error("Error opening chat:", error);
+			} catch {
 				setState((prev) => ({
 					...prev,
 					error: "error",
@@ -64,7 +98,6 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 	);
 
 	const close = useCallback(() => {
-		// Cancel any ongoing request
 		if (abortControllerRef.current) {
 			abortControllerRef.current.abort();
 			abortControllerRef.current = null;
@@ -79,16 +112,14 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 
 	const checkRateLimit = useCallback(() => {
 		const now = Date.now();
-		const windowDuration = 30000; // 30 seconds
 
-		// Reset window if needed
-		if (now - lastRequestWindowRef.current > windowDuration) {
+		if (now - lastRequestWindowRef.current > RATE_LIMIT_WINDOW_MS) {
 			requestCountRef.current = 0;
 			lastRequestWindowRef.current = now;
 		}
 
-		if (requestCountRef.current >= 5) {
-			return false; // Rate limited
+		if (requestCountRef.current >= MAX_REQUESTS_PER_WINDOW) {
+			return false;
 		}
 
 		requestCountRef.current++;
@@ -96,11 +127,11 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 	}, []);
 
 	const sendMessage = useCallback(
-		async (content: string) => {
+		async (content: string, historyOverride?: ChatMessage[]) => {
 			const trimmedContent = content.trim();
 			if (!trimmedContent || state.sending || !state.initialContext) return;
+			const conversationHistory = historyOverride ?? state.messages;
 
-			// Check rate limit
 			if (!checkRateLimit()) {
 				setState((prev) => ({
 					...prev,
@@ -109,7 +140,6 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 				return;
 			}
 
-			// Add user message
 			const userMessage: ChatMessage = {
 				id: `user-${Date.now()}`,
 				role: "user",
@@ -117,7 +147,6 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 				createdAt: Date.now(),
 			};
 
-			// Add placeholder assistant message for streaming
 			const assistantMessageId = `assistant-${Date.now()}`;
 			const assistantMessage: ChatMessage = {
 				id: assistantMessageId,
@@ -129,23 +158,23 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 
 			setState((prev) => ({
 				...prev,
-				messages: [...prev.messages, userMessage, assistantMessage],
+				messages: [...conversationHistory, userMessage, assistantMessage],
 				sending: true,
 				error: null,
 			}));
 
 			try {
-				// Create abort controller for this request
 				abortControllerRef.current = new AbortController();
 
 				const response = await fetch("/api/context-chat", {
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
+						Accept: "text/event-stream",
 					},
 					body: JSON.stringify({
 						context: state.initialContext,
-						messages: state.messages,
+						messages: conversationHistory,
 						newMessage: trimmedContent,
 					}),
 					signal: abortControllerRef.current.signal,
@@ -158,69 +187,64 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 				const isStreaming = response.headers.get("content-type")?.includes("text/event-stream");
 
 				if (isStreaming) {
-					// Handle streaming response
 					const reader = response.body?.getReader();
 					if (!reader) throw new Error("No response body");
 
 					const decoder = new TextDecoder();
 					let accumulatedContent = "";
+					let bufferedContent = "";
 
 					while (true) {
 						const { done, value } = await reader.read();
 						if (done) break;
 
-						const chunk = decoder.decode(value, { stream: true });
-						const lines = chunk.split("\n");
+						bufferedContent += decoder.decode(value, { stream: true });
+						const lines = bufferedContent.split("\n");
+						bufferedContent = lines.pop() ?? "";
 
 						for (const line of lines) {
-							if (line.startsWith("data: ")) {
-								try {
-									const data = JSON.parse(line.slice(6));
-									if (data.delta) {
-										accumulatedContent += data.delta;
-										setState((prev) => ({
-											...prev,
-											messages: prev.messages.map((msg) =>
-												msg.id === assistantMessageId
-													? { ...msg, content: accumulatedContent, streaming: true }
-													: msg,
-											),
-										}));
-									} else if (data.done) {
-										setState((prev) => ({
-											...prev,
-											messages: prev.messages.map((msg) =>
-												msg.id === assistantMessageId ? { ...msg, streaming: false } : msg,
-											),
-											sending: false,
-										}));
-										return;
-									}
-								} catch (_e) {
-									// Skip malformed JSON
-								}
+							const payload = parseStreamPayload(line);
+							if (payload?.error) {
+								throw new Error(payload.error);
+							}
+							if (payload?.delta) {
+								accumulatedContent += payload.delta;
+								setState((prev) => ({
+									...prev,
+									messages: prev.messages.map((message) =>
+										message.id === assistantMessageId
+											? { ...message, content: accumulatedContent, streaming: true }
+											: message,
+									),
+								}));
 							}
 						}
 					}
-				} else {
-					// Handle non-streaming response
-					const data = await response.json();
+
 					setState((prev) => ({
 						...prev,
-						messages: prev.messages.map((msg) =>
-							msg.id === assistantMessageId
-								? { ...msg, content: data.response || "No response", streaming: false }
-								: msg,
+						messages: prev.messages.map((message) =>
+							message.id === assistantMessageId ? { ...message, streaming: false } : message,
+						),
+						sending: false,
+					}));
+				} else {
+					const data: unknown = await response.json();
+					setState((prev) => ({
+						...prev,
+						messages: prev.messages.map((message) =>
+							message.id === assistantMessageId
+								? { ...message, content: readTextResponse(data), streaming: false }
+								: message,
 						),
 						sending: false,
 					}));
 				}
-			} catch (error: any) {
-				if (error.name === "AbortError") {
-					return; // Request was cancelled
+			} catch (error: unknown) {
+				if (isAbortError(error)) {
+					return;
 				}
 
-				console.error("Chat error:", error);
 				setState((prev) => ({
 					...prev,
 					messages: prev.messages.filter((msg) => msg.id !== assistantMessageId),
@@ -236,30 +260,10 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 
 	const regenerateLast = useCallback(async () => {
 		if (state.messages.length < 2 || state.sending) return;
+		const regeneration = prepareRegeneration(state.messages);
+		if (!regeneration) return;
 
-		// Find the last user message
-		let lastUserMessage: ChatMessage | null = null;
-		for (let i = state.messages.length - 1; i >= 0; i--) {
-			if (state.messages[i].role === "user") {
-				lastUserMessage = state.messages[i];
-				break;
-			}
-		}
-
-		if (!lastUserMessage) return;
-
-		// Remove the last assistant message and resend
-		const messagesWithoutLastAssistant = state.messages.filter(
-			(msg) => !(msg.role === "assistant" && msg.createdAt > lastUserMessage!.createdAt),
-		);
-
-		setState((prev) => ({
-			...prev,
-			messages: messagesWithoutLastAssistant,
-		}));
-
-		// Resend the last user message
-		await sendMessage(lastUserMessage.content);
+		await sendMessage(regeneration.content, regeneration.history);
 	}, [state.messages, state.sending, sendMessage]);
 
 	const clearError = useCallback(() => {

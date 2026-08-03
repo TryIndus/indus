@@ -1,65 +1,29 @@
 import { getCachedExplanation } from "@/hooks/useExplanation";
-import type { ChartPoint, MetricGroups, PageContext } from "@/lib/types";
+import type { FinancialData, MetricGroups, PageChartData, PageContext } from "@/lib/types";
 
-// Define the financial data structure based on existing FinancialData type
-interface FinancialData {
-	symbol: string;
-	shortName?: string;
-	longName?: string;
-	regularMarketPrice?: number;
-	regularMarketChange?: number;
-	regularMarketChangePercent?: number;
-	currency?: string;
-	longBusinessSummary?: string;
-	website?: string;
-	sector?: string;
-	industry?: string;
-	country?: string;
-	city?: string;
-	state?: string;
-	marketCap?: number;
-	enterpriseValue?: number;
-	sharesOutstanding?: number;
-	revenue?: number;
-	employees?: number;
-	peRatio?: number;
-	priceToBook?: number;
-	evToSales?: number;
-	evToEbitda?: number;
-	priceToCashFlow?: number;
-	forwardPE?: number;
-	pegRatio?: number;
-	grossMargins?: number;
-	ebitdaMargins?: number;
-	operatingMargins?: number;
-	netProfitMargins?: number;
-	returnOnAssets?: number;
-	returnOnEquity?: number;
-	totalCash?: number;
-	totalDebt?: number;
-	debtToEquity?: number;
-	revenueGrowth?: number;
-	earningsGrowth?: number;
-	dividendYield?: number;
-	dividendRate?: number;
-	payoutRatio?: number;
-	volume?: number;
-	beta?: number;
-	bookValue?: number;
-	priceToSales?: number;
-}
-
-// Interface for chart data (if available)
-interface ChartData {
-	interval?: string;
-	points?: any[];
-	latestPrice?: number;
-	dayChangePct?: number;
-}
+const CONTEXT_METRIC_KEYS = [
+	"market_cap",
+	"enterprise_value",
+	"shares_outstanding",
+	"revenue",
+	"employees",
+	"pe_ratio",
+	"forward_pe",
+	"price_to_book",
+	"price_to_sales",
+	"ev_to_sales",
+	"ev_to_ebitda",
+	"gross_margin",
+	"ebitda_margin",
+	"operating_margin",
+	"net_margin",
+] as const;
+const MAX_EXPLANATION_LENGTH = 280;
+const MAX_CONTEXT_SIZE_KB = 25;
 
 interface BuildContextParams {
 	financialData: FinancialData;
-	chartData?: ChartData;
+	chartData?: PageChartData;
 	triggerMetric: {
 		metricKey: string;
 		metricLabel: string;
@@ -72,7 +36,6 @@ export function buildPageContext({
 	chartData,
 	triggerMetric,
 }: BuildContextParams): PageContext {
-	// Build metric groups
 	const metricGroups: MetricGroups = {
 		companyProfile: {
 			marketCap: financialData.marketCap,
@@ -115,66 +78,37 @@ export function buildPageContext({
 		},
 	};
 
-	// Gather cached explanations (limit to avoid size issues)
 	const cachedExplanations: Record<string, string> = {};
-	const metricKeys = [
-		"market_cap",
-		"enterprise_value",
-		"shares_outstanding",
-		"revenue",
-		"employees",
-		"pe_ratio",
-		"forward_pe",
-		"price_to_book",
-		"price_to_sales",
-		"ev_to_sales",
-		"ev_to_ebitda",
-		"gross_margin",
-		"ebitda_margin",
-		"operating_margin",
-		"net_margin",
-		"roa",
-		"roe",
-		"total_cash",
-		"total_debt",
-		"debt_to_equity",
-		"beta",
-		"dividend_yield",
-		"payout_ratio",
-	];
 
-	// Collect cached explanations, truncating if too long
-	for (const metricKey of metricKeys.slice(0, 15)) {
-		// Limit to first 15 to avoid size issues
+	for (const metricKey of CONTEXT_METRIC_KEYS) {
 		const cached = getCachedExplanation(financialData.symbol, metricKey);
 		if (cached) {
-			// Truncate explanations to avoid payload bloat
 			cachedExplanations[metricKey] =
-				cached.length > 280 ? `${cached.substring(0, 280)}...` : cached;
+				cached.length > MAX_EXPLANATION_LENGTH
+					? `${cached.substring(0, MAX_EXPLANATION_LENGTH)}...`
+					: cached;
 		}
 	}
 
-	// Build chart context if available
 	const chart = chartData?.points
 		? {
-				interval: chartData.interval || "1d",
+				interval: chartData.interval ?? "1d",
 				points: chartData.points.slice(-50).map((point) => ({
-					// Limit to last 50 points
-					t: point.t || Date.now(),
-					o: point.o || 0,
-					h: point.h || 0,
-					l: point.l || 0,
-					c: point.c || 0,
-					v: point.v || 0,
-				})) as ChartPoint[],
-				latestPrice: chartData.latestPrice || financialData.regularMarketPrice || 0,
-				dayChangePct: chartData.dayChangePct || financialData.regularMarketChangePercent || 0,
+					t: point.t,
+					o: point.o,
+					h: point.h,
+					l: point.l,
+					c: point.c,
+					v: point.v,
+				})),
+				latestPrice: chartData.latestPrice ?? financialData.regularMarketPrice ?? 0,
+				dayChangePct: chartData.dayChangePct ?? financialData.regularMarketChangePercent ?? 0,
 			}
 		: undefined;
 
 	return {
 		symbol: financialData.symbol,
-		companyName: financialData.longName || financialData.shortName || financialData.symbol,
+		companyName: financialData.longName ?? financialData.shortName ?? financialData.symbol,
 		asOf: new Date().toISOString(),
 		metricGroups,
 		chart,
@@ -183,18 +117,13 @@ export function buildPageContext({
 	};
 }
 
-// Helper function to estimate context size and trim if needed
 export function trimContextIfNeeded(context: PageContext): PageContext {
-	const contextStr = JSON.stringify(context);
-	const sizeKB = new Blob([contextStr]).size / 1024;
+	const sizeKB = new TextEncoder().encode(JSON.stringify(context)).byteLength / 1024;
 
-	if (sizeKB > 25) {
-		// If larger than 25KB
-		// Remove oldest explanations
+	if (sizeKB > MAX_CONTEXT_SIZE_KB) {
 		const explanationEntries = Object.entries(context.cachedExplanations);
 		const trimmedExplanations: Record<string, string> = {};
 
-		// Keep only the first 10 explanations
 		for (let i = 0; i < Math.min(10, explanationEntries.length); i++) {
 			const [key, value] = explanationEntries[i];
 			trimmedExplanations[key] = value.length > 200 ? `${value.substring(0, 200)}...` : value;
@@ -206,7 +135,7 @@ export function trimContextIfNeeded(context: PageContext): PageContext {
 			chart: context.chart
 				? {
 						...context.chart,
-						points: context.chart.points.slice(-30), // Reduce chart points
+						points: context.chart.points.slice(-30),
 					}
 				: undefined,
 		};

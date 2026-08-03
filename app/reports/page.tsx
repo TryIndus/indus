@@ -154,8 +154,7 @@ export default function ReportsPage() {
 							clearInterval(interval);
 						}
 					}
-				} catch (error) {
-					console.error("Error polling report status:", error);
+				} catch {
 					clearInterval(interval);
 				}
 			}, 3000);
@@ -228,17 +227,13 @@ export default function ReportsPage() {
 
 		try {
 			await generateMutation.mutateAsync(newReportSymbol.toUpperCase());
-		} catch (error) {
-			console.error("Error generating report:", error);
-		}
+		} catch {}
 	};
 
 	const deleteReport = async (reportId: string) => {
 		try {
 			await deleteMutation.mutateAsync(reportId);
-		} catch (error) {
-			console.error("Error deleting report:", error);
-		}
+		} catch {}
 	};
 
 	const handleViewReport = (report: Report) => {

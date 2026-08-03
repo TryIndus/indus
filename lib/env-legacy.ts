@@ -6,7 +6,9 @@ const LEGACY_KEY_MAP: Record<string, string> = {
 
 // Deprecated shim: falls back to NEXT_PUBLIC_ALPACA_* if the server-only names are unset.
 // The legacy names leak Alpaca credentials into the client bundle. Tracked for removal.
-export function coalesceLegacyEnv(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function coalesceLegacyEnv(
+	source: Readonly<Record<string, string | undefined>>,
+): Record<string, string | undefined> {
 	const next = { ...source };
 	const usedLegacy: string[] = [];
 	for (const [canonical, legacy] of Object.entries(LEGACY_KEY_MAP)) {

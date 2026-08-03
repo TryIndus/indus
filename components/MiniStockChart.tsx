@@ -40,9 +40,8 @@ export default function MiniStockChart({
 			} else {
 				setError(`Failed to load data`);
 			}
-		} catch (error) {
+		} catch {
 			setError(`Error loading data`);
-			console.error("Error loading data:", error);
 		} finally {
 			setIsLoading(false);
 		}

@@ -32,7 +32,6 @@ function saveCacheToStorage(cache: Map<string, string>) {
 // Global cache and loading state - initialized from localStorage
 const explanationCache = loadCacheFromStorage();
 const loadingState = new Map<string, boolean>();
-const _preloadPromise: Promise<void> | null = null;
 
 // Cache update listeners - now keyed by cache key
 const cacheListeners = new Map<string, Set<() => void>>();
@@ -62,7 +61,7 @@ export function subscribeToCacheUpdates(symbol: string, metric: string, callback
 	if (!cacheListeners.has(key)) {
 		cacheListeners.set(key, new Set());
 	}
-	cacheListeners.get(key)!.add(callback);
+	cacheListeners.get(key)?.add(callback);
 	return () => {
 		const listeners = cacheListeners.get(key);
 		if (listeners) {
@@ -98,19 +97,6 @@ export async function fetchExplanation(
 	await batchPreload([{ symbol, metric, value }]);
 }
 
-function getFallbackExplanation(_symbol: string, metric: string, _value: number): string {
-	switch (metric) {
-		case "price":
-			return `Error`;
-		case "pe_ratio":
-			return `Error`;
-		case "volume":
-			return `Error`;
-		default:
-			return `Error`;
-	}
-}
-
 export async function batchPreload(items: Item[]) {
 	// If a batch request is already in progress, wait for it and return
 	// This prevents duplicate API calls from React Strict Mode or race conditions
@@ -126,6 +112,12 @@ export async function batchPreload(items: Item[]) {
 		return;
 	}
 
+	for (const item of toFetch) {
+		const key = makeKey(item.symbol, item.metric);
+		loadingState.set(key, true);
+		notifyCacheUpdate(key);
+	}
+
 	// Create and store the promise BEFORE the async operation
 	// This ensures any concurrent calls will see the pending request
 	pendingBatchRequest = (async () => {
@@ -137,26 +129,27 @@ export async function batchPreload(items: Item[]) {
 			});
 			const data = await res.json();
 
-			if (data.explanations) {
-				for (const [key, text] of Object.entries(data.explanations)) {
-					explanationCache.set(key, text as string);
-					notifyCacheUpdate(key);
-				}
-				// Persist to localStorage
-				saveCacheToStorage(explanationCache);
-			} else if (data.error?.includes("429")) {
-				// Rate limit exceeded - use fallback explanations
-				for (const item of toFetch) {
-					const key = makeKey(item.symbol, item.metric);
-					const fallbackExplanation = getFallbackExplanation(item.symbol, item.metric, item.value);
-					explanationCache.set(key, fallbackExplanation);
-					notifyCacheUpdate(key);
-				}
+			if (!res.ok) {
+				throw new Error(`Explanation request failed with status ${res.status}`);
 			}
-		} catch (e) {
-			console.error("Batch preload error:", e);
+
+			if (data && typeof data === "object" && data.explanations) {
+				for (const [key, text] of Object.entries(data.explanations)) {
+					if (typeof text === "string") {
+						explanationCache.set(key, text);
+						notifyCacheUpdate(key);
+					}
+				}
+				saveCacheToStorage(explanationCache);
+			}
+		} catch {
+			// Transient provider and network failures remain retryable.
 		} finally {
-			// Clear the pending request so future calls can proceed
+			for (const item of toFetch) {
+				const key = makeKey(item.symbol, item.metric);
+				loadingState.delete(key);
+				notifyCacheUpdate(key);
+			}
 			pendingBatchRequest = null;
 		}
 	})();

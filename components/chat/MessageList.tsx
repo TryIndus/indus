@@ -15,6 +15,14 @@ interface MessageListProps {
 	hasUserMessages: boolean;
 }
 
+const SEED_MESSAGE: ChatMessage = {
+	id: "seed",
+	role: "assistant",
+	content:
+		"Hi — I can interpret any metric here (valuation, margins, growth, leverage). Ask a question to begin.",
+	createdAt: 0,
+};
+
 export const MessageList: React.FC<MessageListProps> = ({
 	messages,
 	sending,
@@ -25,17 +33,14 @@ export const MessageList: React.FC<MessageListProps> = ({
 }) => {
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 
-	// Auto-scroll to bottom when new messages arrive
 	useEffect(() => {
 		messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, []);
+	});
 
 	const copyToClipboard = async (content: string) => {
 		try {
 			await navigator.clipboard.writeText(content);
-		} catch (err) {
-			console.error("Failed to copy:", err);
-		}
+		} catch {}
 	};
 
 	const renderMessage = (message: ChatMessage) => {
@@ -90,16 +95,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 		);
 	};
 
-	// Seed message for first-time users
-	const seedMessage: ChatMessage = {
-		id: "seed",
-		role: "assistant",
-		content:
-			"Hi — I can interpret any metric here (valuation, margins, growth, leverage). Ask a question to begin.",
-		createdAt: Date.now(),
-	};
-
-	const allMessages = !hasUserMessages && messages.length === 0 ? [seedMessage] : messages;
+	const allMessages = !hasUserMessages && messages.length === 0 ? [SEED_MESSAGE] : messages;
 
 	return (
 		<div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-none">

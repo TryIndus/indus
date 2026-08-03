@@ -213,6 +213,7 @@ export default function AuthPage() {
 										size="sm"
 										onClick={() => setShowPassword(!showPassword)}
 										className="absolute right-1 top-1 h-8 w-8 p-0"
+										aria-label={showPassword ? "Hide password" : "Show password"}
 									>
 										{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
 									</Button>

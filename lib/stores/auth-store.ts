@@ -33,8 +33,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 					loading: false,
 				});
 			})
-			.catch((error) => {
-				console.error("Error loading auth session:", error);
+			.catch(() => {
 				if (active) {
 					set({ session: null, user: null, loading: false });
 				}
