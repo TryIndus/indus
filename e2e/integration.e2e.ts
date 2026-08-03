@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("@integration public navigation reaches authentication", async ({ page }) => {
 	await page.goto("/");
-	await page.getByRole("button", { name: "Get Started" }).click();
+	await page.getByRole("link", { name: "Get Started" }).click();
 	await expect(page).toHaveURL(/\/auth$/);
 	await expect(page.getByText("Welcome Back", { exact: true })).toBeVisible();
 });

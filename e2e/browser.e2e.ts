@@ -5,7 +5,7 @@ test("@browser landing page exposes the primary product path", async ({ page }) 
 	await expect(
 		page.getByRole("heading", { name: /The Turning Point of Financial Intelligence/ }),
 	).toBeVisible();
-	await expect(page.getByRole("button", { name: "Explore Dashboard" })).toBeVisible();
+	await expect(page.getByRole("link", { name: "Explore Dashboard" })).toBeVisible();
 	await expect(page.getByText("Comprehensive Analytics", { exact: true }).first()).toBeVisible();
 });
 
