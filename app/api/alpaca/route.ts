@@ -1,4 +1,4 @@
-import { Alpaca, TimeFrame, timeFrame, TimeFrameUnit } from "@alpacahq/alpaca-trade-api";
+import { Alpaca, TimeFrame, TimeFrameUnit, timeFrame } from "@alpacahq/alpaca-trade-api";
 import { type NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/observability/logger";
@@ -88,7 +88,11 @@ export async function GET(request: NextRequest) {
 		};
 		const bars =
 			type === "crypto"
-				? await alpaca.marketData.getCryptoBarsFor(symbol, { ...request, loc: "us" }, { maxPerSymbol: limit })
+				? await alpaca.marketData.getCryptoBarsFor(
+						symbol,
+						{ ...request, loc: "us" },
+						{ maxPerSymbol: limit },
+					)
 				: await alpaca.marketData.getStockBarsFor(
 						symbol,
 						{ ...request, feed: "iex", adjustment: "split" },
@@ -115,8 +119,7 @@ export async function GET(request: NextRequest) {
 			timeframe: timeframe,
 			totalBars: sortedData.length,
 			earliestTimestamp: sortedData.length > 0 ? sortedData[0].time : null,
-			latestTimestamp:
-				sortedData.length > 0 ? sortedData[sortedData.length - 1].time : null,
+			latestTimestamp: sortedData.length > 0 ? sortedData[sortedData.length - 1].time : null,
 		});
 	} catch (error) {
 		logger.error("alpaca.history_failed", error, { symbol, timeframe, type });
