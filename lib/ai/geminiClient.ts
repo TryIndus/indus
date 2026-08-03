@@ -139,10 +139,9 @@ export class GeminiClient {
 		const normalized = buffer.replace(/\r\n/g, "\n");
 		const events = normalized.split("\n\n");
 		const remainder = flush ? "" : (events.pop() ?? "");
-		const completeEvents = flush ? events : events;
 		const texts: string[] = [];
 
-		for (const event of completeEvents) {
+		for (const event of events) {
 			const payload = event
 				.split("\n")
 				.filter((line) => line.startsWith("data:"))

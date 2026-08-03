@@ -36,29 +36,29 @@ function createStreamingResponse(
 	messages: GeminiMessage[],
 ): ReadableStream<Uint8Array> {
 	return new ReadableStream({
-			async start(controller) {
-				try {
-					const geminiStream = await geminiClient.generateStreamingContent(messages);
-					const reader = geminiStream.getReader();
-					const decoder = new TextDecoder();
-					let buffer = "";
+		async start(controller) {
+			try {
+				const geminiStream = await geminiClient.generateStreamingContent(messages);
+				const reader = geminiStream.getReader();
+				const decoder = new TextDecoder();
+				let buffer = "";
 
-					while (true) {
-						const { done, value } = await reader.read();
-						if (done) break;
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
 
-						buffer += decoder.decode(value, { stream: true });
-						const parsed = GeminiClient.parseSseBuffer(buffer);
-						buffer = parsed.remainder;
-						for (const text of parsed.texts) {
-							controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: text })}\n\n`));
-						}
-					}
-
-					buffer += decoder.decode();
-					for (const text of GeminiClient.parseSseBuffer(buffer, true).texts) {
+					buffer += decoder.decode(value, { stream: true });
+					const parsed = GeminiClient.parseSseBuffer(buffer);
+					buffer = parsed.remainder;
+					for (const text of parsed.texts) {
 						controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: text })}\n\n`));
 					}
+				}
+
+				buffer += decoder.decode();
+				for (const text of GeminiClient.parseSseBuffer(buffer, true).texts) {
+					controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta: text })}\n\n`));
+				}
 
 				controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
 			} catch (error) {
