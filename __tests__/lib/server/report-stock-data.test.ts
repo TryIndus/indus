@@ -1,5 +1,9 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { loadReportStockData } from "@/lib/server/report-stock-data";
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 describe("loadReportStockData", () => {
 	test("loads a bounded financial snapshot directly from the provider", async () => {
@@ -22,7 +26,12 @@ describe("loadReportStockData", () => {
 					returnOnEquity: 0.3,
 					debtToEquity: 40,
 				},
-				summaryDetail: { trailingPE: 25, fiftyTwoWeekLow: 90, fiftyTwoWeekHigh: 140 },
+				summaryDetail: {
+					marketCap: 6_000,
+					trailingPE: 25,
+					fiftyTwoWeekLow: 90,
+					fiftyTwoWeekHigh: 140,
+				},
 			}),
 		};
 
@@ -62,11 +71,24 @@ describe("loadReportStockData", () => {
 	});
 
 	test("returns null when the provider is unavailable", async () => {
+		const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 		const provider = {
 			quote: vi.fn().mockRejectedValue(new Error("provider unavailable")),
 			quoteSummary: vi.fn().mockResolvedValue({}),
 		};
 
 		await expect(loadReportStockData("NVDA", provider)).resolves.toBeNull();
+		expect(warning).toHaveBeenCalledWith(expect.stringContaining("report.stock_data_unavailable"));
+	});
+
+	test("returns null when summary retrieval fails", async () => {
+		const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+		const provider = {
+			quote: vi.fn().mockResolvedValue({ symbol: "TSLA" }),
+			quoteSummary: vi.fn().mockRejectedValue(new Error("summary unavailable")),
+		};
+
+		await expect(loadReportStockData("TSLA", provider)).resolves.toBeNull();
+		expect(warning).toHaveBeenCalledWith(expect.stringContaining('"symbol":"TSLA"'));
 	});
 });

@@ -24,6 +24,7 @@ export default defineConfig({
 				"lib/realtime/alpaca-stream.ts",
 				"lib/schemas/api.ts",
 				"lib/security/ai-access.ts",
+				"lib/server/report-stock-data.ts",
 			],
 			reporter: ["text", "html", "json-summary"],
 			reportsDirectory: "coverage",

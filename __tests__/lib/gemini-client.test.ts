@@ -37,6 +37,17 @@ describe("GeminiClient.parseSseBuffer", () => {
 		expect(parsed.texts).toEqual(["one", "two"]);
 	});
 
+	test("flushes a final event without a trailing separator", () => {
+		const event = `data: ${JSON.stringify({
+			candidates: [{ content: { parts: [{ text: "final" }] } }],
+		})}`;
+
+		expect(GeminiClient.parseSseBuffer(event, true)).toEqual({
+			texts: ["final"],
+			remainder: "",
+		});
+	});
+
 	test("ignores terminal and malformed provider events", () => {
 		const parsed = GeminiClient.parseSseBuffer(
 			'data: [DONE]\n\ndata: not-json\n\ndata: {"candidates": []}',
