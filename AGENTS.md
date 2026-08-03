@@ -1,105 +1,146 @@
-# Indus - AI-Powered Financial Dashboard
+# Indus Repository Guide
 
-## What This Project Is
+## Mission
 
-Indus is a full-stack financial intelligence platform where users authenticate, browse and search stocks/crypto, view 50+ financial metrics per company, stream real-time price data, interact with an AI financial analyst agent (multi-step tool use), and generate AI-powered research reports. It serves as a portfolio showcase of modern full-stack system design.
+Indus is a financial intelligence platform for authenticated stock and cryptocurrency research, live market charts, model-assisted explanations and chat, and generated research reports. Treat it as a production portfolio project: changes should demonstrate sound boundaries, security, reliability, and operational judgment.
 
----
+## Sources of Truth
 
-## Behavioral Rules
+- The checked-in code and migrations describe the system that exists today.
+- [`docs/REVAMP_PLAN.md`](./docs/REVAMP_PLAN.md) describes the approved future architecture and phased migration; it is not current implementation guidance.
+- [`docs/QUALITY.md`](./docs/QUALITY.md) defines the local verification contract.
+- `AGENTS.md` is the canonical agent context. `CLAUDE.md` must remain a relative symlink to it.
 
-These apply to every task, every message, regardless of context.
+Never implement a future revamp phase merely because it appears in the plan. Start a phase only when the user explicitly requests it.
 
-### Commits
+## Working Rules
 
-- Treat large feature work and small amendments differently:
-    - **Large work** (feature implementations, multi-file refactors, substantial research-backed changes): commit incrementally as you go. Break it into small, scoped, one-sentence commits per logical step — do not accumulate a giant uncommitted diff. Don't wait until the end of the response.
-    - **Small amendments** (status flips in docs, typos, one-line comment fixes, removing stray formatting, minor settings tweaks): `git add` only. Do not create a commit. Surface the staged change in the response so the user can commit when convenient.
-- One-sentence commit messages. Describe what changed, not why (the PR does that).
-- Never batch multiple unrelated changes into a single commit.
-- Never amend a commit unless explicitly asked.
-- Never mention AI, Claude, or any AI tool in commit messages, PR titles, PR descriptions, or co-author tags. All commits and PRs must read as if written by a human developer.
+### Scope and Safety
 
-### Code Quality
+- Inspect the relevant implementation, tests, migrations, and documentation before editing.
+- Preserve unrelated user changes in a dirty worktree.
+- Make the smallest coherent change that fully addresses the request.
+- Do not combine feature work, infrastructure work, dependency upgrades, and unrelated cleanup in one PR.
+- Treat `main` as production. Do not push directly to it.
+- Do not mutate production data, cloud resources, secrets, or external services without explicit authorization.
+- Prefer forward-only database fixes after a migration has reached any shared environment.
+- Never expose credentials, tokens, private prompts, or full provider payloads in logs, tests, commits, or responses.
 
-- Run `bun run build` after any code change to verify zero TypeScript and zero lint errors before considering the work done.
-- Run `bun test` after any change that touches logic, schemas, or utilities.
-- Preserve `serverExternalPackages: ['yahoo-finance2']` in `next.config.ts` — removing it breaks the build.
-- Preserve the `punycode` webpack warning suppression in `next.config.ts` until the upstream dependency is resolved.
-- Shared Zod schemas live in `lib/schemas/api.ts` so they can be imported by both routes and tests.
-- Test files live in `__tests__/` mirroring the source structure.
+### Branches, Commits, and Pull Requests
 
-### Pull Requests
+- Branch from the current `origin/main` using a short-lived topic branch.
+- Commit substantial work incrementally by logical concern; do not accumulate a large mixed diff.
+- Use one-sentence commit messages that describe what changed.
+- Stage minor amendments without a standalone commit unless the user requested a completed PR or push.
+- Never amend, rewrite, or force-push history unless explicitly requested.
+- Do not include coding-assistant attribution, co-author tags, or generated-by language in commits or PR metadata. Product terms such as Gemini or model-assisted features are allowed when technically relevant.
+- Open a PR only when explicitly requested. Target `main` and state scope, verification, migration impact, rollback, and deferred work.
 
-- Open a PR after each phase or feature is complete, but only when the user explicitly asks for it.
-- All PRs target `main`.
+### Verification
 
-### Branch Strategy
+Run checks in proportion to the changed boundary:
 
-- Ship work to `main` in small PRs — one per phase, or one per feature. Avoid large multi-phase PRs.
-- `main` is the production deployment. Every merge to `main` triggers a Vercel production deploy; treat each merge as a release.
-- Use short-lived topic branches per phase or feature; merge to `main` once the work's verification checklist passes.
-- Phase 1 is the trickiest cutover because it changes env vars, the package manager, and the lockfile — coordinate the Vercel env var changes with that merge.
+| Change | Required verification |
+|---|---|
+| Documentation or agent context only | `git diff --check`; validate paths, links, and symlinks |
+| TypeScript, React, or configuration | `bun run lint`, `bun run typecheck`, `bun run build` |
+| Logic, schemas, routes, or utilities | Above plus `bun run test` |
+| PostgreSQL migration, grants, RLS, or quotas | Above plus `bun run test:database` |
+| Browser-visible behavior | Relevant Playwright integration, browser, authenticated, accessibility, or performance suites |
+| Broad or release-sensitive changes | `bun run test:local` |
 
-### Documentation Sync
+- Add tests for new behavior and existing behavior changed by the patch.
+- Test failure paths, authorization boundaries, retries, and malformed inputs when relevant.
+- Do not weaken assertions, coverage thresholds, lint rules, or compiler settings to make a change pass.
+- Report commands that could not run and the exact reason.
 
-- Any change to `CLAUDE.md` must also be reflected in `AGENTS.md`. Keep both files in sync.
+## Current Architecture
 
----
+The repository currently uses:
 
-## Current Tech Stack
+- Bun, Next.js 15 App Router, React 19, and strict TypeScript.
+- Tailwind CSS 4, Radix primitives, Lucide icons, and `next-themes`.
+- Supabase Auth and PostgreSQL with versioned SQL migrations, RLS, explicit grants, constraints, and database-enforced request quotas.
+- Zustand for client state and TanStack Query for asynchronous state.
+- Alpaca for real-time and historical market data; Yahoo Finance 2 for fundamentals.
+- Server-side Alpaca WebSockets fanned to browsers through SSE route handlers.
+- Google Gemini through a server-side REST client with manually parsed streaming responses.
+- TradingView Lightweight Charts for financial visualization.
+- Zod for shared request and environment schemas.
+- Biome, Vitest, pgTAP, Playwright, axe-core, and local performance budgets.
+- Vercel as the current deployment target.
 
-- **Runtime**: Bun
-- **Framework**: Next.js 15.5.22 (App Router) + React 19.1.0
-- **Language**: TypeScript 5 (strict mode)
-- **Styling**: Tailwind CSS v4 + shadcn/ui (Radix primitives) + Lucide icons + next-themes
-- **Auth & DB**: Supabase (PostgreSQL + Auth with Google OAuth + email/password)
-- **Real-time**: SSE via Next.js Route Handlers (streams Alpaca WebSocket bars to clients)
-- **Charts**: TradingView Lightweight Charts v5
-- **AI**: Google Gemini 2.5 Flash through the REST API — manual SSE streaming, no tool use
-- **Financial Data**: Alpaca Trade API (real-time + historical bars), Yahoo Finance 2 (fundamentals)
-- **State**: Zustand for client state + TanStack Query for async/server state
-- **Validation**: Zod (API inputs + environment variables)
-- **Testing**: Vitest
-- **Linting**: Biome
-- **Date utils**: date-fns v4
-- **Deployment**: Vercel Hobby
+The approved target architecture replaces the application runtime incrementally with React/Vite, a Rails API, a Rust market-data service, Google Gemini, and an AWS/EKS platform. Follow the phase boundaries in the revamp plan; do not perform a big-bang rewrite.
 
-## Key Files
+## Current Implementation Invariants
 
-- `app/layout.tsx` — Root layout with AppProviders > ConditionalLayout
-- `components/AppProviders.tsx` — TanStack Query, theme, and auth session bootstrap provider
-- `middleware.ts` — Supabase auth, protects /dashboard, /company, /search, /crypto, /reports, /settings
-- `app/api/stream/[symbol]/route.ts` — SSE endpoint for live stock and crypto bars
-- `lib/realtime/alpaca-stream.ts` — Shared Alpaca stream normalization and SSE helpers
-- `lib/ai/geminiClient.ts` — Gemini API wrapper
-- `lib/prompts.ts` — Prompt construction for batch explain
-- `lib/system-prompts.ts` — System prompts for AI
-- `lib/schemas/api.ts` — Shared Zod schemas for all API routes and env validation
-- `lib/env.ts` — Validated environment variables (imports schemas from `lib/schemas/api.ts`)
-- `lib/env-legacy.ts` — Temporary shim mapping `NEXT_PUBLIC_ALPACA_*` to the server-only equivalents; remove once all deployments are migrated
-- `lib/stores/auth-store.ts` — Zustand auth/session state and sign out
-- `lib/stores/favorites-store.ts` — Zustand favorites state with TanStack Query mutations
-- `components/PriceChart.tsx` — Shared TradingView chart with EventSource live updates
-- `components/StockChart.tsx` / `CryptoChart.tsx` — Stock/crypto chart wrappers
-- `next.config.ts` — Next.js config with `serverExternalPackages: ['yahoo-finance2']`, punycode warning suppression
+### Application and Provider Boundaries
 
-## Environment Variables
+- Keep provider credentials server-only. Only Supabase URL and anonymous key may use `NEXT_PUBLIC_*`.
+- Validate environment variables through `lib/env.ts` and shared schemas in `lib/schemas/api.ts`.
+- Keep shared Zod API schemas in `lib/schemas/api.ts` so routes and tests use the same contracts.
+- Authenticate protected application routes in `middleware.ts`.
+- Authorize tenant-owned database operations with RLS as well as application checks.
+- Load report market data directly from server-side providers; never trust an incoming request origin to call internal routes.
+- Bound provider requests, chat history, batch sizes, symbols, and generated output.
+- Fail closed when authentication, quota enforcement, or required provider evidence is unavailable.
 
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (public — required by Supabase client)
-- `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_IS_PAPER` (server-only)
-- `GEMINI_API_KEY` (server-only)
-- `NEXT_PUBLIC_VERCEL_URL` (optional)
-- All validated at startup via Zod in `lib/env.ts`
-- Legacy `NEXT_PUBLIC_ALPACA_API_KEY` / `_SECRET_KEY` / `_IS_PAPER` are coalesced to the server-only names by `lib/env-legacy.ts` for backward compatibility; tracked for removal
+### Database
 
-## Database Tables (Supabase)
+- Add schema changes as sequential files in `supabase/migrations/`; never edit an applied migration.
+- Enforce durable invariants with PostgreSQL constraints and tenant access with explicit grants plus RLS.
+- Add or update pgTAP coverage for migrations, policies, privileges, constraints, and quota behavior.
+- Preflight existing data before validating a new constraint in a shared environment.
+- Apply migrations through the Supabase CLI or the established migration process, then verify migration history and resulting database objects.
 
-- `favorites` (user_id, symbol, created_at)
-- `reports` (id, user_id, symbol, company_name, status, report_content, summary, created_at)
+Current application tables include `favorites`, `reports`, `metric_explanations`, and `ai_usage_windows`.
 
-Schema migrations are tracked in `supabase/migrations/` and numbered sequentially. Run them manually in the Supabase SQL Editor when setting up a new project.
+### Real-Time Data
 
-## Revamp Plan
+- Preserve the server-side Alpaca-to-SSE boundary; browsers must not receive Alpaca credentials.
+- Keep stock and cryptocurrency symbol normalization centralized in `lib/realtime/alpaca-stream.ts`.
+- Preserve event IDs, reconnect behavior, abort cleanup, and bounded upstream connections.
+- Test both stock and slash-delimited cryptocurrency symbols when changing stream handling.
 
-The detailed rewrite plan (phases, architecture, verification checklists) lives in [`docs/REVAMP_PLAN.md`](./docs/REVAMP_PLAN.md).
+### Next.js Configuration
+
+- Preserve `serverExternalPackages: ["yahoo-finance2"]` in `next.config.ts`.
+- Preserve the `punycode` webpack warning suppression until the upstream dependency is removed.
+- Do not disable TypeScript, lint, build, or runtime validation failures.
+
+## Repository Map
+
+- `app/` — App Router pages and server route handlers.
+- `components/` — UI, chart, navigation, and chat components.
+- `hooks/` — client behavior shared across components.
+- `lib/` — schemas, providers, stores, security, observability, and domain utilities.
+- `__tests__/` — Vitest tests mirroring source boundaries.
+- `e2e/` — Playwright integration, browser, accessibility, authenticated, and performance tests.
+- `supabase/migrations/` — ordered production database migrations.
+- `supabase/tests/database/` — pgTAP database boundary tests.
+- `scripts/` — isolated local verification orchestration.
+- `docs/` — durable architecture and operational documentation.
+
+## Documentation Standards
+
+- Keep `README.md` focused on stable setup, commands, architecture orientation, and links to durable documents.
+- Keep detailed documentation under `docs/`; retain `README.md` and repository control files at the root.
+- Remove temporary progress narration, speculative claims, stale issue lists, and duplicated instructions.
+- Document decisions, invariants, failure behavior, operations, and rollback information that will remain useful after the current task.
+- Update the revamp plan when an architectural decision or phase boundary changes.
+- Update only `AGENTS.md` for agent guidance; verify that `CLAUDE.md` still resolves to it.
+
+## Key Current Files
+
+- `app/layout.tsx` — provider and layout composition.
+- `components/AppProviders.tsx` — query, theme, and auth bootstrap providers.
+- `middleware.ts` — protected-route authentication.
+- `app/api/stream/[symbol]/route.ts` — live SSE endpoint.
+- `lib/realtime/alpaca-stream.ts` — market stream normalization and SSE helpers.
+- `lib/ai/geminiClient.ts` — Gemini request and stream client.
+- `lib/security/ai-access.ts` — authentication and quota enforcement for model-backed routes.
+- `lib/server/report-stock-data.ts` — server-side report evidence retrieval.
+- `lib/schemas/api.ts` — shared API and environment schemas.
+- `lib/env.ts` and `lib/env-legacy.ts` — current and transitional environment handling.
+- `next.config.ts` — required server package and warning configuration.
+- `docs/REVAMP_PLAN.md` — future Rails, Rust, Gemini, and AWS migration plan.
