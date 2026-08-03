@@ -1,4 +1,4 @@
-import type { ReportStockData } from "@/lib/schemas/api";
+import type { ReportStockData } from "@/lib/types";
 
 const REPORT_SYSTEM_INSTRUCTION = `You create factual financial-data summaries for an educational dashboard.
 

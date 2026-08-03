@@ -143,31 +143,6 @@ export const stockDataQuerySchema = z.object({
 	symbol: symbolSchema,
 });
 
-const nullableFiniteNumberSchema = finiteNumberSchema.nullable().optional();
-
-export const reportStockDataResponseSchema = z.object({
-	data: z.object({
-		shortName: z.string().optional(),
-		longName: z.string().optional(),
-		regularMarketPrice: finiteNumberSchema.optional(),
-		regularMarketChange: finiteNumberSchema.optional(),
-		regularMarketChangePercent: finiteNumberSchema.optional(),
-		marketCap: nullableFiniteNumberSchema,
-		peRatio: nullableFiniteNumberSchema,
-		sector: z.string().nullable().optional(),
-		industry: z.string().nullable().optional(),
-		beta: nullableFiniteNumberSchema,
-		fiftyTwoWeekLow: nullableFiniteNumberSchema,
-		fiftyTwoWeekHigh: nullableFiniteNumberSchema,
-		revenueGrowth: nullableFiniteNumberSchema,
-		netProfitMargins: nullableFiniteNumberSchema,
-		returnOnEquity: nullableFiniteNumberSchema,
-		debtToEquity: nullableFiniteNumberSchema,
-	}),
-});
-
-export type ReportStockData = z.infer<typeof reportStockDataResponseSchema>["data"];
-
 export const generateReportSchema = z
 	.object({
 		symbol: symbolSchema,

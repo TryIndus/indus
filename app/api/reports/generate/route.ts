@@ -3,33 +3,10 @@ import { GeminiApiError, GeminiClient } from "@/lib/ai/geminiClient";
 import { createReportMessages, extractReportSummary } from "@/lib/ai/report";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/observability/logger";
-import {
-	generateReportSchema,
-	type ReportStockData,
-	reportStockDataResponseSchema,
-} from "@/lib/schemas/api";
+import { generateReportSchema } from "@/lib/schemas/api";
 import { type AiAccessClient, checkAiAccess, getAiQuotaHeaders } from "@/lib/security/ai-access";
+import { loadReportStockData } from "@/lib/server/report-stock-data";
 import { createClient } from "@/lib/supabase/server";
-
-async function fetchStockData(requestUrl: string, symbol: string): Promise<ReportStockData | null> {
-	try {
-		const url = new URL("/api/stock-data", requestUrl);
-		url.searchParams.set("symbol", symbol);
-		const response = await fetch(url);
-		if (!response.ok) {
-			return null;
-		}
-
-		const parsed = reportStockDataResponseSchema.safeParse(await response.json());
-		return parsed.success ? parsed.data.data : null;
-	} catch (error) {
-		logger.warn("report.stock_data_unavailable", {
-			symbol,
-			errorMessage: error instanceof Error ? error.message : String(error),
-		});
-		return null;
-	}
-}
 
 export async function POST(request: Request) {
 	let reportId: string | null = null;
@@ -54,7 +31,7 @@ export async function POST(request: Request) {
 		}
 
 		reportUserId = access.userId;
-		const stockData = await fetchStockData(request.url, symbol);
+		const stockData = await loadReportStockData(symbol);
 		const { data: report, error: insertError } = await supabase
 			.from("reports")
 			.insert({
@@ -75,7 +52,9 @@ export async function POST(request: Request) {
 
 		reportId = report.id;
 		const geminiClient = new GeminiClient(env.GEMINI_API_KEY);
-		const reportContent = await geminiClient.generateContent(createReportMessages(symbol, stockData));
+		const reportContent = await geminiClient.generateContent(
+			createReportMessages(symbol, stockData),
+		);
 		const summary = extractReportSummary(reportContent, symbol);
 
 		const { data: completedReport, error: updateError } = await supabase

@@ -67,6 +67,25 @@ export interface FinancialData {
 	priceToSales?: number;
 }
 
+export interface ReportStockData {
+	shortName?: string;
+	longName?: string;
+	regularMarketPrice?: number;
+	regularMarketChange?: number;
+	regularMarketChangePercent?: number;
+	marketCap?: number;
+	peRatio?: number;
+	sector?: string;
+	industry?: string;
+	beta?: number;
+	fiftyTwoWeekLow?: number;
+	fiftyTwoWeekHigh?: number;
+	revenueGrowth?: number;
+	netProfitMargins?: number;
+	returnOnEquity?: number;
+	debtToEquity?: number;
+}
+
 export interface CryptoData {
 	symbol: string;
 	shortName?: string;
