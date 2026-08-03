@@ -74,7 +74,7 @@ bunx supabase --version
 
 ## Reliability-first development
 
-Indus uses test-driven development for new behavior and regressions: define the observable contract and its failure boundaries before or alongside the production implementation. As a working reliability heuristic, aim for at least ten lines of focused verification code and durable test infrastructure for every line of production behavior introduced. This is not permission to inflate test files with redundant assertions; the intent is to make each production change small while covering its valid path, malformed inputs, boundary values, failure behavior, security properties, and relevant browser contract at the appropriate layers.
+Indus uses test-driven development for new behavior and regressions: define the observable contract and its failure boundaries before or alongside the production implementation. Verification effort should scale with risk and blast radius, with enough focused coverage to make expected behavior and failure modes explicit. Keep each production change small while covering its valid path, malformed inputs, boundary values, failure behavior, security properties, and relevant browser contract at the appropriate layers.
 
 Tests should verify externally meaningful behavior instead of implementation details. A small production change may therefore be supported by schema tests, unit cases, database assertions, and browser coverage rather than a single oversized test file.
 
