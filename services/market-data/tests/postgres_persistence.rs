@@ -48,7 +48,10 @@ fn record(event: &NormalizedEvent, offset: i64) -> KafkaRecord {
         topic: event.topic().into(),
         payload: event.encode(),
         event_id: Some(event.envelope().unwrap().event_id.clone()),
-        partition: 0,
+        // Cargo executes integration-test binaries concurrently. Keep this
+        // synthetic database fixture disjoint from the live Kafka test,
+        // which consumes the broker-assigned partition zero.
+        partition: 32_767,
         offset,
     }
 }
