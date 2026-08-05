@@ -26,6 +26,24 @@
 .DS_Store
 *.pem
 
+# Terraform local state, plans, and generated provider data
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.plan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local infrastructure inputs may contain account IDs or secret references.
+infra/terraform/**/backend.hcl
+infra/terraform/**/terraform.tfvars
+infra/terraform/**/secrets.auto.tfvars
+
 # debug
 npm-debug.log*
 yarn-debug.log*
