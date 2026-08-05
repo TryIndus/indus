@@ -3,11 +3,9 @@ require "rdkafka"
 module Reports
   class EventConsumer
     def self.from_env
-      consumer = Rdkafka::Config.new({
-        "bootstrap.servers": ENV.fetch("KAFKA_BROKERS"),
-        "group.id": ENV.fetch("REPORTS_KAFKA_CONSUMER_GROUP", "indus-report-workflow-starter-v1"),
-        "auto.offset.reset": "earliest", "enable.auto.commit": false
-      }).consumer
+      config = Events::KafkaConfig.build(client_id: ENV.fetch("KAFKA_CLIENT_ID", "indus-reports-consumer"),
+        consumer_group: ENV.fetch("REPORTS_KAFKA_CONSUMER_GROUP", "indus-report-workflow-starter-v1"))
+      consumer = Events::KafkaConfig.consumer(config)
       consumer.subscribe("reports.lifecycle.v1")
       new(consumer: consumer, temporal: TemporalClient.from_env)
     end

@@ -1,18 +1,10 @@
-require "rdkafka"
-
 module Events
   class KafkaProducer
     def self.from_env
       brokers = ENV.fetch("KAFKA_BROKERS")
-      config = {
-        "bootstrap.servers": brokers,
-        "client.id": ENV.fetch("KAFKA_CLIENT_ID", "indus-platform-api"),
-        "enable.idempotence": true,
-        "acks": "all",
-        "message.timeout.ms": ENV.fetch("KAFKA_MESSAGE_TIMEOUT_MS", "10000")
-      }
-      config["security.protocol"] = ENV.fetch("KAFKA_SECURITY_PROTOCOL") if ENV["KAFKA_SECURITY_PROTOCOL"].present?
-      new(producer: Rdkafka::Config.new(config).producer)
+      config = KafkaConfig.build(client_id: ENV.fetch("KAFKA_CLIENT_ID", "indus-platform-api"))
+        .merge("bootstrap.servers": brokers, "enable.idempotence": true, "acks": "all")
+      new(producer: KafkaConfig.producer(config))
     end
 
     def initialize(producer:)
