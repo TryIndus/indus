@@ -1,0 +1,24 @@
+FROM rust:1.96.0-bookworm AS build
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends cmake libssl-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY src ./src
+COPY migrations ./migrations
+RUN cargo build --locked --release
+
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --no-create-home indus
+
+COPY --from=build /workspace/target/release/indus-market-data /usr/local/bin/indus-market-data
+
+USER 10001
+EXPOSE 8081
+ENTRYPOINT ["indus-market-data"]
