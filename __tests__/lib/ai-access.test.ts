@@ -105,9 +105,7 @@ describe("checkAiAccess", () => {
 	});
 
 	it("omits quota headers when no reset boundary is available", () => {
-		expect(
-			getAiQuotaHeaders({ allowed: false, status: 401, error: "Unauthorized" }),
-		).toEqual({});
+		expect(getAiQuotaHeaders({ allowed: false, status: 401, error: "Unauthorized" })).toEqual({});
 	});
 
 	it("creates a bounded retry header for exhausted quota", () => {
