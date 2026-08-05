@@ -102,7 +102,7 @@ describe('application routing', () => {
     await renderPath('/crypto', true, resolver)
     expect(await screen.findByText('Bitcoin')).toBeVisible()
     expect(screen.queryByText('Coinbase')).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Live prices are unavailable in Phase 2')
+    expect(screen.getByRole('status')).toHaveTextContent('Feed stale')
     expect(resolver).toHaveBeenCalledWith('/v1/instruments/search?q=crypto&page_size=20')
   })
 

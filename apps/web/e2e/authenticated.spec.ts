@@ -31,7 +31,7 @@ test('renders queryless crypto navigation', async ({ page }) => {
   await expect(page).toHaveURL(/\/crypto$/)
   await expect(page.getByRole('heading', { name: 'Crypto markets', exact: true })).toBeVisible()
   await expect(page.getByText('Bitcoin')).toBeVisible()
-  await expect(page.getByRole('status')).toContainText('Live prices are unavailable')
+  await expect(page.getByRole('status')).toContainText('Feed stale')
 })
 
 test('renders authenticated reports navigation', async ({ page }) => {
