@@ -115,6 +115,32 @@ describe('application routing', () => {
     await waitFor(() => expect(mutation).toHaveBeenCalled())
     expect(mutation).toHaveBeenCalledWith('/v1/favorites', 'POST', { symbol: 'TSLA', instrument_type: 'equity' }, expect.stringMatching(/^[0-9a-f-]{36}$/))
   })
+
+  it('polls active reports until they reach a terminal state', async () => {
+    const id = '00000000-0000-4000-8000-000000000006'
+    const resolver = vi.fn(() => ({ next_cursor: null, items: [{ id, symbol: 'AAPL', title: 'Apple research',
+      status: resolver.mock.calls.length > 1 ? 'completed' : 'queued', created_at: now, updated_at: now }] }))
+
+    await renderPath('/reports', true, resolver)
+
+    expect(await screen.findByText('queued')).toBeVisible()
+    expect(await screen.findByText('completed', {}, { timeout: 3_500 })).toBeVisible()
+    expect(resolver).toHaveBeenCalledTimes(2)
+  }, 5_000)
+
+  it('requests cancellation for active reports and applies the returned terminal state', async () => {
+    const id = '00000000-0000-4000-8000-000000000007'
+    const report = { id, symbol: 'MSFT', title: 'Microsoft research', status: 'generating', created_at: now, updated_at: now }
+    const mutation = vi.fn(() => ({ ...report, status: 'cancelled' }))
+    await renderPath('/reports', true, () => ({ next_cursor: null, items: [report] }), mutation)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(mutation).toHaveBeenCalled())
+    expect(mutation).toHaveBeenCalledWith(`/v1/reports/${id}/cancel`, 'POST', undefined, expect.stringMatching(/^[0-9a-f-]{36}$/))
+    expect(await screen.findByText('cancelled')).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
 })
 
 function cleanupView() { cleanup() }
