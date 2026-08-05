@@ -16,7 +16,11 @@ mode="${4:-}"
 [[ "$workload" =~ ^(database-platform|database-market|database-migration|platform-api|market-data|research-worker)$ ]] || usage
 [[ -f "$json_file" ]] || { echo "Secret JSON file does not exist." >&2; exit 2; }
 
-permissions="$(stat -f '%Lp' "$json_file" 2>/dev/null || stat -c '%a' "$json_file")"
+if stat -c '%a' "$json_file" >/dev/null 2>&1; then
+  permissions="$(stat -c '%a' "$json_file")"
+else
+  permissions="$(stat -f '%Lp' "$json_file")"
+fi
 [[ "$permissions" == "600" || "$permissions" == "400" ]] || {
   echo "Secret JSON file must be readable only by its owner (chmod 600)." >&2
   exit 2
