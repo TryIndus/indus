@@ -93,8 +93,10 @@ services:
     command:
       - >-
         until rpk cluster health --exit-when-healthy --brokers redpanda:9092; do sleep 2; done;
-        rpk topic create reports.lifecycle.v1 portfolios.activity.v1 audit.security.v1
-        --if-not-exists --brokers redpanda:9092
+        for topic in reports.lifecycle.v1 portfolios.activity.v1 audit.security.v1; do
+          rpk topic describe "$${topic}" --brokers redpanda:9092 >/dev/null 2>&1 ||
+          rpk topic create "$${topic}" --brokers redpanda:9092;
+        done
 
   platform-migrate:
     profiles: ["distributed"]

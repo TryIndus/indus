@@ -55,8 +55,13 @@ services:
   redpanda-init:
     profiles: ["distributed"]
     image: docker.redpanda.com/redpandadata/redpanda:v25.2.1
-    entrypoint: ["rpk"]
-    command: ["topic", "create", "market.bars.v1", "market.quotes.v1", "--if-not-exists", "--brokers", "redpanda:9092"]
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - >-
+        for topic in market.bars.v1 market.quotes.v1; do
+          rpk topic describe "$${topic}" --brokers redpanda:9092 >/dev/null 2>&1 ||
+          rpk topic create "$${topic}" --brokers redpanda:9092;
+        done
     depends_on:
       redpanda:
         condition: service_healthy

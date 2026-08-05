@@ -49,7 +49,7 @@ curl --fail --silent http://127.0.0.1:14173/ >/dev/null
 curl --fail --silent http://127.0.0.1:19000/minio/health/ready >/dev/null
 
 echo "Checking Kafka acknowledgement and broker restart recovery"
-"${compose[@]}" exec -T redpanda rpk topic create "$smoke_topic" --if-not-exists --brokers redpanda:9092 >/dev/null
+"${compose[@]}" exec -T redpanda rpk topic create "$smoke_topic" --brokers redpanda:9092 >/dev/null
 printf '%s\n' "$smoke_payload" | "${compose[@]}" exec -T redpanda rpk topic produce "$smoke_topic" --brokers redpanda:9092 >/dev/null
 "${compose[@]}" restart redpanda >/dev/null
 "${compose[@]}" up --detach --wait redpanda >/dev/null

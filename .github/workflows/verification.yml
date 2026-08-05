@@ -283,7 +283,7 @@ jobs:
             --kafka-addr=external://0.0.0.0:19092 \
             --advertise-kafka-addr=external://127.0.0.1:19092
           timeout 60 bash -c 'until docker exec indus-redpanda rpk cluster health --exit-when-healthy; do sleep 2; done'
-          docker exec indus-redpanda rpk topic create market.bars.v1 market.quotes.v1 --if-not-exists
+          docker exec indus-redpanda rpk topic create market.bars.v1 market.quotes.v1
 
       - name: Verify market data service
         working-directory: services/market-data
