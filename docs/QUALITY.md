@@ -84,6 +84,14 @@ Run the full sequence with:
 bun run test:local
 ```
 
+## Pull request verification
+
+GitHub Actions runs the same locked Bun toolchain used locally. The core job installs from `bun.lock`, runs Biome, type-checking, unit coverage, the production build, and a production dependency audit with non-secret test configuration. It never receives deployed Supabase, Alpaca, Gemini, Vercel, or AWS credentials.
+
+The stable `Required verification` job aggregates the required layers as they are introduced. Configure branch protection against that job only after its first successful run on GitHub, so the repository never depends on a check name that has not been registered.
+
+Pull request workflows must use `pull_request`, least-privilege permissions, pinned actions, and disposable test services. Do not use `pull_request_target` for code execution or upload authenticated browser traces containing session material.
+
 The database layer always uses a temporary Supabase project on dedicated test ports. It resets and removes only that isolated project, so an existing local Supabase stack and its data are not modified.
 
 The authenticated browser layer follows the same isolation model. It starts a temporary Supabase Auth, API, and database stack on ports `55521` and `55522`, applies every migration, provisions a confirmed test user through the local admin API, and removes the stack on exit. Docker must be available, and no deployed credentials are required.
