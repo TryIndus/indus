@@ -26,6 +26,13 @@ describe("alpaca stream helpers", () => {
 		expect(extractBarSymbol({ Pair: "btc/usd" })).toBe("BTC/USD");
 	});
 
+	it("supports lowercase provider keys and rejects missing symbols", () => {
+		expect(extractBarSymbol({ symbol: " msft " })).toBe("MSFT");
+		expect(extractBarSymbol({ pair: "eth/usd" })).toBe("ETH/USD");
+		expect(extractBarSymbol({ Symbol: "" })).toBeNull();
+		expect(extractBarSymbol(null)).toBeNull();
+	});
+
 	it("converts stock bars to chart candlesticks", () => {
 		const result = toStockCandlestickData({
 			Timestamp: "2026-05-24T15:00:00.000Z",
@@ -88,9 +95,35 @@ describe("alpaca stream helpers", () => {
 		});
 	});
 
+	it("accepts finite numeric strings and defaults malformed values to zero", () => {
+		expect(
+			toStockCandlestickData({
+				timestamp: "2026-05-24T15:00:00.000Z",
+				open: "100.5",
+				high: "not-a-number",
+				low: null,
+				close: 102,
+				volume: Number.POSITIVE_INFINITY,
+			}),
+		).toEqual({
+			time: Date.parse("2026-05-24T15:00:00.000Z") / 1000,
+			open: 100.5,
+			high: 0,
+			low: 0,
+			close: 102,
+			volume: 0,
+		});
+	});
+
 	it("formats SSE messages with id, event, and JSON data", () => {
 		expect(formatSseMessage({ id: 7, event: "bar", data: { close: 102 } })).toBe(
 			'id: 7\nevent: bar\ndata: {"close":102}\n\n',
+		);
+	});
+
+	it("keeps embedded newlines encoded inside one SSE data field", () => {
+		expect(formatSseMessage({ data: { message: "line one\nline two" } })).toBe(
+			'data: {"message":"line one\\nline two"}\n\n',
 		);
 	});
 
@@ -98,5 +131,8 @@ describe("alpaca stream helpers", () => {
 		expect(getNextEventId("41")).toBe(42);
 		expect(getNextEventId(null)).toBe(1);
 		expect(getNextEventId("not-a-number")).toBe(1);
+		expect(getNextEventId("-1")).toBe(1);
+		expect(getNextEventId("0")).toBe(1);
+		expect(getNextEventId("41.9")).toBe(42);
 	});
 });
