@@ -350,12 +350,67 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn stream_route_rejects_invalid_symbols_after_authentication() {
+        let response = test_router(true)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/streams/AAPL%3BDROP")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn stream_route_distinguishes_user_quota_and_global_exhaustion() {
+        let metrics = Metrics::new().unwrap();
+        let user_limits = StreamLimits::new(1, 2, metrics.clone());
+        let _user_lease = user_limits.acquire("user-1").unwrap();
+        let response = test_router_with_limits(true, metrics.clone(), user_limits)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/streams/AAPL")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "5");
+
+        let global_limits = StreamLimits::new(2, 1, metrics.clone());
+        let _global_lease = global_limits.acquire("another-user").unwrap();
+        let response = test_router_with_limits(true, metrics, global_limits)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/streams/AAPL")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "5");
+    }
+
     fn test_router(authorized: bool) -> Router {
         let metrics = Metrics::new().unwrap();
+        let limits = StreamLimits::new(2, 10, metrics.clone());
+        test_router_with_limits(authorized, metrics, limits)
+    }
+
+    fn test_router_with_limits(
+        authorized: bool,
+        metrics: Metrics,
+        limits: Arc<StreamLimits>,
+    ) -> Router {
         let state = AppState {
             authenticator: Arc::new(StubAuth(authorized)),
             hub: Arc::new(StreamHub::new(4, 4, std::time::Duration::from_secs(30))),
-            limits: StreamLimits::new(2, 10, metrics.clone()),
+            limits,
             health: Arc::new(ServiceHealth::default()),
             metrics,
             heartbeat: std::time::Duration::from_secs(15),

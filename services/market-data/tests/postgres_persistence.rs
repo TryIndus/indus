@@ -41,6 +41,36 @@ async fn duplicate_reordered_and_unsupported_events_are_explicit() {
         store.persist(&rejected).await.unwrap(),
         PersistOutcome::Rejected
     );
+
+    let mut invalid_id = events[0].clone();
+    invalid_id.envelope_mut().event_id = "not-a-uuid".into();
+    assert_eq!(
+        store.persist(&record(&invalid_id, 52)).await.unwrap(),
+        PersistOutcome::Rejected
+    );
+
+    let mut missing_timestamp = events[1].clone();
+    missing_timestamp.envelope_mut().occurred_at = None;
+    assert_eq!(
+        store
+            .persist(&record(&missing_timestamp, 53))
+            .await
+            .unwrap(),
+        PersistOutcome::Rejected
+    );
+}
+
+trait EnvelopeMut {
+    fn envelope_mut(&mut self) -> &mut indus_market_data::event::EventEnvelope;
+}
+
+impl EnvelopeMut for NormalizedEvent {
+    fn envelope_mut(&mut self) -> &mut indus_market_data::event::EventEnvelope {
+        match self {
+            NormalizedEvent::Bar(event) => event.envelope.as_mut().unwrap(),
+            NormalizedEvent::Quote(event) => event.envelope.as_mut().unwrap(),
+        }
+    }
 }
 
 fn record(event: &NormalizedEvent, offset: i64) -> KafkaRecord {

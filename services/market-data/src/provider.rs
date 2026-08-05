@@ -304,13 +304,25 @@ pub fn normalize_symbol(value: &str) -> Result<String, ProviderError> {
     if symbol.is_empty()
         || symbol.len() > 20
         || symbol.chars().filter(|character| *character == '/').count() > 1
-        || !symbol
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || ".-/".contains(character))
+        || !symbol.split('/').all(valid_symbol_part)
     {
         return Err(ProviderError::Symbol(value.into()));
     }
     Ok(symbol)
+}
+
+fn valid_symbol_part(part: &str) -> bool {
+    let mut previous_was_separator = true;
+    for character in part.chars() {
+        if character.is_ascii_alphanumeric() {
+            previous_was_separator = false;
+        } else if ".-".contains(character) && !previous_was_separator {
+            previous_was_separator = true;
+        } else {
+            return false;
+        }
+    }
+    !previous_was_separator
 }
 
 fn text<'a>(value: &'a Value, key: &'static str) -> Result<&'a str, ProviderError> {
@@ -359,5 +371,30 @@ mod tests {
     fn rejects_unsafe_symbols() {
         assert!(normalize_symbol("AAPL;DROP").is_err());
         assert_eq!(normalize_symbol(" btc/usd ").unwrap(), "BTC/USD");
+    }
+
+    #[test]
+    fn ignores_control_frames_but_rejects_invalid_recognized_events() {
+        assert!(
+            parse_message(
+                r#"[{"T":"success","msg":"authenticated"}]"#,
+                FeedKind::Equity
+            )
+            .unwrap()
+            .is_empty()
+        );
+        let invalid_number =
+            r#"[{"T":"q","S":"AAPL","t":"2026-08-05T12:00:00Z","bp":{},"ap":2,"bs":1,"as":1}]"#;
+        assert!(matches!(
+            parse_message(invalid_number, FeedKind::Equity),
+            Err(ProviderError::Invalid("bp"))
+        ));
+    }
+
+    #[test]
+    fn rejects_repeated_separators_and_overlong_symbols() {
+        for symbol in ["BTC//USD", "AAPL.", "AAPL/BTC/USD", "ABCDEFGHIJKLMNOPQRSTU"] {
+            assert!(normalize_symbol(symbol).is_err(), "accepted {symbol}");
+        }
     }
 }

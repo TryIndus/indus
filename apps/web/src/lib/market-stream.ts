@@ -51,7 +51,9 @@ export function createMarketStream(baseUrl: string, accessToken: () => Promise<s
               if (event.id) lastEventId = event.id
               if (event.type === 'stale') { onStatus?.('stale'); continue }
               if (event.type !== 'bar' && event.type !== 'quote') continue
-              const parsed = liveEventSchema.safeParse(JSON.parse(event.data))
+              const payload = parseJson(event.data)
+              if (payload === undefined) continue
+              const parsed = liveEventSchema.safeParse(payload)
               if (!parsed.success) continue
               const price = event.type === 'bar'
                 ? Number(parsed.data.payload.close)
@@ -68,6 +70,11 @@ export function createMarketStream(baseUrl: string, accessToken: () => Promise<s
       }
     },
   }
+}
+
+function parseJson(value: string): unknown | undefined {
+  try { return JSON.parse(value) }
+  catch { return undefined }
 }
 
 interface SseMessage { id?: string; type: string; data: string }

@@ -122,8 +122,22 @@ impl EventStore for PostgresStore {
             Err(error) => return self.reject(record, &error.to_string()).await,
         };
         let envelope = event.envelope()?;
-        let event_id = Uuid::parse_str(&envelope.event_id).map_err(|_| StoreError::EventId)?;
-        let occurred_at = timestamp(envelope.occurred_at.as_ref(), "occurred_at")?;
+        let event_id = match Uuid::parse_str(&envelope.event_id) {
+            Ok(event_id) => event_id,
+            Err(_) => return self.reject(record, &StoreError::EventId.to_string()).await,
+        };
+        let occurred_at = match timestamp(envelope.occurred_at.as_ref(), "occurred_at") {
+            Ok(occurred_at) => occurred_at,
+            Err(error) => return self.reject(record, &error.to_string()).await,
+        };
+        let market_timestamp = match &event {
+            NormalizedEvent::Bar(event) => timestamp(event.window_start.as_ref(), "window_start")
+                .and_then(|_| timestamp(event.window_end.as_ref(), "window_end")),
+            NormalizedEvent::Quote(event) => timestamp(event.observed_at.as_ref(), "observed_at"),
+        };
+        if let Err(error) = market_timestamp {
+            return self.reject(record, &error.to_string()).await;
+        }
         let mut transaction = self.pool.begin().await?;
         let inserted = sqlx::query(
             "INSERT INTO market_data.consumed_events \

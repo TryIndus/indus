@@ -22,4 +22,28 @@ RSpec.describe Events::OutboxPublisher do
     expect(event.reload).to have_attributes(published_at: nil, attempts: 1, last_error: "StandardError")
     expect(event.next_attempt_at).to eq(now + 2.seconds)
   end
+
+  it "publishes only eligible rows within the requested batch bound" do
+    eligible = event
+    future = OutboxEvent.create!(topic: "reports.lifecycle.v1", aggregate_type: "Report",
+      aggregate_id: SecureRandom.uuid, next_attempt_at: 1.day.from_now, payload: event.payload)
+    second = OutboxEvent.create!(topic: "reports.lifecycle.v1", aggregate_type: "Report",
+      aggregate_id: SecureRandom.uuid, payload: event.payload)
+
+    publisher = described_class.new(producer: producer, clock: clock)
+    expect(publisher.publish_batch(limit: 1)).to eq(1)
+    expect([ eligible.reload.published_at, second.reload.published_at ].compact.length).to eq(1)
+    expect(future.reload.published_at).to be_nil
+  end
+
+  it "caps exponential retry delay and records bounded error metadata" do
+    event.update!(attempts: 20)
+    allow(producer).to receive(:publish).and_raise(StandardError, "x" * 500)
+
+    expect(described_class.new(producer: producer, clock: clock).publish_one(event.id)).to be(false)
+
+    expected_delay = [ 2**8, described_class::MAX_BACKOFF ].min.seconds
+    expect(event.reload).to have_attributes(attempts: 21, next_attempt_at: now + expected_delay,
+      last_error: "StandardError")
+  end
 end

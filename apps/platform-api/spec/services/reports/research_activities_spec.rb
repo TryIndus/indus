@@ -35,4 +35,27 @@ RSpec.describe "durable report activities" do
     expect(store).to have_received(:put).once
     expect(OutboxEvent.where("payload ->> 'status' = ?", "completed").count).to eq(1)
   end
+
+  it "marks an active report failed once with bounded public failure metadata" do
+    report.update!(status: "generating")
+    failure_input = input.merge("failure_code" => "provider-" + ("x" * 200))
+
+    first = Reports::MarkReportFailedActivity.new.execute(failure_input)
+    second = Reports::MarkReportFailedActivity.new.execute(failure_input)
+
+    expect(first).to eq("status" => "failed")
+    expect(second).to eq("status" => "failed")
+    expect(report.reload.failure_code.bytesize).to eq(100)
+    expect(OutboxEvent.where("payload ->> 'status' = ?", "failed").count).to eq(1)
+  end
+
+  it "preserves completed reports when late cancellation cleanup arrives" do
+    report.update!(status: "completed", completed_at: Time.current)
+
+    result = Reports::MarkReportCancelledActivity.new.execute(input)
+
+    expect(result).to eq("status" => "completed")
+    expect(report.reload.status).to eq("completed")
+    expect(OutboxEvent.where("payload ->> 'status' = ?", "cancelled")).to be_empty
+  end
 end

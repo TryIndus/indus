@@ -282,3 +282,52 @@ fn header_value<H: Headers>(headers: Option<&H>, key: &str) -> Option<String> {
             .flatten()
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config() -> KafkaConfig {
+        KafkaConfig {
+            bootstrap_servers: "broker:9092".into(),
+            transactional_id: "producer-1".into(),
+            group_id: "consumer-1".into(),
+            security_protocol: "SASL_SSL".into(),
+            sasl_mechanism: Some("OAUTHBEARER".into()),
+            sasl_username: None,
+            sasl_password: None,
+            ssl_ca_location: Some("/etc/ssl/certs/ca.pem".into()),
+            aws_region: Some("us-east-1".into()),
+        }
+    }
+
+    #[test]
+    fn applies_transport_configuration_without_static_credentials() {
+        let client = base_config(&config());
+        assert_eq!(client.get("bootstrap.servers"), Some("broker:9092"));
+        assert_eq!(client.get("security.protocol"), Some("SASL_SSL"));
+        assert_eq!(client.get("sasl.mechanism"), Some("OAUTHBEARER"));
+        assert_eq!(client.get("ssl.ca.location"), Some("/etc/ssl/certs/ca.pem"));
+        assert_eq!(client.get("sasl.username"), None);
+        assert_eq!(client.get("sasl.password"), None);
+    }
+
+    #[test]
+    fn extracts_trace_headers_without_assuming_utf8_payloads() {
+        let headers = OwnedHeaders::new()
+            .insert(Header {
+                key: "event_id",
+                value: Some("event-1"),
+            })
+            .insert(Header {
+                key: "binary",
+                value: Some(&[0xff_u8][..]),
+            });
+        assert_eq!(
+            header_value(Some(&headers), "event_id"),
+            Some("event-1".into())
+        );
+        assert_eq!(header_value(Some(&headers), "missing"), None);
+        assert_eq!(header_value::<OwnedHeaders>(None, "event_id"), None);
+    }
+}

@@ -229,4 +229,68 @@ mod tests {
         );
         assert!(authenticator.authenticate(&HeaderMap::new()).await.is_err());
     }
+
+    #[tokio::test]
+    async fn rejects_malformed_headers_and_untrusted_claims() {
+        let secret = b"local-test-secret-that-is-not-production";
+        let authenticator = JwtAuthenticator::new(&AuthConfig {
+            issuer: "https://identity.example".into(),
+            audience: "indus-web".into(),
+            jwks_url: None,
+            hs256_secret: Some(String::from_utf8(secret.to_vec()).unwrap()),
+        })
+        .await
+        .unwrap();
+
+        for value in ["Basic token", "Bearer ", "Bearer token with-spaces"] {
+            let mut headers = HeaderMap::new();
+            headers.insert(AUTHORIZATION, HeaderValue::from_str(value).unwrap());
+            assert!(matches!(
+                authenticator.authenticate(&headers).await,
+                Err(AuthError::Malformed)
+            ));
+        }
+
+        let wrong_audience = encode(
+            &Header::new(Algorithm::HS256),
+            &TestClaims {
+                sub: "user-1",
+                iss: "https://identity.example",
+                aud: "another-service",
+                exp: (Utc::now() + Duration::minutes(5)).timestamp(),
+            },
+            &EncodingKey::from_secret(secret),
+        )
+        .unwrap();
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {wrong_audience}")).unwrap(),
+        );
+        assert!(matches!(
+            authenticator.authenticate(&headers).await,
+            Err(AuthError::Invalid)
+        ));
+    }
+
+    #[tokio::test]
+    async fn fails_closed_for_weak_or_insecure_verifier_configuration() {
+        let weak = JwtAuthenticator::new(&AuthConfig {
+            issuer: "https://identity.example".into(),
+            audience: "indus-web".into(),
+            jwks_url: None,
+            hs256_secret: Some("too-short".into()),
+        })
+        .await;
+        assert!(matches!(weak, Err(AuthError::Configuration(_))));
+
+        let insecure = JwtAuthenticator::new(&AuthConfig {
+            issuer: "https://identity.example".into(),
+            audience: "indus-web".into(),
+            jwks_url: Some("http://identity.example/.well-known/jwks.json".into()),
+            hs256_secret: None,
+        })
+        .await;
+        assert!(matches!(insecure, Err(AuthError::Configuration(_))));
+    }
 }

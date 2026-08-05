@@ -141,6 +141,20 @@ describe('application routing', () => {
     expect(await screen.findByText('cancelled')).toBeVisible()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
+
+  it('keeps an active report visible when cancellation fails without exposing provider details', async () => {
+    const id = '00000000-0000-4000-8000-000000000008'
+    const report = { id, symbol: 'NVDA', title: 'NVIDIA research', status: 'generating', created_at: now, updated_at: now }
+    const mutation = vi.fn(async () => { throw new Error('temporal.internal.example refused the request') })
+    await renderPath('/reports', true, () => ({ next_cursor: null, items: [report] }), mutation)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The report cancellation could not be requested.')
+    expect(screen.queryByText(/temporal\.internal/)).not.toBeInTheDocument()
+    expect(screen.getByText('generating')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
+  })
 })
 
 function cleanupView() { cleanup() }
