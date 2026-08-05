@@ -32,4 +32,16 @@ describe('Rails API client', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ value: '42' }), { status: 200 })))
     await expect(createApiClient('https://api.example.test', async () => null).get('/v1/value', z.object({ value: z.number() }))).rejects.toBeInstanceOf(z.ZodError)
   })
+
+  it('sends JSON mutations with a caller-stable idempotency key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'created' }), { status: 201 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await createApiClient('https://api.example.test', async () => 'token').mutate('/v1/resources', 'POST', { name: 'Core' }, z.object({ id: z.string() }), 'mutation-1')
+    expect(fetchMock).toHaveBeenCalledWith(new URL('https://api.example.test/v1/resources'), expect.objectContaining({ method: 'POST', body: '{"name":"Core"}', headers: expect.objectContaining({ 'Content-Type': 'application/json', 'Idempotency-Key': 'mutation-1' }) }))
+  })
+
+  it('supports empty delete responses without parsing JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+    await expect(createApiClient('https://api.example.test', async () => 'token').mutate('/v1/resources/1', 'DELETE', undefined, z.undefined(), 'mutation-2')).resolves.toBeUndefined()
+  })
 })

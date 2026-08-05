@@ -6,7 +6,7 @@ The replacement Indus browser application is a React 19 and Vite single-page app
 
 - TanStack Router owns browser navigation and rejects unauthenticated protected-route requests before rendering application content.
 - The Supabase adapter is the temporary identity boundary. Only the public project URL and anonymous key enter the browser; provider and service credentials remain server-side.
-- `src/lib/api.ts` is the typed Rails JSON boundary. It attaches the current access token, validates responses, and returns bounded errors that do not expose upstream payloads.
+- `src/lib/api.ts` is the typed Rails JSON boundary. It attaches the current access token, validates responses, supplies idempotency keys for mutations, and returns bounded errors that do not expose upstream payloads. Its Zod schemas follow the OpenAPI wire format and provide runtime validation; direct imports from the generated TypeScript client are deferred until that generator output is compatible with this application's strict TypeScript settings.
 - `src/lib/market-stream.ts` defines the Phase 3 live-market interface. The initial implementation deliberately opens no provider connection.
 - TanStack Query owns remote server state. Components do not call Rails or market providers directly.
 
@@ -35,4 +35,4 @@ The browser suite verifies anonymous fail-closed routing, authenticated dashboar
 
 ## Failure behavior
 
-Missing identity configuration leaves the application fail-closed at sign-in. Invalid API payloads fail schema validation, non-success responses expose only status and request ID, and unavailable market streaming is a no-op until the Phase 3 adapter is installed.
+Missing identity configuration leaves the application fail-closed at sign-in. Invalid API payloads fail schema validation, non-success responses expose only status and request ID, and unavailable market streaming is a no-op until the Phase 3 adapter is installed. Search, fundamentals, favorites, portfolios, reports, and settings use the Rails `/v1` contract; their views retain explicit loading, retryable error, empty, and success behavior.

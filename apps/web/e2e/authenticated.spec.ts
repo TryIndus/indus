@@ -10,6 +10,10 @@ test.beforeEach(async ({ context, page }) => {
       watchlist: [{ symbol: 'AAPL', name: 'Apple Inc.', price: 228.12, changePercent: 1.08 }],
     }),
   }))
+  await page.route('**/v1/reports?*', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ next_cursor: null, items: [{ id: '00000000-0000-4000-8000-000000000004', symbol: 'MSFT', title: 'Microsoft research', status: 'completed', created_at: '2026-08-05T12:00:00.000Z', updated_at: '2026-08-05T12:00:00.000Z' }] }),
+  }))
 })
 
 test('renders an authenticated dashboard using the Rails contract', async ({ page }) => {
@@ -27,6 +31,7 @@ test('renders queryless crypto navigation', async ({ page }) => {
 test('renders authenticated reports navigation', async ({ page }) => {
   await page.goto('/reports')
   await expect(page.getByRole('heading', { name: 'Reports', exact: true })).toBeVisible()
+  await expect(page.getByText('Microsoft research')).toBeVisible()
 })
 
 test('authenticated dashboard has no serious accessibility violations', async ({ page }) => {
