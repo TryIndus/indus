@@ -22,6 +22,7 @@ module V1
       if attributes[:focus].present? && (!attributes[:focus].is_a?(String) || !attributes[:focus].length.between?(1, 1_000))
         raise ActionController::BadRequest, "focus must be between 1 and 1000 characters"
       end
+      AiUsageLimiter.new(user: Current.user, operation: "report").consume!
       report = Current.user.reports.new(symbol: attributes[:symbol], portfolio_id: attributes[:portfolio_id],
         title: "#{attributes[:symbol].to_s.upcase} research report")
       authorize report

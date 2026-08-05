@@ -14,7 +14,7 @@ module Reports
 
     def execute(input)
       heartbeat("start")
-      ActivityExecution.run(report_id: input.fetch("report_id"), activity_key: "start:v1") do
+      ActivityExecution.run(report_id: input.fetch("report_id"), activity_key: "start:v1", lease_seconds: 30) do
         Report.transaction do
           report = Report.lock.find(input.fetch("report_id"))
           previous_status = report.status
@@ -32,7 +32,7 @@ module Reports
 
     def execute(input)
       heartbeat("load-evidence")
-      ActivityExecution.run(report_id: input.fetch("report_id"), activity_key: "evidence:v1") do
+      ActivityExecution.run(report_id: input.fetch("report_id"), activity_key: "evidence:v1", lease_seconds: 30) do
         report = Report.includes(portfolio: :positions).find(input.fetch("report_id"))
         snapshot = FundamentalsProvider.default.fetch(symbol: report.symbol)
         evidence = [ {
@@ -59,7 +59,7 @@ module Reports
 
     def execute(input)
       heartbeat("model-request")
-      ActivityExecution.run(report_id: input.fetch("report_id"), activity_key: "model:research_report:v1") do
+      ActivityExecution.run(report_id: input.fetch("report_id"), activity_key: "model:research_report:v1", lease_seconds: 120) do
         execution = ModelGateway.default.execute(task: "research_report",
           input: { symbol: input.fetch("evidence").fetch("symbol"),
             untrusted_user_focus: input.fetch("evidence")["focus"], evidence: input.fetch("evidence").fetch("evidence") })
@@ -75,7 +75,7 @@ module Reports
 
     def execute(input)
       heartbeat("persist")
-      ActivityExecution.run(report_id: input.fetch("report_id"), activity_key: "persist:v1") do
+      ActivityExecution.run(report_id: input.fetch("report_id"), activity_key: "persist:v1", lease_seconds: 60) do
         report = Report.find(input.fetch("report_id"))
         document = input.fetch("generation").fetch("payload").merge("report_id" => report.id,
           "symbol" => report.symbol, "generated_at" => Time.current.iso8601(6),

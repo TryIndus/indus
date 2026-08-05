@@ -24,6 +24,23 @@ RSpec.describe Reports::ActivityExecution do
     expect(report.report_activity_executions.first.reload.attempts).to eq(2)
   end
 
+  it "rejects an overlapping delivery while its execution lease is active and recovers a stale lease" do
+    execution = ReportActivityExecution.create!(report: report, activity_key: "model:v1", status: "running", attempts: 1,
+      lease_expires_at: 1.minute.from_now)
+    calls = 0
+    expect do
+      described_class.run(report_id: report.id, activity_key: "model:v1", lease_seconds: 120) { calls += 1 }
+    end.to raise_error(Reports::ActivityExecution::InProgress)
+    expect(calls).to eq(0)
+    expect(execution.reload.attempts).to eq(1)
+
+    execution.update!(lease_expires_at: 1.second.ago)
+    expect(described_class.run(report_id: report.id, activity_key: "model:v1", lease_seconds: 120) { calls += 1; { "ok" => true } })
+      .to eq("ok" => true)
+    expect(calls).to eq(1)
+    expect(execution.reload).to have_attributes(status: "completed", attempts: 2, lease_expires_at: nil)
+  end
+
   it "fails closed after cancellation" do
     report.update!(status: "cancelled")
     expect { described_class.run(report_id: report.id, activity_key: "model:v1") { raise "not reached" } }

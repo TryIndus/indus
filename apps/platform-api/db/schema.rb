@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_05_005000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_05_007000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -24,9 +24,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_005000) do
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
     t.datetime "window_started_at", null: false
-    t.index ["user_id", "operation", "window_started_at"], name: "ai_usage_window_identity", unique: true
+    t.string "window_type", default: "hour", null: false
+    t.index ["user_id", "operation", "window_type", "window_started_at"], name: "ai_usage_window_identity", unique: true
     t.index ["user_id"], name: "index_ai_usage_windows_on_user_id"
     t.check_constraint "request_count >= 0 AND input_tokens >= 0 AND output_tokens >= 0", name: "ai_usage_nonnegative"
+    t.check_constraint "window_type::text = ANY (ARRAY['hour'::character varying, 'day'::character varying]::text[])", name: "ai_usage_window_type"
   end
 
   create_table "audit_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -121,14 +123,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_005000) do
     t.integer "attempts", default: 0, null: false
     t.datetime "created_at", null: false
     t.string "last_error", limit: 120
+    t.datetime "lease_expires_at"
     t.uuid "report_id", null: false
     t.jsonb "result", default: {}, null: false
     t.string "status", default: "running", null: false
     t.datetime "updated_at", null: false
+    t.index ["lease_expires_at"], name: "report_activity_running_leases", where: "((status)::text = 'running'::text)"
     t.index ["report_id", "activity_key"], name: "report_activity_identity", unique: true
     t.index ["report_id"], name: "index_report_activity_executions_on_report_id"
     t.check_constraint "attempts >= 0", name: "report_activity_attempts_nonnegative"
-    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "report_activity_status"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "report_activity_status"
   end
 
   create_table "report_sources", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
