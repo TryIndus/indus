@@ -100,7 +100,12 @@ jq -e . infra/helm/indus-platform/values.schema.json >/dev/null
 shellcheck infra/images/web-publisher/publish.sh scripts/evaluate-cutover.sh scripts/validate-phase4.sh scripts/aws/*.sh
 ruby -c scripts/hydrate-gitops.rb >/dev/null
 ruby scripts/test/hydrate_gitops_test.rb
+ruby scripts/test/evaluate_cutover_test.rb
+ruby scripts/test/put_secret_test.rb
+ruby scripts/test/phase4_render_test.rb
+ruby scripts/test/phase4_workflow_test.rb
 ruby -c scripts/update-gitops-images.rb >/dev/null
+ruby scripts/test/update_gitops_images_test.rb
 if command -v actionlint >/dev/null 2>&1; then
   actionlint .github/workflows/*.yml
 fi

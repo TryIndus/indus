@@ -311,6 +311,9 @@ jobs:
         with:
           version: v4.2.3
 
+      - name: Install offline validators
+        run: sudo apt-get update && sudo apt-get install --yes jq ripgrep ruby shellcheck
+
       - name: Validate infrastructure and GitOps definitions
         run: scripts/validate-phase4.sh
 
