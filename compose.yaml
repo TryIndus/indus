@@ -50,8 +50,8 @@ services:
     profiles: ["application"]
     build:
       context: ./apps/web
-    environment:
-      VITE_API_URL: http://127.0.0.1:13000
+      args:
+        VITE_API_URL: http://127.0.0.1:13000
     ports:
       - "127.0.0.1:14173:4173"
     depends_on:
