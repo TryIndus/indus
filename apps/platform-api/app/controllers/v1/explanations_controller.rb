@@ -3,8 +3,8 @@ module V1
     def create
       attributes = contract_params(:symbol, :metrics, :as_of, required: %i[symbol metrics])
       symbol = normalized_symbol(attributes[:symbol])
-      metrics = Array(attributes[:metrics])
-      unless metrics.length.between?(1, 20) && metrics.uniq.length == metrics.length &&
+      metrics = attributes[:metrics]
+      unless metrics.is_a?(Array) && metrics.length.between?(1, 20) && metrics.uniq.length == metrics.length &&
           metrics.all? { |metric| metric.is_a?(String) && metric.length.between?(1, 80) }
         raise ActionController::BadRequest, "metrics must contain 1 to 20 unique names"
       end
@@ -20,7 +20,8 @@ module V1
 
     def normalized_symbol(value)
       value.to_s.upcase.tap do |symbol|
-        raise ActionController::BadRequest, "invalid symbol" unless symbol.match?(/\A[A-Z0-9]+(?:[.\/-][A-Z0-9]+)?\z/)
+        valid = symbol.length <= 20 && symbol.match?(/\A[A-Z0-9]+(?:[.\/-][A-Z0-9]+)?\z/)
+        raise ActionController::BadRequest, "invalid symbol" unless valid
       end
     end
   end

@@ -8,7 +8,7 @@ module Fundamentals
 
     def fetch(symbol:)
       normalized = symbol.to_s.upcase
-      raise Error, "invalid symbol" unless normalized.match?(/\A[A-Z0-9.\/-]{1,20}\z/)
+      raise InvalidSymbol, "invalid symbol" unless normalized.match?(/\A[A-Z0-9]+(?:[.\/-][A-Z0-9]+)?\z/) && normalized.length <= 20
 
       uri = URI(ENDPOINT)
       uri.query = URI.encode_www_form(symbols: normalized)
@@ -19,7 +19,7 @@ module Fundamentals
       raise Error, "fundamentals provider unavailable" unless response.is_a?(Net::HTTPSuccess)
 
       quote = JSON.parse(response.body).dig("quoteResponse", "result", 0)
-      raise Error, "symbol not found" unless quote
+      raise NotFound, "symbol not found" unless quote
 
       FundamentalsSnapshot.new(symbol: normalized, as_of: Time.current,
         metrics: quote.slice("marketCap", "trailingPE", "forwardPE", "epsTrailingTwelveMonths", "regularMarketPrice",

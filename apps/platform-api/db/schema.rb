@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_05_002000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_05_003000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -48,8 +48,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_002000) do
     t.uuid "user_id", null: false
     t.index ["user_id", "symbol", "instrument_type"], name: "favorites_instrument_identity", unique: true
     t.index ["user_id"], name: "index_favorites_on_user_id"
+    t.check_constraint "char_length(symbol::text) <= 20 AND symbol::text ~ '^[A-Z0-9]+([./-][A-Z0-9]+)?$'::text", name: "favorites_strict_symbol"
     t.check_constraint "instrument_type::text = ANY (ARRAY['equity'::character varying::text, 'crypto'::character varying::text])", name: "favorites_instrument_type"
-    t.check_constraint "symbol::text ~ '^[A-Z0-9./-]{1,20}$'::text", name: "favorites_symbol_format"
   end
 
   create_table "idempotency_records", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -100,6 +100,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_002000) do
     t.index ["portfolio_id", "symbol", "instrument_type"], name: "positions_instrument_identity", unique: true
     t.index ["portfolio_id"], name: "index_positions_on_portfolio_id"
     t.check_constraint "average_cost IS NULL OR average_cost >= 0::numeric", name: "positions_nonnegative_cost"
+    t.check_constraint "char_length(symbol::text) <= 20 AND symbol::text ~ '^[A-Z0-9]+([./-][A-Z0-9]+)?$'::text", name: "positions_strict_symbol"
     t.check_constraint "currency::text ~ '^[A-Z]{3}$'::text", name: "positions_currency_format"
     t.check_constraint "instrument_type::text = ANY (ARRAY['equity'::character varying::text, 'crypto'::character varying::text])", name: "positions_instrument_type"
     t.check_constraint "quantity > 0::numeric", name: "positions_positive_quantity"
@@ -130,6 +131,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_002000) do
     t.uuid "user_id", null: false
     t.index ["portfolio_id"], name: "index_reports_on_portfolio_id"
     t.index ["user_id"], name: "index_reports_on_user_id"
+    t.check_constraint "char_length(symbol::text) <= 20 AND symbol::text ~ '^[A-Z0-9]+([./-][A-Z0-9]+)?$'::text", name: "reports_strict_symbol"
     t.check_constraint "char_length(title::text) >= 1 AND char_length(title::text) <= 200", name: "reports_title_length"
     t.check_constraint "status::text = ANY (ARRAY['queued'::character varying::text, 'generating'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "reports_status"
   end

@@ -21,7 +21,8 @@ module Instruments
         symbol = quote["symbol"].to_s.upcase
         next unless type && name.present? && symbol.match?(/\A[A-Z0-9]+(?:[.\/-][A-Z0-9]+)?\z/)
 
-        { symbol: symbol, name: name.to_s.byteslice(0, 200), instrument_type: type, exchange: quote["exchange"].presence }
+        { symbol: symbol, name: name.to_s.byteslice(0, 200), instrument_type: type,
+          exchange: quote["exchange"].presence }.compact
       end
     rescue JSON::ParserError, SocketError, SystemCallError, Timeout::Error => error
       raise FundamentalsProvider::Error, "instrument provider failed: #{error.class}"

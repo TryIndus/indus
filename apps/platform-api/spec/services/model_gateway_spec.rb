@@ -45,4 +45,24 @@ RSpec.describe ModelGateway do
     expect(gateway.execute(task: "financial_chat", input: { messages: [ { role: "user", content: "Revenue?" } ] }).payload)
       .to include("message" => include("role" => "assistant"))
   end
+
+  it "rejects incomplete explanations and malformed citations" do
+    excessive_sources = Array.new(21) do
+      { "label" => "Source", "as_of" => "2026-01-01T00:00:00Z" }
+    end
+    invalid = [
+      { "explanations" => [ { "metric" => "revenue", "explanation" => "One" },
+        { "metric" => "revenue", "explanation" => "Two" } ] },
+      { "explanations" => [ { "metric" => "revenue", "explanation" => "One",
+        "sources" => [ { "label" => "Source", "uri" => "javascript:alert(1)", "as_of" => "2026-01-01T00:00:00Z" } ] } ] },
+      { "explanations" => [ { "metric" => "revenue", "explanation" => "One",
+        "sources" => excessive_sources } ] }
+    ]
+    invalid.each do |payload|
+      allow(adapter).to receive(:generate).and_return(ModelResult.new(text: payload.to_json, model: "fixture", usage: {}))
+      metrics = payload["explanations"].length == 2 ? %w[revenue earnings] : [ "revenue" ]
+      expect { gateway.execute(task: "metric_explanations", input: { symbol: "AAPL", metrics: metrics }) }
+        .to raise_error(ModelGateway::Error) { |error| expect(error.category).to eq(:invalid_response) }
+    end
+  end
 end

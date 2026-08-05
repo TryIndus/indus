@@ -70,6 +70,74 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
     expect(JSON.parse(response.body).dig("message", "role")).to eq("assistant")
   end
 
+  it "rejects malformed model inputs before quota or provider work" do
+    allow(ModelGateway).to receive(:default)
+    invalid_requests = [
+      [ "/v1/explanations", { symbol: "AAPL", metrics: "revenue" } ],
+      [ "/v1/explanations", { symbol: "A" * 21, metrics: [ "revenue" ] } ],
+      [ "/v1/chat", { messages: "hello" } ],
+      [ "/v1/chat", { messages: { role: "user", content: "hello" } } ],
+      [ "/v1/chat", { conversation_id: "not-a-uuid", messages: [ { role: "user", content: "hello" } ] } ],
+      [ "/v1/chat", { symbol: "A" * 21, messages: [ { role: "user", content: "hello" } ] } ]
+    ]
+    invalid_requests.each do |path, payload|
+      post path, params: payload, headers: write_headers.merge("Idempotency-Key" => SecureRandom.uuid)
+      expect(response).to have_http_status(:bad_request)
+    end
+    expect(AiUsageWindow.count).to eq(0)
+    expect(ModelGateway).not_to have_received(:default)
+  end
+
+  it "classifies fundamentals validation, absence, and upstream failure" do
+    providers = [
+      instance_double(FundamentalsProvider, fetch: -> { raise FundamentalsProvider::InvalidSymbol }),
+      instance_double(FundamentalsProvider, fetch: -> { raise FundamentalsProvider::NotFound }),
+      instance_double(FundamentalsProvider, fetch: -> { raise FundamentalsProvider::Error })
+    ]
+    expected = %i[bad_request not_found bad_gateway]
+    providers.zip(expected).each do |provider, status|
+      allow(provider).to receive(:fetch).and_raise(
+        status == :bad_request ? FundamentalsProvider::InvalidSymbol :
+          status == :not_found ? FundamentalsProvider::NotFound : FundamentalsProvider::Error)
+      allow(FundamentalsProvider).to receive(:default).and_return(provider)
+      get "/v1/fundamentals/AAPL", headers: auth
+      expect(response).to have_http_status(status)
+    end
+  end
+
+  it "rejects a cursor that is not a canonical UUID" do
+    malformed = Base64.urlsafe_encode64("------------------------------------", padding: false)
+    get "/v1/favorites?cursor=#{malformed}", headers: auth
+    expect(response).to have_http_status(:bad_request)
+  end
+
+  it "carries bounded report focus into the durable outbox event" do
+    post "/v1/reports", params: { symbol: "AAPL", focus: "Revenue durability" }, headers: write_headers
+    expect(response).to have_http_status(:accepted)
+    expect(OutboxEvent.last.payload).to include("focus" => "Revenue durability")
+  end
+
+  it "maps duplicate owned resources to a conflict" do
+    post "/v1/favorites", params: { symbol: "AAPL", instrument_type: "equity" }, headers: write_headers
+    post "/v1/favorites", params: { symbol: "AAPL", instrument_type: "equity" },
+      headers: write_headers.merge("Idempotency-Key" => SecureRandom.uuid)
+    expect(response).to have_http_status(:conflict)
+    expect(JSON.parse(response.body)).to include("code" => "resource_conflict")
+  end
+
+  it "rejects malformed separated symbols on write boundaries" do
+    post "/v1/reports", params: { symbol: "BTC//USD" }, headers: write_headers
+    expect(response).to have_http_status(:unprocessable_content)
+
+    post "/v1/portfolios", params: { name: "Symbols", base_currency: "USD" },
+      headers: write_headers.merge("Idempotency-Key" => SecureRandom.uuid)
+    portfolio_id = JSON.parse(response.body).fetch("id")
+    post "/v1/portfolios/#{portfolio_id}/positions",
+      params: { symbol: "AAPL-", instrument_type: "equity", quantity: "1", average_cost: "1", currency: "USD" },
+      headers: write_headers.merge("Idempotency-Key" => SecureRandom.uuid)
+    expect(response).to have_http_status(:unprocessable_content)
+  end
+
   it "allows the configured local SPA origin without reflecting arbitrary origins" do
     options "/v1/me", headers: { "Origin" => "http://localhost:5173", "Access-Control-Request-Method" => "GET" }
     expect(response.headers["Access-Control-Allow-Origin"]).to eq("http://localhost:5173")

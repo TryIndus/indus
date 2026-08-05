@@ -27,7 +27,7 @@ module ApiSerialization
 
   def decode_cursor(cursor)
     decoded = Base64.urlsafe_decode64(cursor.to_s)
-    raise ArgumentError unless decoded.match?(/\A[0-9a-f-]{36}\z/)
+    raise ArgumentError unless decoded.match?(/\A[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/)
 
     decoded
   rescue ArgumentError
@@ -64,7 +64,9 @@ module ApiSerialization
 
   def report_detail_json(report)
     report_json(report).merge(summary: report.summary, content: report.content,
-      sources: report.report_sources.map { |source| { label: source.source_reference, as_of: source.created_at.iso8601 } })
+      sources: report.report_sources.order(:id).limit(100).map do |source|
+        { label: source.source_reference, as_of: source.created_at.iso8601 }
+      end)
   end
 
   def decimal(value) = value&.to_s("F")

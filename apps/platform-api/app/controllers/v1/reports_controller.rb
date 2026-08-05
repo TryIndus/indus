@@ -19,7 +19,7 @@ module V1
     def create
       attributes = contract_params(:symbol, :portfolio_id, :focus, required: [ :symbol ])
       policy_scope(Portfolio).find(attributes[:portfolio_id]) if attributes[:portfolio_id].present?
-      if attributes[:focus].present? && !attributes[:focus].length.between?(1, 1_000)
+      if attributes[:focus].present? && (!attributes[:focus].is_a?(String) || !attributes[:focus].length.between?(1, 1_000))
         raise ActionController::BadRequest, "focus must be between 1 and 1000 characters"
       end
       report = Current.user.reports.new(symbol: attributes[:symbol], portfolio_id: attributes[:portfolio_id],
@@ -28,7 +28,7 @@ module V1
       Report.transaction do
         report.save!
         OutboxEvent.create!(topic: "report.requested", aggregate_type: "Report", aggregate_id: report.id,
-          payload: { report_id: report.id, user_id: Current.user.id, symbol: report.symbol })
+          payload: { report_id: report.id, user_id: Current.user.id, symbol: report.symbol, focus: attributes[:focus] })
       end
       response.set_header("Location", "/v1/reports/#{report.id}")
       render json: report_json(report), status: :accepted

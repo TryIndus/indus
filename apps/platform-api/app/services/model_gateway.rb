@@ -1,6 +1,3 @@
-ModelResult = Data.define(:text, :model, :usage)
-ModelExecution = Data.define(:payload, :model, :usage, :task, :prompt_version)
-
 class ModelGateway
   class Error < StandardError
     attr_reader :category
@@ -56,7 +53,7 @@ class ModelGateway
         explanations.all? do |item|
           item.is_a?(Hash) && (item.keys - %w[metric explanation sources]).empty? &&
             item["metric"].in?(input.fetch(:metrics)) && item["explanation"].to_s.length.between?(1, 5_000) && valid_sources?(item["sources"])
-        end
+        end && explanations.pluck("metric").sort == input.fetch(:metrics).sort
     when "financial_chat"
       message = payload["message"]
       (payload.keys - %w[message sources]).empty? && message.is_a?(Hash) && message.keys.sort == %w[content role] &&
@@ -69,9 +66,17 @@ class ModelGateway
     return true if sources.nil?
     sources.is_a?(Array) && sources.length <= 20 && sources.all? do |source|
       source.is_a?(Hash) && (source.keys - %w[label uri as_of]).empty? && source["label"].to_s.length.between?(1, 200) &&
-        Time.iso8601(source["as_of"].to_s)
+        valid_source_uri?(source["uri"]) && Time.iso8601(source["as_of"].to_s)
     rescue ArgumentError
       false
     end
+  end
+
+  def valid_source_uri?(value)
+    return true if value.nil?
+    uri = URI.parse(value.to_s)
+    uri.is_a?(URI::HTTP) && uri.host.present?
+  rescue URI::InvalidURIError
+    false
   end
 end

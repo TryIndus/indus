@@ -8,7 +8,8 @@ module V1
     def show
       portfolio = policy_scope(Portfolio).includes(:positions).find(params[:id])
       authorize portfolio
-      render json: portfolio_json(portfolio).merge(positions: portfolio.positions.map { |position| position_json(position) })
+      render json: portfolio_json(portfolio).merge(
+        positions: portfolio.positions.order(:id).limit(1_000).map { |position| position_json(position) })
     end
 
     def create

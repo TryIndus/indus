@@ -14,6 +14,9 @@ class ApplicationController < ActionController::API
   rescue_from ActionController::BadRequest, ActionController::ParameterMissing, with: :render_bad_request
   rescue_from ModelGateway::Error, with: :render_upstream_failure
   rescue_from FundamentalsProvider::Error, with: :render_upstream_failure
+  rescue_from FundamentalsProvider::InvalidSymbol, with: :render_bad_request
+  rescue_from FundamentalsProvider::NotFound, with: :render_not_found
+  rescue_from ActiveRecord::RecordNotUnique, with: :render_conflict
 
   private
 
@@ -25,7 +28,7 @@ class ApplicationController < ActionController::API
     raise Authentication::Unauthorized, "verified token is missing an email" unless email.match?(URI::MailTo::EMAIL_REGEXP)
     display_name = claims.dig("user_metadata", "name") || claims["name"] || email.split("@").first
     Current.request_id = request.request_id
-    Current.user = User.find_or_create_by!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub")) do |user|
+    Current.user = User.create_or_find_by!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub")) do |user|
       user.email = email
       user.display_name = display_name
     end
@@ -43,6 +46,9 @@ class ApplicationController < ActionController::API
   def render_not_found = render_problem(status: :not_found, code: "not_found", title: "Resource not found")
 
   def render_invalid(error)
+    if error.record.errors.details.values.flatten.any? { |detail| detail[:error] == :taken }
+      return render_conflict
+    end
     errors = error.record.errors.map do |entry|
       { code: "invalid_field", pointer: "/#{entry.attribute}", detail: entry.message.to_s.byteslice(0, 500) }
     end
@@ -56,6 +62,7 @@ class ApplicationController < ActionController::API
 
   def render_bad_request(error) = render_problem(status: :bad_request, code: "bad_request", title: "Malformed request", detail: error.message)
   def render_upstream_failure = render_problem(status: :bad_gateway, code: "upstream_unavailable", title: "Upstream provider unavailable")
+  def render_conflict = render_problem(status: :conflict, code: "resource_conflict", title: "Resource conflict")
 
   def render_problem(status:, code:, title:, detail: nil, errors: nil)
     numeric_status = Rack::Utils.status_code(status)

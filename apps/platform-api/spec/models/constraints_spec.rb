@@ -16,4 +16,45 @@ RSpec.describe "domain constraints" do
   it "restricts reports to durable workflow states" do
     expect { user.reports.create!(symbol: "AAPL", status: "mystery") }.to raise_error(ActiveRecord::RecordInvalid)
   end
+
+  it "rejects symbols with repeated or trailing separators" do
+    portfolio = user.portfolios.create!(name: "Symbols")
+    expect(portfolio.positions.new(symbol: "BTC//USD", quantity: 1, average_cost: 1)).not_to be_valid
+    expect(user.reports.new(symbol: "AAPL-", title: "Malformed")).not_to be_valid
+    expect(user.favorites.new(symbol: "BRK..B", instrument_type: "equity")).not_to be_valid
+  end
+
+  it "enforces strict symbols when writes bypass Active Record validation" do
+    portfolio = user.portfolios.create!(name: "Database symbols")
+    now = Time.current
+    writes = [
+      -> { Favorite.insert_all!([ { user_id: user.id, symbol: "BTC//USD", instrument_type: "crypto", created_at: now, updated_at: now } ]) },
+      -> { Position.insert_all!([ { portfolio_id: portfolio.id, symbol: "AAPL-", instrument_type: "equity",
+        quantity: 1, average_cost: 1, currency: "USD", created_at: now, updated_at: now } ]) },
+      -> { Report.insert_all!([ { user_id: user.id, symbol: "BRK..B", title: "Invalid", status: "queued",
+        created_at: now, updated_at: now } ]) }
+    ]
+    writes.each do |write|
+      expect { ApplicationRecord.transaction(requires_new: true) { write.call } }.to raise_error(ActiveRecord::StatementInvalid)
+    end
+  end
+
+  it "caps positions and report evidence at their response bounds" do
+    portfolio = user.portfolios.create!(name: "Bounded")
+    position = portfolio.positions.new(symbol: "AAPL", quantity: 1, average_cost: 1)
+    allow(Portfolio).to receive_message_chain(:lock, :find).and_return(portfolio)
+    allow(Position).to receive(:where).with(portfolio_id: portfolio.id)
+      .and_return(instance_double(ActiveRecord::Relation, count: Position::MAX_PER_PORTFOLIO))
+    expect(position).not_to be_valid
+    expect(position.errors[:base]).to include("portfolio position limit reached")
+
+    report = user.reports.create!(symbol: "AAPL", title: "AAPL report")
+    source = report.report_sources.new(provider: "fixture", kind: "filing", source_reference: "10-Q")
+    allow(Report).to receive_message_chain(:lock, :find).and_return(report)
+    allow(ReportSource).to receive(:where).with(report_id: report.id)
+      .and_return(instance_double(ActiveRecord::Relation, count: ReportSource::MAX_PER_REPORT))
+    expect(source).not_to be_valid
+    expect(source.errors[:base]).to include("report source limit reached")
+    expect(report.report_sources.new(provider: "fixture", kind: "filing", source_reference: "x" * 201)).not_to be_valid
+  end
 end
