@@ -94,6 +94,10 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 | [Revamp Plan](./docs/REVAMP_PLAN.md) | In-progress application modernization plan retained during the revamp |
 | [Market Data Architecture](./docs/architecture/market-data.md) | Phase 3 ingestion, event delivery, persistence, streaming, and AWS compatibility |
 | [Market Data Runbook](./docs/runbooks/market-data.md) | Local startup, replay, failure response, retention, and rollback |
+| [Distributed Research Workflows](./docs/architecture/distributed-research-workflows.md) | Kafka, Temporal, grounding, and artifact invariants |
+| [Local Distributed Platform](./docs/runbooks/local-distributed-platform.md) | Start and verify the complete replacement stack locally |
+| [Report Workflow Recovery](./docs/runbooks/report-workflow-recovery.md) | Cancel, replay, and dependency recovery procedures |
+| [Migration Rehearsal](./docs/runbooks/migration-rehearsal.md) | Supabase export, Cognito limitations, reconciliation, and rollback |
 
 ## Features
 

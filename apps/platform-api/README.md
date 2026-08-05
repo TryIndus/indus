@@ -20,6 +20,13 @@ The service fails closed when required identity, database, or model configuratio
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection URL |
 | `REDIS_URL` | Sidekiq Redis URL |
+| `KAFKA_BROKERS` | Comma-separated Kafka bootstrap brokers |
+| `KAFKA_AUTH_MODE` | `plaintext` locally or `msk_iam` with AWS workload identity |
+| `TEMPORAL_ADDRESS` | Temporal frontend address; defaults to `temporal:7233` |
+| `TEMPORAL_NAMESPACE` | Temporal namespace; defaults to `default` |
+| `REPORT_ARTIFACT_BUCKET` | S3-compatible bucket for generated report artifacts |
+| `OBJECT_STORAGE_ENDPOINT` | Optional path-style endpoint used by local MinIO |
+| `AUTH_PROVIDER` | `supabase` during migration or `cognito` at cutover |
 | `SUPABASE_JWT_ISSUER` | Expected token issuer |
 | `SUPABASE_JWT_AUDIENCE` | Expected token audience; defaults to `authenticated` |
 | `SUPABASE_JWKS_URL` | Optional explicit HTTPS JWKS endpoint |
@@ -36,7 +43,9 @@ Production also requires Rails' standard `SECRET_KEY_BASE`. No Rails master key 
 
 Every `/v1` request requires a verified bearer token. The token issuer and audience are fixed by server configuration, and Pundit scopes every tenant-owned query by the internal user identifier. Mutations require an `Idempotency-Key`; the mutation, audit event, and replay response commit in one transaction. Reusing a key with the same request replays the recorded response, while changing the request returns `409`. Reports are created together with an outbox event in that transaction; workers may process that event only after commit. Provider credentials and provider payloads do not cross the API boundary.
 
-Model-backed operations are owned by a task registry in `ModelGateway`. Each task pins a prompt version, declares an allowlisted tool set, validates structured provider output, normalizes usage and provider failures, and consumes a per-user quota before invocation. Phase 2 does not run autonomous tool loops; Kafka publication and Temporal report orchestration remain Phase 3 work.
+Model-backed operations are owned by a task registry in `ModelGateway`. Each task pins a prompt version, declares an allowlisted tool set, validates structured provider output, normalizes usage and provider failures, and consumes a per-user quota before invocation.
+
+Phase 3 publishes committed outbox rows to Kafka and starts durable report workflows through an idempotent consumer. Temporal uses stable workflow IDs and persistent activity leases to prevent overlapping model and artifact work. Research claims must cite allowlisted evidence with matching as-of values before artifacts are stored. See the [workflow architecture](../../docs/architecture/distributed-research-workflows.md) and [recovery runbook](../../docs/runbooks/report-workflow-recovery.md).
 
 `GET /healthz` proves the process can serve HTTP. `GET /readyz` additionally verifies PostgreSQL connectivity and returns `503` when it is unavailable. Neither endpoint requires authentication.
 
