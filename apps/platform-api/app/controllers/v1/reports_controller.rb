@@ -27,8 +27,12 @@ module V1
       authorize report
       Report.transaction do
         report.save!
-        OutboxEvent.create!(topic: "report.requested", aggregate_type: "Report", aggregate_id: report.id,
-          payload: { report_id: report.id, user_id: Current.user.id, symbol: report.symbol, focus: attributes[:focus] })
+        event = OutboxEvent.new(id: SecureRandom.uuid, topic: "reports.lifecycle.v1", aggregate_type: "Report", aggregate_id: report.id)
+        event.payload = { envelope: Events::Envelope.build(event_id: event.id, event_type: "report.queued",
+          tenant_id: Current.user.id, correlation_id: request.request_id, idempotency_key: request.headers["Idempotency-Key"]),
+          report_id: report.id, user_id: Current.user.id, symbol: report.symbol, previous_status: nil,
+          status: report.status, workflow_id: "report-#{report.id}", failure_code: nil, focus: attributes[:focus] }
+        event.save!
       end
       response.set_header("Location", "/v1/reports/#{report.id}")
       render json: report_json(report), status: :accepted
