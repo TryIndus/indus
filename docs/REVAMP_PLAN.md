@@ -186,6 +186,44 @@ docs/
 
 Use one ownership boundary per directory, generated clients from committed contracts, and language-native dependency management within each application.
 
+## Stacked Pull Request Delivery
+
+Deliver construction work as short stacks of no more than four dependent PRs. Each PR is based on the branch immediately below it, declares `Depends on #<parent>`, and contains only the diff for its layer. Merge each stack from the bottom upward, retarget or rebase the next PR after its parent merges, and rerun that PR's complete verification before merging it.
+
+```text
+main
+└── PR 1: contracts or service foundation
+    └── PR 2: next dependent capability
+        └── PR 3: integration or vertical slice
+            └── PR 4: cutover-ready behavior
+```
+
+Do not keep one stack open for the entire revamp. Finish and merge a stack before opening another large dependency chain. Every merged lower layer must be safe to deploy while dormant, compatible with the current production application, and removable without requiring an unfinished upper layer.
+
+### Planned Stacks
+
+| Stack | PR 1 | PR 2 | PR 3 | PR 4 |
+|---|---|---|---|---|
+| Application foundation | Architecture decisions and contracts | Monorepo and local orchestration | Rails API foundation | React/Vite application shell |
+| Product migration | Rails read APIs and generated client | Dashboard, search, and company views | Favorites and portfolio writes | Reports, settings, and route cutover |
+| Market data | Rust service foundation | Alpaca ingestion and PostgreSQL persistence | Kafka producers and consumers | Authenticated SSE cutover |
+| Model workflows | Provider-neutral `ModelGateway` | Gemini adapter and secret integration | Prompts, tools, schemas, and evaluations | Temporal report workflow and product cutover |
+| AWS platform | Accounts, networking, and IAM | ECR, EKS, and workload identity | Managed data services and observability | GitHub Actions, Argo CD, and rollback rehearsal |
+
+The application-foundation and AWS-platform stacks may proceed independently after the architecture contracts stabilize. Production identity migration, final data synchronization, traffic cutover, and legacy decommissioning remain standalone PRs because their rollback and operational risk should not be hidden inside a dependent stack.
+
+### Migration Rules Across Stacks
+
+- Keep the current Next.js and Supabase paths operational until the replacement vertical slice passes staging verification.
+- Add new schemas and APIs before moving readers or writers; remove old contracts only after the rollback window.
+- Use shadow reads and reconciliation reports before changing the source of truth.
+- Assign one authoritative writer per record type whenever possible. If bounded dual writes are unavoidable, define conflict handling, monitoring, duration, and repair tooling first.
+- Move traffic by route or feature flag with explicit abort thresholds instead of switching the entire product at once.
+- Use expand, migrate, verify, and contract steps for incompatible database changes.
+- Preserve correlation and idempotency identifiers across old and new paths so duplicated or lost work can be detected.
+- Keep compatibility code visibly temporary, owned, measured, and attached to a removal phase.
+- Do not combine production data migration, identity cutover, or legacy deletion with unrelated product changes.
+
 ## Migration Roadmap
 
 Each phase ships through a separate PR. Do not start the next phase until the current phase's acceptance criteria pass in staging.
