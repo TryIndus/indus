@@ -216,7 +216,7 @@ resource "aws_lb_target_group" "api" {
     unhealthy_threshold = 3
     interval            = 15
     timeout             = 5
-    path                = "/up"
+    path                = "/readyz"
     matcher             = "200"
   }
 
@@ -402,6 +402,7 @@ resource "aws_cloudfront_distribution" "this" {
     domain_name              = aws_s3_bucket.this["web"].bucket_regional_domain_name
     origin_id                = "web"
     origin_access_control_id = aws_cloudfront_origin_access_control.web.id
+    origin_path              = "/current"
   }
 
   origin {
@@ -428,6 +429,17 @@ resource "aws_cloudfront_distribution" "this" {
 
   ordered_cache_behavior {
     path_pattern             = "/api/*"
+    target_origin_id         = "api"
+    viewer_protocol_policy   = "https-only"
+    allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods           = ["GET", "HEAD", "OPTIONS"]
+    compress                 = true
+    cache_policy_id          = data.aws_cloudfront_cache_policy.disabled.id
+    origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_except_host.id
+  }
+
+  ordered_cache_behavior {
+    path_pattern             = "/v1/*"
     target_origin_id         = "api"
     viewer_protocol_policy   = "https-only"
     allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]

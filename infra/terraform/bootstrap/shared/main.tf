@@ -144,6 +144,7 @@ data "aws_iam_policy_document" "ecr_pull" {
     actions = [
       "ecr:BatchCheckLayerAvailability",
       "ecr:BatchGetImage",
+      "ecr:BatchGetImage",
       "ecr:GetDownloadUrlForLayer",
     ]
     principals {

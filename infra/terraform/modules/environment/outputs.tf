@@ -1,6 +1,7 @@
 output "cluster" {
   value = {
     name                      = aws_eks_cluster.this.name
+    vpc_id                    = aws_vpc.this.id
     endpoint                  = aws_eks_cluster.this.endpoint
     certificate_authority     = aws_eks_cluster.this.certificate_authority[0].data
     oidc_provider_arn         = aws_iam_openid_connect_provider.eks.arn

@@ -1,12 +1,14 @@
 locals {
   workload_service_accounts = {
-    platform_api    = "indus/platform-api"
-    sidekiq         = "indus/sidekiq"
-    research_worker = "indus/research-worker"
-    market_data     = "indus/market-data"
-    web_publisher   = "indus/web-publisher"
-    otel_collector  = "observability/otel-collector"
-    load_balancer   = "kube-system/aws-load-balancer-controller"
+    platform_api     = "indus/platform-api"
+    sidekiq          = "indus/sidekiq"
+    platform_outbox  = "indus/platform-outbox"
+    reports_consumer = "indus/reports-consumer"
+    research_worker  = "indus/research-worker"
+    market_data      = "indus/market-data"
+    web_publisher    = "indus/web-publisher"
+    otel_collector   = "observability/otel-collector"
+    load_balancer    = "kube-system/aws-load-balancer-controller"
   }
 
   oidc_provider_host = replace(aws_iam_openid_connect_provider.eks.url, "https://", "")
@@ -85,7 +87,7 @@ data "aws_iam_policy_document" "platform_api" {
 }
 
 resource "aws_iam_role_policy" "platform_api" {
-  for_each = toset(["platform_api", "sidekiq"])
+  for_each = toset(["platform_api", "sidekiq", "platform_outbox", "reports_consumer"])
 
   name   = "runtime"
   role   = aws_iam_role.workload[each.key].id
@@ -167,10 +169,12 @@ data "aws_iam_policy_document" "market_data" {
     sid = "MarketTopics"
     actions = [
       "kafka-cluster:AlterGroup",
+      "kafka-cluster:AlterTransactionalId",
       "kafka-cluster:Connect",
       "kafka-cluster:DescribeCluster",
       "kafka-cluster:DescribeGroup",
       "kafka-cluster:DescribeTopic",
+      "kafka-cluster:DescribeTransactionalId",
       "kafka-cluster:ReadData",
       "kafka-cluster:WriteData",
     ]
@@ -178,6 +182,7 @@ data "aws_iam_policy_document" "market_data" {
       aws_msk_serverless_cluster.this.arn,
       "${replace(aws_msk_serverless_cluster.this.arn, ":cluster/", ":topic/")}/*",
       "${replace(aws_msk_serverless_cluster.this.arn, ":cluster/", ":group/")}/*",
+      "${replace(aws_msk_serverless_cluster.this.arn, ":cluster/", ":transactional-id/")}/*",
     ]
   }
 }
