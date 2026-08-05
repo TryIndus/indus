@@ -189,35 +189,30 @@ docs/
 
 Use one ownership boundary per directory, generated clients from committed contracts, and language-native dependency management within each application.
 
-## Stacked Pull Request Delivery
+## Four-PR Migration Delivery
 
-Deliver construction work as short stacks of no more than four dependent PRs. Each PR is based on the branch immediately below it, declares `Depends on #<parent>`, and contains only the diff for its layer. Merge each stack from the bottom upward, retarget or rebase the next PR after its parent merges, and rerun that PR's complete verification before merging it.
+The entire revamp ships as one dependent stack of exactly four phases, with one pull request per phase. This is not a limit applied repeatedly to smaller stacks. A phase may contain multiple small, logically scoped commits, but it remains one reviewable PR with one acceptance checklist and one rollback boundary. Do not split a phase or introduce a fifth revamp PR unless the delivery plan is explicitly revised.
 
 ```text
 main
-└── PR 1: contracts or service foundation
-    └── PR 2: next dependent capability
-        └── PR 3: integration or vertical slice
-            └── PR 4: cutover-ready behavior
+└── Phase 1 PR: verification and characterization
+    └── Phase 2 PR: application platform replacement
+        └── Phase 3 PR: distributed services and migration readiness
+            └── Phase 4 PR: AWS deployment and production cutover
 ```
 
-Do not keep one stack open for the entire revamp. Finish and merge a stack before opening another large dependency chain. Every merged lower layer must be safe to deploy while dormant, compatible with the current production application, and removable without requiring an unfinished upper layer.
+Each child PR targets the branch immediately below it and declares that dependency. Merge the stack from Phase 1 through Phase 4, retargeting each child to `main` after its parent merges and rerunning its complete verification before merge. Each phase must leave its branch internally coherent, documented, and reversible. The current production path remains available until the Phase 4 traffic cutover and rollback window complete.
 
-### Planned Stacks
+| Phase | Single-PR outcome | Production posture |
+|---|---|---|
+| 1 | Layered CI and executable characterization of current security, API, database, browser, accessibility, and performance boundaries | No runtime or infrastructure changes |
+| 2 | Monorepo foundation plus the Rails API, React/Vite web application, shared contracts, and provider-neutral Gemini model gateway | Replacement applications remain dormant; current Next.js/Supabase deployment remains operational |
+| 3 | Rust market-data service, Kafka and Temporal workflows, complete product behavior, identity/data migration tooling, and local end-to-end verification | Replacement platform is cutover-ready but no AWS resources or production traffic are changed |
+| 4 | Terraform-managed AWS platform, managed services, deployment, observability, rehearsed migration, gradual traffic cutover, and legacy decommissioning | Production moves only after acceptance and rollback gates pass |
 
-| Stack | PR 1 | PR 2 | PR 3 | PR 4 |
-|---|---|---|---|---|
-| Application foundation | Architecture decisions and contracts | Monorepo and local orchestration | Rails API foundation | React/Vite application shell |
-| Product migration | Rails read APIs and generated client | Dashboard, search, and company views | Favorites and portfolio writes | Reports, settings, and route cutover |
-| Market data | Rust service foundation | Alpaca ingestion and PostgreSQL persistence | Kafka producers and consumers | Authenticated SSE cutover |
-| Model workflows | Provider-neutral `ModelGateway` | Gemini adapter and secret integration | Prompts, tools, schemas, and evaluations | Temporal report workflow and product cutover |
-| AWS platform | Accounts, networking, and IAM | ECR, EKS, and workload identity | Managed data services and observability | GitHub Actions, Argo CD, and rollback rehearsal |
+### Migration Rules Across Phases
 
-The application-foundation and AWS-platform stacks may proceed independently after the architecture contracts stabilize. Production identity migration, final data synchronization, traffic cutover, and legacy decommissioning remain standalone PRs because their rollback and operational risk should not be hidden inside a dependent stack.
-
-### Migration Rules Across Stacks
-
-- Keep the current Next.js and Supabase paths operational until the replacement vertical slice passes staging verification.
+- Keep the current Next.js and Supabase paths operational until the replacement platform passes local and CI verification, then Phase 4 staging verification.
 - Add new schemas and APIs before moving readers or writers; remove old contracts only after the rollback window.
 - Use shadow reads and reconciliation reports before changing the source of truth.
 - Assign one authoritative writer per record type whenever possible. If bounded dual writes are unavoidable, define conflict handling, monitoring, duration, and repair tooling first.
@@ -229,148 +224,75 @@ The application-foundation and AWS-platform stacks may proceed independently aft
 
 ## Migration Roadmap
 
-Each phase ships through one or more PRs in the stacks above. Do not start a dependent phase until the required lower PRs have merged and the current phase's acceptance criteria pass in staging.
+### Phase 1 PR: Verification and Characterization
 
-### Phase 0: Architecture Baseline
-
-- Record architecture decisions for Rails, Rust, Kafka, Temporal, Cognito, Aurora, EKS, Gemini, the application-owned model gateway, and the post-compatibility fundamentals provider.
-- Define service ownership, API/event contracts, SLOs, data classification, threat model, and cutover metrics.
-- Capture current behavior with contract and browser characterization tests.
-- Inventory current Supabase data, identities, provider integrations, and operational dependencies.
-
-Acceptance criteria:
-
-- Decisions and rejected alternatives are documented.
-- Existing user journeys have executable characterization coverage.
-- Migration and rollback owners are explicit.
-
-### Phase 1: AWS and Delivery Foundation
-
-- Create the account and network topology with Terraform.
-- Provision ECR, EKS, Route 53, ACM, Secrets Manager, KMS, and baseline observability.
-- Provision only the Gemini secret container and access policy through Terraform; add the personal API token through an approved secret-management workflow so it never enters source control, plans, or state.
-- Establish GitHub Actions OIDC, image builds, signing, Helm charts, and Argo CD promotion.
-- Deploy minimal health-check workloads to development and staging.
+- Run linting, type checking, unit coverage, production builds, and dependency audits on every pull request without production credentials.
+- Run migrations and PostgreSQL security tests against disposable databases, including RLS, tenant isolation, constraints, quotas, and table privileges.
+- Exercise HTTP integration boundaries, authenticated product journeys, cross-browser behavior, accessibility, and performance budgets.
+- Characterize protected-route redirects, authentication ordering, request validation, report access, and stream-symbol rejection before replacing their implementations.
+- Keep the current runtime, database, providers, and deployment behavior unchanged.
 
 Acceptance criteria:
 
-- A clean account can be bootstrapped from versioned code.
-- No long-lived AWS credentials exist in GitHub.
-- Rollback to a prior image is tested.
+- Every verification layer passes locally and on clean GitHub-hosted runners.
+- A stable aggregate check can protect later phase branches.
+- Tests use synthetic configuration and disposable services without deployed credentials.
+- Existing migration-critical behavior has executable characterization coverage.
 
-### Phase 2: Application Foundation
+### Phase 2 PR: Application Platform Replacement
 
-- Create the monorepo directories without moving or breaking the production Next.js application.
-- Scaffold React/Vite, Rails API, Rust, and Temporal worker applications with health checks and language-native verification.
-- Add generated-contract workflows and local orchestration for PostgreSQL, Redis, Kafka, and Temporal.
-- Keep new services dormant and excluded from current Vercel runtime paths until their cutover phase.
-
-Acceptance criteria:
-
-- The existing application still builds, tests, and deploys without depending on unfinished services.
-- Every new application has a reproducible local start command and passing health check.
-- Contract generation is deterministic and detects stale generated clients.
-- Local orchestration starts from documented commands without production credentials.
-
-### Phase 3: Rails Platform API
-
-- Create the Rails API with PostgreSQL, RSpec, Pundit, OpenAPI, structured logging, and OpenTelemetry.
-- Model favorites, portfolios, reports, audit events, idempotency keys, and the transactional outbox.
-- Implement Cognito JWT verification behind a temporary compatibility boundary.
-- Define the Rails fundamentals-provider interface and shadow it against the current Yahoo Finance behavior before removing compatibility code.
-- Add Sidekiq for bounded background work.
-- Shadow current read behavior before moving writes.
+- Establish the monorepo layout, pinned containerized toolchains, and documented local orchestration while preserving the root Next.js application.
+- Publish OpenAPI and event contracts and generate a typed React client deterministically.
+- Implement the Rails API with PostgreSQL, Active Record migrations, Pundit authorization, RSpec, idempotency, audit records, transactional outbox, Sidekiq, structured logging, and OpenTelemetry.
+- Implement authentication behind a provider boundary that supports current Supabase sessions during development and Cognito JWTs at the later cutover.
+- Preserve Yahoo Finance behavior behind a fundamentals-provider interface and verify compatibility with fixtures and shadow comparisons.
+- Implement the React/Vite application for authentication, dashboard, search, company, crypto, favorites, portfolios, reports, and settings without changing production traffic.
+- Implement the provider-neutral `ModelGateway`, Gemini REST adapter, versioned prompts, structured outputs, allowlisted tools, quotas, and golden evaluations. Use local secret injection only; AWS Secrets Manager integration belongs to Phase 4.
 
 Acceptance criteria:
 
-- Request, model, policy, migration, and contract tests pass.
-- Tenant-boundary tests prove cross-user access is denied.
-- Shadow-read differences are measured and resolved.
+- Rails request, model, policy, migration, contract, and tenant-boundary tests pass.
+- React critical journeys pass in Chromium, Firefox, WebKit, and mobile Chromium with accessibility and performance budgets enforced.
+- Contract generation is deterministic and detects stale clients.
+- The Gemini adapter is isolated behind `ModelGateway`; provider failures and malformed outputs are covered without exposing credentials.
+- The current application still builds and deploys without depending on dormant replacement applications.
 
-### Phase 4: React Application Extraction
+### Phase 3 PR: Distributed Services and Migration Readiness
 
-- Create the Vite React application and generated Rails API client.
-- Migrate authentication, dashboard, search, company, crypto, reports, and settings incrementally.
-- Preserve accessibility, responsive behavior, charts, and error/loading states.
-- Serve staging assets through S3 and CloudFront.
-
-Acceptance criteria:
-
-- Existing critical journeys pass in Chromium, Firefox, WebKit, and mobile Chromium.
-- Accessibility and performance budgets do not regress.
-- No server secret is included in browser bundles.
-
-### Phase 5: Identity and Transactional Data Migration
-
-- Configure Cognito OAuth/OIDC, MFA policy, token lifetimes, and role claims.
-- Provision Aurora PostgreSQL and RDS Proxy.
-- Build repeatable Supabase-to-Aurora data exports, transformations, validation, and reconciliation reports.
-- Migrate identities with an explicit password-reset or just-in-time migration strategy.
-- Dual-read, then dual-write only where necessary and for a bounded period.
+- Implement the Rust market-data service with Alpaca ingestion, normalized versioned events, PostgreSQL persistence, authenticated SSE, quotas, backpressure, reconnection, stale-feed detection, and graceful shutdown.
+- Implement Kafka producers and idempotent consumers, the Rails outbox publisher, replay tooling, schema compatibility checks, and traceable event identifiers.
+- Implement Temporal report workflows with idempotent activities, deadlines, retries, cancellation, citation metadata, and artifact-storage boundaries.
+- Complete the React-to-Rails and React-to-Rust integrations for every product journey under local routing and feature flags.
+- Build repeatable Supabase data and identity export, transformation, validation, reconciliation, and rollback tooling without executing a production migration.
+- Provide local PostgreSQL, Redis, Kafka, and Temporal orchestration plus end-to-end, contract, load, failure-injection, and recovery tests.
+- Keep deployment interfaces compatible with Cognito, Aurora PostgreSQL, ElastiCache, MSK, S3, and Secrets Manager without provisioning those services.
 
 Acceptance criteria:
 
-- Row counts, checksums, ownership relationships, and sampled records reconcile.
-- Authentication, revocation, and account recovery work end to end.
-- A rehearsed rollback preserves writes and identity consistency.
+- The complete replacement product runs locally without production credentials and passes end-to-end verification.
+- Market-data load and recovery tests meet documented latency, connection, and no-silent-loss targets.
+- Report evaluations and workflow tests cover grounding, prompt injection, retries, cancellation, and duplicate prevention.
+- Migration rehearsals reconcile row counts, checksums, ownership relationships, identities, and sampled records against disposable datasets.
+- Current production remains on the legacy path and can ignore every replacement service.
 
-### Phase 6: Rust Market Data Platform
+### Phase 4 PR: AWS Deployment and Production Cutover
 
-- Implement Alpaca adapters, normalized schemas, Kafka publishing, backfills, and partitioned Aurora PostgreSQL persistence.
-- Add retention, archival, indexing, and query-plan tests for historical market tables before considering a specialized datastore.
-- Add authenticated fetch-based SSE fan-out with bearer-token validation, connection quotas, backpressure, and no credentials in URLs.
-- Replay captured provider fixtures and test disconnect, duplication, reordering, and stale-feed scenarios.
-- Move the React application from Next.js streaming routes to the Rust endpoint.
-
-Acceptance criteria:
-
-- Load tests meet stream latency and connection targets.
-- Chaos tests demonstrate recovery without silent event loss.
-- Every market event is traceable from provider receipt to client delivery.
-
-### Phase 7: Gemini Research Workflows
-
-- Create `ModelGateway` with provider-neutral request, response, tool, error, usage, and tracing contracts.
-- Implement the Gemini adapter through Google's official REST API using the personal API token supplied by AWS Secrets Manager.
-- Configure model identifiers independently for chat, explanations, and reports without coupling prompts to model names.
-- Define versioned prompts, structured outputs, allowlisted tools, safety settings, quotas, and evaluation datasets outside the adapter.
-- Implement Temporal report workflows with idempotent activities and cancellation.
-- Store artifacts in S3 and source metadata in Aurora.
-- Migrate explanation, chat, and report behavior through `ModelGateway` without changing the selected provider.
+- Provision separate AWS environments, networking, ECR, EKS, Route 53, ACM, CloudFront, WAF, IAM, KMS, and Secrets Manager through Terraform.
+- Provision Aurora PostgreSQL, RDS Proxy, ElastiCache, MSK, S3, and the managed observability stack outside Kubernetes.
+- Add least-privilege workload identity, GitHub Actions OIDC, image scanning and signing, Helm packaging, Argo CD promotion, network policies, and restricted pod security.
+- Add the personal Gemini API token through an approved secret-management workflow so it never enters source, logs, Terraform plans, or state.
+- Deploy development and staging, exercise SLO dashboards, alerts, runbooks, backup restoration, disaster recovery, capacity, security, and image rollback.
+- Configure Cognito and rehearse identity and data migration before the production window.
+- Freeze incompatible changes, execute final synchronization, reconcile data, and shift traffic gradually with explicit abort thresholds.
+- Observe the target platform through the rollback window before deliberately retiring Vercel, Supabase, compatibility routes, legacy credentials, and redundant data copies.
 
 Acceptance criteria:
 
-- Golden evaluations cover factual grounding, tool selection, malformed output, prompt injection, and provider failure.
-- Product services depend only on `ModelGateway`; Gemini-specific request and response types remain inside the adapter.
-- Rotating the Gemini token requires no image rebuild, and changing a configured Gemini model requires no prompt or business-logic edit.
-- Reports retain citations and data timestamps.
-- Retries cannot duplicate reports or quota charges.
-
-### Phase 8: Production Hardening
-
-- Complete dashboards, alerts, runbooks, on-call exercises, capacity tests, backup restoration, and disaster-recovery rehearsal.
-- Enforce WAF, network policies, workload identity, admission policies, vulnerability thresholds, and signed images.
-- Run penetration, dependency, container, infrastructure, and authorization testing.
-
-Acceptance criteria:
-
-- SLO dashboards and actionable alerts are operational.
-- Restore and rollback exercises meet documented objectives.
-- No unresolved critical security finding remains.
-
-### Phase 9: Cutover and Decommissioning
-
-- Freeze incompatible schema changes during the final migration window.
-- Perform final data synchronization and reconciliation.
-- Shift traffic gradually with explicit abort thresholds.
-- Observe at full traffic before removing compatibility paths.
-- Decommission Vercel and Supabase only after the rollback window expires and backups are verified.
-
-Acceptance criteria:
-
-- Production traffic runs entirely on the target platform.
-- Error rate, latency, data integrity, and workflow completion remain within thresholds.
-- Legacy credentials, routes, infrastructure, and data copies are retired deliberately.
+- A clean environment can be bootstrapped from versioned code without long-lived AWS credentials in GitHub.
+- Restore, rollback, migration, and cutover rehearsals meet documented recovery objectives.
+- No unresolved critical security finding remains and alerts map to user-visible failure modes.
+- Production error rate, latency, data integrity, stream health, and workflow completion remain within their objectives at full traffic.
+- Legacy infrastructure is removed only after backups and the rollback window are verified.
 
 ## Verification Strategy
 
