@@ -14,6 +14,10 @@ test.beforeEach(async ({ context, page }) => {
     contentType: 'application/json',
     body: JSON.stringify({ next_cursor: null, items: [{ id: '00000000-0000-4000-8000-000000000004', symbol: 'MSFT', title: 'Microsoft research', status: 'completed', created_at: '2026-08-05T12:00:00.000Z', updated_at: '2026-08-05T12:00:00.000Z' }] }),
   }))
+  await page.route('**/v1/instruments/search?*', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ next_cursor: null, items: [{ symbol: 'BTC/USD', name: 'Bitcoin', instrument_type: 'crypto', exchange: 'Alpaca' }] }),
+  }))
 })
 
 test('renders an authenticated dashboard using the Rails contract', async ({ page }) => {
@@ -26,6 +30,8 @@ test('renders queryless crypto navigation', async ({ page }) => {
   await page.goto('/crypto')
   await expect(page).toHaveURL(/\/crypto$/)
   await expect(page.getByRole('heading', { name: 'Crypto markets', exact: true })).toBeVisible()
+  await expect(page.getByText('Bitcoin')).toBeVisible()
+  await expect(page.getByRole('status')).toContainText('Live prices are unavailable')
 })
 
 test('renders authenticated reports navigation', async ({ page }) => {

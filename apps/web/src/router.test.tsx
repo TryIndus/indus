@@ -97,6 +97,15 @@ describe('application routing', () => {
     expect(resolver).toHaveBeenCalledWith('/v1/instruments/search?q=nvidia&page_size=20')
   })
 
+  it('renders non-streaming crypto discovery from the instrument contract', async () => {
+    const resolver = vi.fn((path: string) => path.startsWith('/v1/instruments/search') ? { next_cursor: null, items: [{ symbol: 'BTC/USD', name: 'Bitcoin', instrument_type: 'crypto', exchange: 'Alpaca' }, { symbol: 'COIN', name: 'Coinbase', instrument_type: 'equity' }] } : responseFor(path))
+    await renderPath('/crypto', true, resolver)
+    expect(await screen.findByText('Bitcoin')).toBeVisible()
+    expect(screen.queryByText('Coinbase')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Live prices are unavailable in Phase 2')
+    expect(resolver).toHaveBeenCalledWith('/v1/instruments/search?q=crypto&page_size=20')
+  })
+
   it('invokes an idempotent Rails mutation from the favorites view', async () => {
     const mutation = vi.fn(() => ({ id: '00000000-0000-4000-8000-000000000005', symbol: 'TSLA', instrument_type: 'equity', created_at: now }))
     await renderPath('/favorites', true, undefined, mutation)
