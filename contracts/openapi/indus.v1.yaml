@@ -27,6 +27,8 @@ tags:
     description: User-owned portfolio and position operations.
   - name: Market
     description: Bounded market snapshots used by authenticated product views.
+  - name: Instruments
+    description: Bounded ticker and company discovery operations.
   - name: Fundamentals
     description: Bounded financial fundamentals snapshots.
   - name: Reports
@@ -401,6 +403,37 @@ paths:
           $ref: "#/components/responses/TooManyRequests"
         "502":
           $ref: "#/components/responses/BadGateway"
+  /v1/instruments/search:
+    get:
+      tags: [Instruments]
+      operationId: searchInstruments
+      summary: Search instruments by ticker symbol or company name.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Case-insensitive ticker symbol or company-name query.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: A bounded page of matching instruments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstrumentSearchPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "502":
+          $ref: "#/components/responses/BadGateway"
   /v1/fundamentals/{symbol}:
     get:
       tags: [Fundamentals]
@@ -769,6 +802,35 @@ components:
     InstrumentType:
       type: string
       enum: [equity, crypto]
+    InstrumentSearchResult:
+      type: object
+      additionalProperties: false
+      required: [symbol, name, instrument_type]
+      properties:
+        symbol:
+          $ref: "#/components/schemas/Symbol"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        instrument_type:
+          $ref: "#/components/schemas/InstrumentType"
+        exchange:
+          type: string
+          minLength: 1
+          maxLength: 50
+    InstrumentSearchPage:
+      unevaluatedProperties: false
+      allOf:
+        - $ref: "#/components/schemas/PageMetadata"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              maxItems: 100
+              items:
+                $ref: "#/components/schemas/InstrumentSearchResult"
     Favorite:
       type: object
       additionalProperties: false

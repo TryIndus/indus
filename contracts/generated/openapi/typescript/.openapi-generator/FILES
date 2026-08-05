@@ -1,6 +1,7 @@
 apis/FavoritesApi.ts
 apis/FundamentalsApi.ts
 apis/IdentityApi.ts
+apis/InstrumentsApi.ts
 apis/MarketApi.ts
 apis/ModelsApi.ts
 apis/OperationsApi.ts
@@ -26,7 +27,10 @@ docs/FundamentalsApi.md
 docs/FundamentalsMetricsValue.md
 docs/Health.md
 docs/IdentityApi.md
+docs/InstrumentSearchPage.md
+docs/InstrumentSearchResult.md
 docs/InstrumentType.md
+docs/InstrumentsApi.md
 docs/MarketApi.md
 docs/MarketQuote.md
 docs/MarketSummary.md
@@ -70,6 +74,8 @@ models/FieldError.ts
 models/Fundamentals.ts
 models/FundamentalsMetricsValue.ts
 models/Health.ts
+models/InstrumentSearchPage.ts
+models/InstrumentSearchResult.ts
 models/InstrumentType.ts
 models/MarketQuote.ts
 models/MarketSummary.ts

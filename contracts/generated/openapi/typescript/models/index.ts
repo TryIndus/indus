@@ -16,6 +16,8 @@ export * from './FieldError';
 export * from './Fundamentals';
 export * from './FundamentalsMetricsValue';
 export * from './Health';
+export * from './InstrumentSearchPage';
+export * from './InstrumentSearchResult';
 export * from './InstrumentType';
 export * from './MarketQuote';
 export * from './MarketSummary';
