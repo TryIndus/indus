@@ -33,7 +33,8 @@ This is the target architecture, not a description of the current repository. Do
 | Historical market data | Partitioned PostgreSQL tables in Amazon Aurora PostgreSQL |
 | Cache and job queues | Amazon ElastiCache for Redis |
 | Event backbone | Amazon MSK Serverless with Apache Kafka |
-| Models | Application-owned `ModelGateway` with a Google Gemini adapter using the official Google Gen AI SDK/API |
+| Financial data | Alpaca for live and historical market data; a provider boundary for fundamentals with temporary Yahoo Finance compatibility |
+| Models | Application-owned `ModelGateway` with a Google Gemini adapter using the official Gemini REST API |
 | Object storage | Amazon S3 for generated reports, exports, raw events, and audit artifacts |
 | Identity | Amazon Cognito using OAuth 2.0/OIDC, JWTs, MFA, and scoped roles |
 | Containers | Amazon EKS, Amazon ECR, Kubernetes, Helm |
@@ -55,6 +56,7 @@ Ruby on Rails replaces the previously proposed Go platform API. Adding both Rail
 - Uses generated API clients from the Rails OpenAPI contract.
 - Uses TanStack Query for remote state and a small local store only for ephemeral UI state.
 - Connects directly to the Rust streaming endpoint for live market updates.
+- Uses an authenticated fetch-based SSE client so Cognito access tokens remain in headers rather than URLs.
 - Builds to static assets stored in S3 and distributed through CloudFront.
 - Contains no provider credentials or business authorization rules.
 
@@ -64,6 +66,7 @@ Ruby on Rails replaces the previously proposed Go platform API. Adding both Rail
 - Validates Cognito JWTs and applies resource authorization with Pundit.
 - Owns the public REST API and publishes its OpenAPI contract.
 - Uses Active Record migrations and database constraints for persistent invariants.
+- Owns the fundamentals-provider boundary and preserves current Yahoo Finance behavior only through a temporary compatibility path until its replacement adapter passes shadow verification.
 - Coordinates normal asynchronous work with Sidekiq.
 - Starts and observes durable report workflows through Temporal.
 - Publishes domain events through an outbox table to avoid database/Kafka dual-write loss.
@@ -74,7 +77,7 @@ Ruby on Rails replaces the previously proposed Go platform API. Adding both Rail
 - Maintains upstream Alpaca WebSocket connections and bounded REST backfills.
 - Normalizes provider payloads into versioned internal events.
 - Publishes normalized events to Kafka; a bounded consumer writes historical bars and feed measurements to partitioned Aurora PostgreSQL tables.
-- Fans live updates out to browsers through authenticated SSE endpoints.
+- Fans live updates out to browsers through authenticated SSE endpoints and rejects credentials supplied in query strings.
 - Implements backpressure, reconnection with jitter, heartbeat monitoring, stale-feed detection, and graceful shutdown.
 - Exposes health, readiness, metrics, and trace endpoints.
 - Does not own users, portfolios, reports, or authorization policy.
@@ -93,7 +96,7 @@ Ruby on Rails replaces the previously proposed Go platform API. Adding both Rail
 
 `ModelGateway` is an application-owned interface, not an external model-routing product. Rails and Temporal activities call it with a task, prompt version, messages, tool definitions, and an output schema. The gateway normalizes responses, usage metadata, errors, timeouts, and tracing so product code does not depend on Gemini request or response objects.
 
-The first adapter uses Google Gemini exclusively through Google's official Gen AI SDK/API. The personal Gemini API token is stored as a secure value in AWS Secrets Manager, injected only into the authorized server-side workload through workload identity, and never committed, placed in Terraform state, logged, or sent to the browser.
+The first adapter uses Google Gemini exclusively through Google's official REST API. Rails does not depend on a language SDK that Google does not officially support. The personal Gemini API token is stored as a secure value in AWS Secrets Manager, injected only into the authorized server-side workload through workload identity, and never committed, placed in Terraform state, logged, or sent to the browser.
 
 Keep model selection separate from the API token and configurable per task, for example chat, explanations, and reports. Prompt templates, tool contracts, and structured output schemas remain in an application-owned versioned catalog. A future model provider is introduced by adding another adapter and mapping the common contracts; no provider switch occurs without golden evaluations and a canary rollout because prompts and tool behavior are not perfectly portable between models.
 
@@ -129,7 +132,7 @@ Store immutable report artifacts, data exports, raw ingestion samples used for r
 
 - Version public endpoints under `/v1` and publish OpenAPI documentation.
 - Use cursor pagination, idempotency keys for retried writes, bounded request bodies, and consistent error envelopes.
-- Authenticate at the edge and authorize every resource in Rails; authentication alone is insufficient.
+- Authenticate with Cognito, validate tokens at every Rails or Rust trust boundary, and authorize every resource in Rails; authentication alone is insufficient.
 - Keep provider keys in Secrets Manager and expose them only to the owning workload through IAM roles. Store the personal Gemini API token there as a manually supplied secret value, not in source code or Terraform state.
 - Encrypt traffic in transit and data at rest with managed KMS keys.
 - Apply WAF rules, rate limits, request timeouts, and maximum stream counts.
@@ -157,7 +160,7 @@ All services must emit structured logs, OpenTelemetry traces, RED metrics, depen
 - Keep managed stateful services outside the cluster: Aurora, ElastiCache, MSK, and S3.
 - Use ECR for images and Argo CD for declarative cluster reconciliation.
 - Use GitHub Actions only to verify changes, build and sign images, publish artifacts, and update GitOps references.
-- Use CloudFront for the React application and route API/stream traffic through WAF and an Application Load Balancer.
+- Use CloudFront as the single public origin: serve React assets from S3 and route `/api/*` to Rails and `/stream/*` to Rust through WAF and an Application Load Balancer.
 - Back up Aurora, version critical S3 buckets, test restore procedures, and document regional recovery objectives.
 
 ## Repository Direction
@@ -226,11 +229,11 @@ The application-foundation and AWS-platform stacks may proceed independently aft
 
 ## Migration Roadmap
 
-Each phase ships through a separate PR. Do not start the next phase until the current phase's acceptance criteria pass in staging.
+Each phase ships through one or more PRs in the stacks above. Do not start a dependent phase until the required lower PRs have merged and the current phase's acceptance criteria pass in staging.
 
 ### Phase 0: Architecture Baseline
 
-- Record architecture decisions for Rails, Rust, Kafka, Temporal, Cognito, Aurora, EKS, Gemini, and the application-owned model gateway.
+- Record architecture decisions for Rails, Rust, Kafka, Temporal, Cognito, Aurora, EKS, Gemini, the application-owned model gateway, and the post-compatibility fundamentals provider.
 - Define service ownership, API/event contracts, SLOs, data classification, threat model, and cutover metrics.
 - Capture current behavior with contract and browser characterization tests.
 - Inventory current Supabase data, identities, provider integrations, and operational dependencies.
@@ -255,11 +258,26 @@ Acceptance criteria:
 - No long-lived AWS credentials exist in GitHub.
 - Rollback to a prior image is tested.
 
-### Phase 2: Rails Platform API
+### Phase 2: Application Foundation
+
+- Create the monorepo directories without moving or breaking the production Next.js application.
+- Scaffold React/Vite, Rails API, Rust, and Temporal worker applications with health checks and language-native verification.
+- Add generated-contract workflows and local orchestration for PostgreSQL, Redis, Kafka, and Temporal.
+- Keep new services dormant and excluded from current Vercel runtime paths until their cutover phase.
+
+Acceptance criteria:
+
+- The existing application still builds, tests, and deploys without depending on unfinished services.
+- Every new application has a reproducible local start command and passing health check.
+- Contract generation is deterministic and detects stale generated clients.
+- Local orchestration starts from documented commands without production credentials.
+
+### Phase 3: Rails Platform API
 
 - Create the Rails API with PostgreSQL, RSpec, Pundit, OpenAPI, structured logging, and OpenTelemetry.
 - Model favorites, portfolios, reports, audit events, idempotency keys, and the transactional outbox.
 - Implement Cognito JWT verification behind a temporary compatibility boundary.
+- Define the Rails fundamentals-provider interface and shadow it against the current Yahoo Finance behavior before removing compatibility code.
 - Add Sidekiq for bounded background work.
 - Shadow current read behavior before moving writes.
 
@@ -269,7 +287,7 @@ Acceptance criteria:
 - Tenant-boundary tests prove cross-user access is denied.
 - Shadow-read differences are measured and resolved.
 
-### Phase 3: React Application Extraction
+### Phase 4: React Application Extraction
 
 - Create the Vite React application and generated Rails API client.
 - Migrate authentication, dashboard, search, company, crypto, reports, and settings incrementally.
@@ -282,7 +300,7 @@ Acceptance criteria:
 - Accessibility and performance budgets do not regress.
 - No server secret is included in browser bundles.
 
-### Phase 4: Identity and Transactional Data Migration
+### Phase 5: Identity and Transactional Data Migration
 
 - Configure Cognito OAuth/OIDC, MFA policy, token lifetimes, and role claims.
 - Provision Aurora PostgreSQL and RDS Proxy.
@@ -296,11 +314,11 @@ Acceptance criteria:
 - Authentication, revocation, and account recovery work end to end.
 - A rehearsed rollback preserves writes and identity consistency.
 
-### Phase 5: Rust Market Data Platform
+### Phase 6: Rust Market Data Platform
 
 - Implement Alpaca adapters, normalized schemas, Kafka publishing, backfills, and partitioned Aurora PostgreSQL persistence.
 - Add retention, archival, indexing, and query-plan tests for historical market tables before considering a specialized datastore.
-- Add authenticated SSE fan-out with connection quotas and backpressure.
+- Add authenticated fetch-based SSE fan-out with bearer-token validation, connection quotas, backpressure, and no credentials in URLs.
 - Replay captured provider fixtures and test disconnect, duplication, reordering, and stale-feed scenarios.
 - Move the React application from Next.js streaming routes to the Rust endpoint.
 
@@ -310,15 +328,15 @@ Acceptance criteria:
 - Chaos tests demonstrate recovery without silent event loss.
 - Every market event is traceable from provider receipt to client delivery.
 
-### Phase 6: Gemini Research Workflows
+### Phase 7: Gemini Research Workflows
 
 - Create `ModelGateway` with provider-neutral request, response, tool, error, usage, and tracing contracts.
-- Implement the Gemini adapter through Google's supported API/SDK using the personal API token supplied by AWS Secrets Manager.
+- Implement the Gemini adapter through Google's official REST API using the personal API token supplied by AWS Secrets Manager.
 - Configure model identifiers independently for chat, explanations, and reports without coupling prompts to model names.
 - Define versioned prompts, structured outputs, allowlisted tools, safety settings, quotas, and evaluation datasets outside the adapter.
 - Implement Temporal report workflows with idempotent activities and cancellation.
 - Store artifacts in S3 and source metadata in Aurora.
-- Migrate explanation, chat, and report behavior without introducing Bedrock.
+- Migrate explanation, chat, and report behavior through `ModelGateway` without changing the selected provider.
 
 Acceptance criteria:
 
@@ -328,7 +346,7 @@ Acceptance criteria:
 - Reports retain citations and data timestamps.
 - Retries cannot duplicate reports or quota charges.
 
-### Phase 7: Production Hardening
+### Phase 8: Production Hardening
 
 - Complete dashboards, alerts, runbooks, on-call exercises, capacity tests, backup restoration, and disaster-recovery rehearsal.
 - Enforce WAF, network policies, workload identity, admission policies, vulnerability thresholds, and signed images.
@@ -340,7 +358,7 @@ Acceptance criteria:
 - Restore and rollback exercises meet documented objectives.
 - No unresolved critical security finding remains.
 
-### Phase 8: Cutover and Decommissioning
+### Phase 9: Cutover and Decommissioning
 
 - Freeze incompatible schema changes during the final migration window.
 - Perform final data synchronization and reconciliation.
