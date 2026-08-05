@@ -34,7 +34,7 @@ Never implement a future revamp phase merely because it appears in the plan. Sta
 - Stage minor amendments without a standalone commit unless the user requested a completed PR or push.
 - Never amend, rewrite, or force-push history unless explicitly requested.
 - Do not include coding-assistant attribution, co-author tags, or generated-by language in commits or PR metadata. Product terms such as Gemini or model-assisted features are allowed when technically relevant.
-- Open a PR only when explicitly requested. Target `main` and state scope, verification, migration impact, rollback, and deferred work.
+- Open a PR only when explicitly requested. Standalone and bottom-of-stack PRs target `main`; in an explicitly approved stack, each child PR targets its immediate parent and declares the dependency. State scope, verification, migration impact, rollback, and deferred work.
 
 ### Verification
 
