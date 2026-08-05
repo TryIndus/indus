@@ -28,7 +28,18 @@ class UnconfiguredAuthAdapter implements AuthAdapter {
   async accessToken() { return null }
 }
 
+const E2E_AUTH_KEY = 'indus:e2e-auth'
+const browserStorage = () => globalThis.window?.localStorage
+
+class E2eAuthAdapter implements AuthAdapter {
+  async getUser() { return browserStorage()?.getItem(E2E_AUTH_KEY) === 'true' ? { id: 'e2e-user', email: 'investor@example.test' } : null }
+  async signIn() { browserStorage()?.setItem(E2E_AUTH_KEY, 'true') }
+  async signOut() { browserStorage()?.removeItem(E2E_AUTH_KEY) }
+  async accessToken() { return browserStorage()?.getItem(E2E_AUTH_KEY) === 'true' ? 'e2e-access-token' : null }
+}
+
 export function createAuthAdapter(): AuthAdapter {
+  if (import.meta.env.VITE_E2E_AUTH === 'true') return new E2eAuthAdapter()
   const url = import.meta.env.VITE_SUPABASE_URL
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY
   return url && key ? new SupabaseAuthAdapter(createClient(url, key)) : new UnconfiguredAuthAdapter()

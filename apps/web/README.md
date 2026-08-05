@@ -31,7 +31,7 @@ bun run build
 bun run test:e2e
 ```
 
-The browser suite verifies anonymous fail-closed routing, serious accessibility rules, responsive browser profiles, and a local shell-load budget. Authenticated end-to-end journeys require a disposable test account and will be added when the Rails compatibility API is available; unit routing tests already exercise authenticated route rendering through the injected identity boundary.
+The browser suite verifies anonymous fail-closed routing, authenticated dashboard and navigation journeys, serious accessibility rules, Chromium, Firefox, WebKit and mobile profiles, and a local shell-load budget. Its web server is compiled with `VITE_E2E_AUTH=true`; test contexts must additionally opt in through a local-storage marker. Builds without that explicit flag cannot select the test identity adapter, and the unit suite verifies that unconfigured normal builds remain fail-closed. The Rails summary request is intercepted with schema-valid fixture data until the compatibility API is available.
 
 ## Failure behavior
 
