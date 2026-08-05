@@ -10,6 +10,7 @@ use axum::{
 use serde::Serialize;
 use tokio::{sync::broadcast, time};
 use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::trace::TraceLayer;
 
 use crate::{
     auth::{AuthError, Authenticate},
@@ -50,6 +51,7 @@ pub fn router(state: AppState, allowed_origins: &[String]) -> Result<Router, htt
         .route("/health/ready", get(readiness))
         .route("/metrics", get(metrics))
         .route("/v1/streams/{symbol}", get(stream))
+        .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state))
 }
@@ -60,7 +62,10 @@ async fn liveness(State(state): State<AppState>) -> impl IntoResponse {
     } else {
         StatusCode::SERVICE_UNAVAILABLE
     };
-    (status, Json(serde_json::json!({"status": status.as_str()})))
+    (
+        status,
+        Json(serde_json::json!({"status": if status.is_success() { "ok" } else { "stopping" }})),
+    )
 }
 
 async fn readiness(State(state): State<AppState>) -> impl IntoResponse {
@@ -271,12 +276,90 @@ impl IntoResponse for ApiError {
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
+    use axum::{body::Body, http::Request};
+    use tower::ServiceExt;
+
     use super::*;
+    use crate::{
+        auth::Principal,
+        metrics::Metrics,
+        streaming::{StreamHub, StreamLimits},
+    };
+
+    struct StubAuth(bool);
+
+    #[async_trait]
+    impl Authenticate for StubAuth {
+        async fn authenticate(&self, _headers: &HeaderMap) -> Result<Principal, AuthError> {
+            self.0
+                .then(|| Principal {
+                    subject: "user-1".into(),
+                })
+                .ok_or(AuthError::Invalid)
+        }
+    }
 
     #[test]
     fn query_credentials_are_rejected_case_insensitively() {
         assert!(query_contains_credentials(Some("access_token=secret")));
         assert!(query_contains_credentials(Some("JWT=secret")));
         assert!(!query_contains_credentials(Some("interval=1m")));
+    }
+
+    #[tokio::test]
+    async fn stream_route_rejects_query_credentials_before_authentication() {
+        let response = test_router(true)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/streams/AAPL?access_token=secret")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn stream_route_enforces_auth_and_returns_sse_only_after_success() {
+        let unauthorized = test_router(false)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/streams/AAPL")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(unauthorized.status(), StatusCode::UNAUTHORIZED);
+
+        let authenticated = test_router(true)
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/streams/BTC%2FUSD")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(authenticated.status(), StatusCode::OK);
+        assert_eq!(
+            authenticated.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/event-stream"
+        );
+    }
+
+    fn test_router(authorized: bool) -> Router {
+        let metrics = Metrics::new().unwrap();
+        let state = AppState {
+            authenticator: Arc::new(StubAuth(authorized)),
+            hub: Arc::new(StreamHub::new(4, 4, std::time::Duration::from_secs(30))),
+            limits: StreamLimits::new(2, 10, metrics.clone()),
+            health: Arc::new(ServiceHealth::default()),
+            metrics,
+            heartbeat: std::time::Duration::from_secs(15),
+        };
+        router(state, &["http://localhost".into()]).unwrap()
     }
 }

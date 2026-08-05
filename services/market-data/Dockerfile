@@ -13,7 +13,7 @@ RUN cargo build --locked --release
 FROM debian:bookworm-slim
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends ca-certificates \
+    && apt-get install --yes --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --no-create-home indus
 
@@ -21,4 +21,6 @@ COPY --from=build /workspace/target/release/indus-market-data /usr/local/bin/ind
 
 USER 10001
 EXPOSE 8081
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+  CMD ["curl", "--fail", "--silent", "http://127.0.0.1:8081/health/ready"]
 ENTRYPOINT ["indus-market-data"]

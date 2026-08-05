@@ -54,6 +54,16 @@ impl PostgresStore {
         Ok(())
     }
 
+    pub async fn has_consumed_event(&self, event_id: Uuid) -> Result<bool, StoreError> {
+        let exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS (SELECT 1 FROM market_data.consumed_events WHERE event_id = $1)",
+        )
+        .bind(event_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(exists)
+    }
+
     pub async fn run_retention(&self, retention_days: u32) -> Result<(), StoreError> {
         sqlx::query("SELECT market_data.ensure_monthly_partitions(2)")
             .execute(&self.pool)

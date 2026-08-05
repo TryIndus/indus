@@ -19,6 +19,7 @@ use crate::{
         to_timestamp,
     },
     health::ServiceHealth,
+    metrics::Metrics,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -132,6 +133,7 @@ pub async fn run(
     config: AlpacaConfig,
     tx: mpsc::Sender<NormalizedEvent>,
     health: Arc<ServiceHealth>,
+    metrics: Metrics,
     shutdown: watch::Receiver<bool>,
 ) -> Result<(), ProviderError> {
     if !config.enabled {
@@ -166,6 +168,7 @@ pub async fn run(
             secret.clone(),
             tx.clone(),
             health.clone(),
+            metrics.clone(),
             shutdown.clone(),
         )));
     }
@@ -178,6 +181,7 @@ pub async fn run(
             secret,
             tx,
             health,
+            metrics,
             shutdown,
         )));
     }
@@ -198,6 +202,7 @@ async fn run_feed(
     secret: String,
     tx: mpsc::Sender<NormalizedEvent>,
     health: Arc<ServiceHealth>,
+    metrics: Metrics,
     mut shutdown: watch::Receiver<bool>,
 ) -> Result<(), ProviderError> {
     let mut attempt = 0_u32;
@@ -222,6 +227,7 @@ async fn run_feed(
             Err(error) => warn!(?feed, %error, "upstream feed failed"),
         }
         health.set_upstream_connected(false);
+        metrics.upstream_reconnects.inc();
         attempt = attempt.saturating_add(1).min(6);
         let base_ms = 250_u64.saturating_mul(1_u64 << attempt);
         let jitter_ms = rand::rng().random_range(0..=base_ms / 2);

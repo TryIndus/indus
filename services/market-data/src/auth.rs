@@ -58,8 +58,21 @@ enum AuthMode {
 impl JwtAuthenticator {
     pub async fn new(config: &AuthConfig) -> Result<Self, AuthError> {
         let mode = if let Some(secret) = &config.hs256_secret {
+            if secret.len() < 32 {
+                return Err(AuthError::Configuration(
+                    "HS256 verification secret must contain at least 32 bytes".into(),
+                ));
+            }
             AuthMode::Hmac(DecodingKey::from_secret(secret.as_bytes()))
         } else if let Some(url) = &config.jwks_url {
+            let parsed = reqwest::Url::parse(url)
+                .map_err(|error| AuthError::Configuration(error.to_string()))?;
+            let local = matches!(parsed.host_str(), Some("127.0.0.1" | "localhost" | "::1"));
+            if parsed.scheme() != "https" && !local {
+                return Err(AuthError::Configuration(
+                    "JWKS URL must use HTTPS outside loopback development".into(),
+                ));
+            }
             let client = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(5))
                 .build()

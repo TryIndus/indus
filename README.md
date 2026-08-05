@@ -92,6 +92,8 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 |---|---|
 | [Quality and Security Verification](./docs/QUALITY.md) | Security boundaries, local verification layers, budgets, and troubleshooting |
 | [Revamp Plan](./docs/REVAMP_PLAN.md) | In-progress application modernization plan retained during the revamp |
+| [Market Data Architecture](./docs/architecture/market-data.md) | Phase 3 ingestion, event delivery, persistence, streaming, and AWS compatibility |
+| [Market Data Runbook](./docs/runbooks/market-data.md) | Local startup, replay, failure response, retention, and rollback |
 
 ## Features
 

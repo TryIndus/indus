@@ -67,6 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.alpaca.clone(),
         event_tx,
         health.clone(),
+        metrics.clone(),
         shutdown_rx.clone(),
     ));
     let consumer_store = store.clone();
