@@ -3,6 +3,7 @@
 export * from './FavoritesApi';
 export * from './FundamentalsApi';
 export * from './IdentityApi';
+export * from './MarketApi';
 export * from './ModelsApi';
 export * from './OperationsApi';
 export * from './PortfoliosApi';

@@ -1,6 +1,7 @@
 apis/FavoritesApi.ts
 apis/FundamentalsApi.ts
 apis/IdentityApi.ts
+apis/MarketApi.ts
 apis/ModelsApi.ts
 apis/OperationsApi.ts
 apis/PortfoliosApi.ts
@@ -26,6 +27,9 @@ docs/FundamentalsMetricsValue.md
 docs/Health.md
 docs/IdentityApi.md
 docs/InstrumentType.md
+docs/MarketApi.md
+docs/MarketQuote.md
+docs/MarketSummary.md
 docs/MetricExplanation.md
 docs/ModelUsage.md
 docs/ModelsApi.md
@@ -48,6 +52,7 @@ docs/UpdatePortfolioRequest.md
 docs/UpdatePositionRequest.md
 docs/UpdateUserRequest.md
 docs/User.md
+docs/WatchlistQuote.md
 index.ts
 models/ChatMessage.ts
 models/ChatRequest.ts
@@ -66,6 +71,8 @@ models/Fundamentals.ts
 models/FundamentalsMetricsValue.ts
 models/Health.ts
 models/InstrumentType.ts
+models/MarketQuote.ts
+models/MarketSummary.ts
 models/MetricExplanation.ts
 models/ModelUsage.ts
 models/PageMetadata.ts
@@ -84,5 +91,6 @@ models/UpdatePortfolioRequest.ts
 models/UpdatePositionRequest.ts
 models/UpdateUserRequest.ts
 models/User.ts
+models/WatchlistQuote.ts
 models/index.ts
 runtime.ts
