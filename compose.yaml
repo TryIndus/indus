@@ -66,6 +66,17 @@ services:
       redpanda:
         condition: service_healthy
 
+  market-data-migrate:
+    profiles: ["distributed"]
+    build:
+      context: ./services/market-data
+    command: ["migrate"]
+    environment:
+      DATABASE_URL: postgres://indus:indus-local-password@postgres:5432/indus_development
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   market-data:
     profiles: ["distributed"]
     build:
@@ -92,6 +103,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      market-data-migrate:
+        condition: service_completed_successfully
       redpanda-init:
         condition: service_completed_successfully
 

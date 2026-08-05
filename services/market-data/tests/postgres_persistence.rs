@@ -11,6 +11,7 @@ async fn duplicate_reordered_and_unsupported_events_are_explicit() {
         eprintln!("skipping PostgreSQL integration test: TEST_DATABASE_URL is unset");
         return;
     };
+    PostgresStore::migrate(&database_url).await.unwrap();
     let store = PostgresStore::connect(&database_url).await.unwrap();
     let mut events = parse_message(
         include_str!("fixtures/alpaca_equity.json"),

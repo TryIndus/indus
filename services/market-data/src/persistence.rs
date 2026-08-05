@@ -45,8 +45,19 @@ impl PostgresStore {
             .acquire_timeout(std::time::Duration::from_secs(5))
             .connect(database_url)
             .await?;
-        sqlx::migrate!().run(&pool).await?;
         Ok(Self { pool })
+    }
+
+    pub async fn migrate(database_url: &str) -> Result<(), StoreError> {
+        let pool = PgPoolOptions::new()
+            .min_connections(0)
+            .max_connections(1)
+            .acquire_timeout(std::time::Duration::from_secs(10))
+            .connect(database_url)
+            .await?;
+        sqlx::migrate!().run(&pool).await?;
+        pool.close().await;
+        Ok(())
     }
 
     pub async fn ping(&self) -> Result<(), StoreError> {

@@ -10,22 +10,36 @@ Required objects:
 
 | Secret | Required JSON keys |
 |---|---|
-| `indus-<env>/database-proxy` | `username`, `password` for the least-privilege `indus_app` database role |
-| `indus-<env>/platform-api` | `DATABASE_URL`, `SECRET_KEY_BASE`, `GEMINI_API_KEY` |
-| `indus-<env>/market-data` | `DATABASE_URL`, `ALPACA_API_KEY`, `ALPACA_SECRET_KEY` |
-| `indus-<env>/research-worker` | `DATABASE_URL`, `GEMINI_API_KEY`, `TEMPORAL_API_KEY` |
+| `indus-<env>/database-platform` | `username`, `password` for `indus_platform` |
+| `indus-<env>/database-market` | `username`, `password` for `indus_market_writer` |
+| `indus-<env>/database-migration` | `username`, `password`, `DATABASE_URL` for `indus_migrator` |
+| `indus-<env>/platform-api` | `DATABASE_URL` using `indus_platform`, plus `SECRET_KEY_BASE`, `GEMINI_API_KEY` |
+| `indus-<env>/market-data` | `DATABASE_URL` using `indus_market_writer`, plus `ALPACA_API_KEY`, `ALPACA_SECRET_KEY` |
+| `indus-<env>/research-worker` | `DATABASE_URL` using `indus_platform`, plus `GEMINI_API_KEY`, `TEMPORAL_API_KEY` |
 
-`DATABASE_URL` points at RDS Proxy with TLS verification and the same
-`indus_app` credential held by the proxy secret. Rails currently uses a static
-database password; it does not refresh RDS IAM tokens. Rotate by creating the
-new database credential, updating both proxy and workload secret versions,
-waiting for proxy readiness, and restarting Rails/worker deployments through a
-reviewed GitOps annotation change. Keep the prior version staged until all
-connections and jobs are healthy, then revoke it. Kafka credentials are never
-stored: Rails and Rust refresh MSK IAM tokens from IRSA. Redis credentials are
-also never stored in AWS environments: platform-api and Sidekiq sign
-short-lived ElastiCache connection tokens from their own IRSA roles. The cache
-endpoint, cache name, port, and IAM user ID are non-secret GitOps values.
+Every `DATABASE_URL` points at RDS Proxy with `sslmode=require`. Runtime URLs
+must use the credential assigned to that workload family; the market writer
+must never receive a platform URL. The migration URL uses `indus_migrator` and
+is visible only to the `database-migrator` service account. Helm supplies
+an owner role plus `search_path=public,pg_catalog` to the Rails migration job
+and `search_path=market_data,pg_catalog` to the Rust migration job. This keeps
+SQLx migration history in the market schema. Never put an owner role in a
+runtime URL.
+
+Rails and Rust use static database passwords and do not refresh RDS IAM tokens.
+Rotate one identity at a time: generate a new value in a protected JSON file,
+run the reviewed role-bootstrap command, update the corresponding proxy and
+runtime secret versions, wait for proxy readiness, and restart only the owning
+deployments through GitOps. Keep the prior secret versions staged until new
+connections and jobs are healthy. The migration identity is rotated separately
+and is not deployed outside hook jobs. Re-run the read-only database boundary
+verifier after every database credential rotation. Kafka credentials are never
+stored: Rails and Rust refresh MSK IAM tokens from workload identity.
+
+Redis credentials are also never stored in AWS environments: platform-api and
+Sidekiq sign short-lived ElastiCache connection tokens from their own IRSA
+roles. The cache endpoint, cache name, port, and IAM user ID are non-secret
+GitOps values.
 
 Gemini rotation: add a new provider key, update both authorized secrets,
 restart API and research workers, run one synthetic model evaluation, then

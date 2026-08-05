@@ -28,8 +28,25 @@
       "additionalProperties": { "type": "string", "pattern": "@sha256:[a-f0-9]{64}$" },
       "required": ["platformApi", "marketData", "researchWorker", "web"]
     },
-    "roles": { "type": "object" },
-    "secrets": { "type": "object" },
+    "roles": {
+      "type": "object",
+      "required": [
+        "platformApi",
+        "sidekiq",
+        "platformOutbox",
+        "reportsConsumer",
+        "marketData",
+        "researchWorker",
+        "databaseMigrator",
+        "webPublisher"
+      ],
+      "additionalProperties": { "type": "string", "pattern": "^arn:aws[a-z-]*:iam::[0-9]{12}:role/" }
+    },
+    "secrets": {
+      "type": "object",
+      "required": ["platformApi", "marketData", "researchWorker", "databaseMigration"],
+      "additionalProperties": { "type": "string", "pattern": "^arn:aws[a-z-]*:secretsmanager:" }
+    },
     "config": {
       "type": "object",
       "required": ["redisEndpoint", "redisPort", "redisCacheName", "redisUser"],

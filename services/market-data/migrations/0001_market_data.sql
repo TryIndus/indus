@@ -76,7 +76,7 @@ CREATE TABLE market_data.feed_measurements_default PARTITION OF market_data.feed
 CREATE OR REPLACE FUNCTION market_data.ensure_monthly_partitions(months_ahead integer DEFAULT 2)
 RETURNS void
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = pg_catalog, market_data
 AS $$
 DECLARE
@@ -105,7 +105,7 @@ $$;
 CREATE OR REPLACE FUNCTION market_data.apply_retention(retention_days integer)
 RETURNS void
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = pg_catalog, market_data
 AS $$
 BEGIN

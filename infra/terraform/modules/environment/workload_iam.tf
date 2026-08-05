@@ -1,17 +1,37 @@
 locals {
   workload_service_accounts = {
-    platform_api     = "indus/platform-api"
-    sidekiq          = "indus/sidekiq"
-    platform_outbox  = "indus/platform-outbox"
-    reports_consumer = "indus/reports-consumer"
-    research_worker  = "indus/research-worker"
-    market_data      = "indus/market-data"
-    web_publisher    = "indus/web-publisher"
-    otel_collector   = "observability/otel-collector"
-    load_balancer    = "kube-system/aws-load-balancer-controller"
+    platform_api      = "indus/platform-api"
+    sidekiq           = "indus/sidekiq"
+    platform_outbox   = "indus/platform-outbox"
+    reports_consumer  = "indus/reports-consumer"
+    research_worker   = "indus/research-worker"
+    market_data       = "indus/market-data"
+    database_migrator = "indus/database-migrator"
+    web_publisher     = "indus/web-publisher"
+    otel_collector    = "observability/otel-collector"
+    load_balancer     = "kube-system/aws-load-balancer-controller"
   }
 
   oidc_provider_host = replace(aws_iam_openid_connect_provider.eks.url, "https://", "")
+}
+
+data "aws_iam_policy_document" "database_migrator" {
+  statement {
+    sid       = "ReadMigrationDatabaseSecret"
+    actions   = ["secretsmanager:DescribeSecret", "secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.workload["database_migration"].arn]
+  }
+  statement {
+    sid       = "DecryptMigrationDatabaseSecret"
+    actions   = ["kms:Decrypt", "kms:DescribeKey"]
+    resources = [aws_kms_key.data.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "database_migrator" {
+  name   = "database-migration"
+  role   = aws_iam_role.workload["database_migrator"].id
+  policy = data.aws_iam_policy_document.database_migrator.json
 }
 
 data "aws_iam_policy_document" "workload_assume" {

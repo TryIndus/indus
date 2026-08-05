@@ -26,12 +26,14 @@ roles:
   reportsConsumer: arn:aws:iam::000000000000:role/replace-reports-consumer
   marketData: arn:aws:iam::000000000000:role/replace-market-data
   researchWorker: arn:aws:iam::000000000000:role/replace-research-worker
+  databaseMigrator: arn:aws:iam::000000000000:role/replace-database-migrator
   webPublisher: arn:aws:iam::000000000000:role/replace-web-publisher
 
 secrets:
   platformApi: arn:aws:secretsmanager:ca-central-1:000000000000:secret:replace-platform-api
   marketData: arn:aws:secretsmanager:ca-central-1:000000000000:secret:replace-market-data
   researchWorker: arn:aws:secretsmanager:ca-central-1:000000000000:secret:replace-research-worker
+  databaseMigration: arn:aws:secretsmanager:ca-central-1:000000000000:secret:replace-database-migration
 
 config:
   rdsProxyEndpoint: replace.proxy.ca-central-1.rds.amazonaws.com

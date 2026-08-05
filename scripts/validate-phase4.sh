@@ -65,9 +65,30 @@ ruby -e '
     projected = documents.select { |doc| doc["kind"] == "SecretProviderClass" }
       .flat_map { |doc| doc.dig("spec", "secretObjects", 0, "data") || [] }
     abort "#{file} still projects REDIS_URL" if projected.any? { |item| item["key"] == "REDIS_URL" }
+
+    jobs = documents.select { |document| document["kind"] == "Job" }
+    migrations = jobs.select { |job| job.dig("metadata", "name")&.include?("database-migrate") }
+    abort "#{file} must render separate platform and market migration jobs" unless migrations.length == 2
+    migrations.each do |job|
+      spec = job.dig("spec", "template", "spec")
+      abort "#{file} migration job bypasses the migration service account" unless spec["serviceAccountName"] == "database-migrator"
+      container = spec.fetch("containers").first
+      role_option = container.fetch("env").find { |entry| entry["name"] == "PGOPTIONS" }&.fetch("value", nil)
+      expected = [
+        "-c role=indus_platform_owner -c search_path=public,pg_catalog",
+        "-c role=indus_market_owner -c search_path=market_data,pg_catalog"
+      ]
+      abort "#{file} migration job has no explicit owner role and schema" unless expected.include?(role_option)
+    end
   end
 ' "$render_dir"/platform-*.yaml
 
+for required_role in indus_platform indus_market_writer indus_migrator indus_platform_owner indus_market_owner; do
+  rg -q "${required_role}" scripts/aws/database-roles.sql
+done
+rg -q 'database_platform' infra/terraform/modules/environment/data.tf infra/terraform/modules/environment/locals.tf
+rg -q 'database_market' infra/terraform/modules/environment/data.tf infra/terraform/modules/environment/locals.tf
+rg -q 'database_migration' infra/terraform/modules/environment/data.tf infra/terraform/modules/environment/locals.tf
 ruby -e '
   require "yaml"
   Dir["infra/gitops/**/*.{yaml,yml}"].each do |file|

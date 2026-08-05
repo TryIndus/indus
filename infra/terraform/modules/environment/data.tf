@@ -157,7 +157,7 @@ resource "aws_iam_role" "rds_proxy" {
 data "aws_iam_policy_document" "rds_proxy" {
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.workload["database_proxy"].arn]
+    resources = [for key in local.rds_proxy_secret_keys : aws_secretsmanager_secret.workload[key].arn]
   }
   statement {
     actions   = ["kms:Decrypt"]
@@ -186,10 +186,14 @@ resource "aws_db_proxy" "this" {
   idle_client_timeout    = 1800
   debug_logging          = false
 
-  auth {
-    auth_scheme = "SECRETS"
-    iam_auth    = "DISABLED"
-    secret_arn  = aws_secretsmanager_secret.workload["database_proxy"].arn
+  dynamic "auth" {
+    for_each = local.rds_proxy_secret_keys
+
+    content {
+      auth_scheme = "SECRETS"
+      iam_auth    = "DISABLED"
+      secret_arn  = aws_secretsmanager_secret.workload[auth.value].arn
+    }
   }
 
   tags = local.common_tags

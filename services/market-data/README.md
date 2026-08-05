@@ -36,3 +36,9 @@ bash scripts/verify-market-data.sh
 ```
 
 Without Docker this still runs formatting, Clippy, fixture/replay, authentication, backpressure, reconnect, stale-feed, and load-boundary tests. With Docker it also runs the real PostgreSQL migration/persistence test, initializes local Kafka topics, and builds the production image.
+
+In AWS, the runtime uses the DML-only `indus_market_writer` credential and does
+not run migrations at startup. The Argo migration hook invokes
+`indus-market-data migrate` with the migration-only credential while assuming
+`indus_market_owner`. Local integration tests still invoke the migration entry
+point explicitly before persistence assertions.

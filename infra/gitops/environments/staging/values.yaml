@@ -15,11 +15,13 @@ roles:
   reportsConsumer: arn:aws:iam::333333333333:role/indus-staging-reports-consumer
   marketData: arn:aws:iam::333333333333:role/indus-staging-market-data
   researchWorker: arn:aws:iam::333333333333:role/indus-staging-research-worker
+  databaseMigrator: arn:aws:iam::333333333333:role/indus-staging-database-migrator
   webPublisher: arn:aws:iam::333333333333:role/indus-staging-web-publisher
 secrets:
   platformApi: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/platform-api
   marketData: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/market-data
   researchWorker: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/research-worker
+  databaseMigration: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/database-migration
 config:
   rdsProxyEndpoint: replace-staging.proxy.ca-central-1.rds.amazonaws.com
   redisEndpoint: replace-staging.serverless.cac1.cache.amazonaws.com

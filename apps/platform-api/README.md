@@ -53,6 +53,11 @@ has no mounted endpoint or channels and its engine is intentionally not loaded
 by this API-only service. If it is introduced later, its long-lived Redis
 connections must use this same refreshable credential path.
 
+AWS runtime processes connect through RDS Proxy as the DML-only
+`indus_platform` role. They never receive schema-owner membership. The Argo
+migration hook alone reads the `indus_migrator` credential and assumes
+`indus_platform_owner` for the duration of each database connection.
+
 ## Boundaries
 
 Every `/v1` request requires a verified bearer token. The token issuer and audience are fixed by server configuration, and Pundit scopes every tenant-owned query by the internal user identifier. Mutations require an `Idempotency-Key`; the mutation, audit event, and replay response commit in one transaction. Reusing a key with the same request replays the recorded response, while changing the request returns `409`. Reports are created together with an outbox event in that transaction; workers may process that event only after commit. Provider credentials and provider payloads do not cross the API boundary.

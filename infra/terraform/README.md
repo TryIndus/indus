@@ -14,6 +14,12 @@ Manager containers and IAM access boundaries; an operator supplies values with
 `scripts/aws/put-secret.sh` over an audited AWS session. Never pass secret
 values through `-var`, `.tfvars`, plans, outputs, or CI logs.
 
+RDS Proxy has three Secrets Manager auth entries: platform runtime, market
+writer, and migration-only. These are distinct PostgreSQL logins; do not reuse
+one password across containers. Runtime configuration secrets hold the matching
+proxy URLs, while only the migration service account can read the migration
+credential. See `docs/runbooks/database-roles.md` for the staged bootstrap.
+
 Copy the checked-in examples to ignored local files, replace account-specific
 placeholders, and bootstrap in this order:
 

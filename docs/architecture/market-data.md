@@ -16,7 +16,7 @@ This is intentionally at-least-once across Kafka and PostgreSQL. A crash after t
 
 ## Storage and retention
 
-Bars, quotes, and feed measurements are monthly range-partitioned. The service creates the previous, current, and next two monthly partitions during migration and maintenance; the default partitions preserve availability across a missed maintenance window. Symbol/time indexes support bounded historical reads. The market-data writer owns its schema, while public schema and object privileges are revoked.
+Bars, quotes, and feed measurements are monthly range-partitioned. The service creates the previous, current, and next two monthly partitions during migration and maintenance; the default partitions preserve availability across a missed maintenance window. Symbol/time indexes support bounded historical reads. A no-login owner owns the market schema; the runtime writer receives only explicit DML and maintenance-function execution, while public schema and object privileges are revoked. A separate migration login assumes the owner only inside the deployment hook.
 
 Retention runs at startup and daily. Bars and feed measurements follow `MARKET_RETENTION_DAYS`; raw quotes are capped at 30 days. Consumed event identities remain seven days longer to protect the replay boundary. Production archival to S3 must complete before Phase 4 shortens retention or drops an old partition.
 

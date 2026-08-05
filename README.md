@@ -101,6 +101,7 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 | [Migration Rehearsal](./docs/runbooks/migration-rehearsal.md) | Supabase export, Cognito limitations, reconciliation, and rollback |
 | [AWS Bootstrap](./docs/runbooks/aws-bootstrap.md) | Safe account, Terraform, secret, GitOps, and environment bootstrap order |
 | [Migration and Cutover](./docs/runbooks/migration-cutover.md) | Rehearsal gates, gradual traffic movement, abort thresholds, and rollback window |
+| [Database Roles](./docs/runbooks/database-roles.md) | Separate runtime writers, migration ownership, rotation, and isolation verification |
 
 ## Features
 

@@ -17,11 +17,13 @@ roles:
   reportsConsumer: arn:aws:iam::222222222222:role/indus-development-reports-consumer
   marketData: arn:aws:iam::222222222222:role/indus-development-market-data
   researchWorker: arn:aws:iam::222222222222:role/indus-development-research-worker
+  databaseMigrator: arn:aws:iam::222222222222:role/indus-development-database-migrator
   webPublisher: arn:aws:iam::222222222222:role/indus-development-web-publisher
 secrets:
   platformApi: arn:aws:secretsmanager:ca-central-1:222222222222:secret:indus-development/platform-api
   marketData: arn:aws:secretsmanager:ca-central-1:222222222222:secret:indus-development/market-data
   researchWorker: arn:aws:secretsmanager:ca-central-1:222222222222:secret:indus-development/research-worker
+  databaseMigration: arn:aws:secretsmanager:ca-central-1:222222222222:secret:indus-development/database-migration
 config:
   rdsProxyEndpoint: replace-development.proxy.ca-central-1.rds.amazonaws.com
   redisEndpoint: replace-development.serverless.cac1.cache.amazonaws.com

@@ -15,11 +15,13 @@ roles:
   reportsConsumer: arn:aws:iam::444444444444:role/indus-production-reports-consumer
   marketData: arn:aws:iam::444444444444:role/indus-production-market-data
   researchWorker: arn:aws:iam::444444444444:role/indus-production-research-worker
+  databaseMigrator: arn:aws:iam::444444444444:role/indus-production-database-migrator
   webPublisher: arn:aws:iam::444444444444:role/indus-production-web-publisher
 secrets:
   platformApi: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/platform-api
   marketData: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/market-data
   researchWorker: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/research-worker
+  databaseMigration: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/database-migration
 config:
   rdsProxyEndpoint: replace-production.proxy.ca-central-1.rds.amazonaws.com
   redisEndpoint: replace-production.serverless.cac1.cache.amazonaws.com

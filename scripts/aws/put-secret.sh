@@ -13,7 +13,7 @@ json_file="$3"
 mode="${4:-}"
 
 [[ "$environment" =~ ^(development|staging|production)$ ]] || usage
-[[ "$workload" =~ ^(database-proxy|platform-api|market-data|research-worker)$ ]] || usage
+[[ "$workload" =~ ^(database-platform|database-market|database-migration|platform-api|market-data|research-worker)$ ]] || usage
 [[ -f "$json_file" ]] || { echo "Secret JSON file does not exist." >&2; exit 2; }
 
 permissions="$(stat -f '%Lp' "$json_file" 2>/dev/null || stat -c '%a' "$json_file")"
@@ -22,6 +22,18 @@ permissions="$(stat -f '%Lp' "$json_file" 2>/dev/null || stat -c '%a' "$json_fil
   exit 2
 }
 jq -e 'type == "object" and length > 0 and all(.[]; type == "string" and length > 0)' "$json_file" >/dev/null
+
+case "$workload" in
+  database-platform)
+    jq -e '.username == "indus_platform" and has("password")' "$json_file" >/dev/null
+    ;;
+  database-market)
+    jq -e '.username == "indus_market_writer" and has("password")' "$json_file" >/dev/null
+    ;;
+  database-migration)
+    jq -e '.username == "indus_migrator" and has("password") and has("DATABASE_URL")' "$json_file" >/dev/null
+    ;;
+esac
 
 secret_id="indus-${environment}/${workload}"
 if [[ "$mode" != "--apply" ]]; then

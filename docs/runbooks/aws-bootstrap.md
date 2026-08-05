@@ -24,15 +24,16 @@ a weighted CNAME and cannot be the zone apex. The primary workload region is
    reviewers for production.
 3. Delegate each environment's Route 53 subdomain and copy the appropriate
    `backend.hcl.example` and `terraform.tfvars.example` to ignored local files.
-4. For development, then staging, then production, bootstrap the empty RDS
-   Proxy secret container before the full plan. Run a reviewed targeted apply
-   for only
-   `module.environment.aws_secretsmanager_secret.workload["database_proxy"]`,
-   populate it with `scripts/aws/put-secret.sh <environment> database-proxy
-   <file> --apply`, and verify that the database role already exists. This
-   one-time ordering is required because RDS Proxy rejects a secret without a
-   current `username`/`password` version. Never use the Aurora master user as
-   an application credential.
+4. For development, then staging, then production, use reviewed targeted plans
+   to create the Aurora cluster, KMS key, and the three database secret
+   containers before creating RDS Proxy. Retrieve the AWS-managed Aurora master
+   secret into a mode `0600` temporary file, prepare separate mode `0600`
+   credential JSON files, and follow `database-roles.md`. Populate
+   `database-platform`, `database-market`, and `database-migration` with
+   `scripts/aws/put-secret.sh` before the proxy plan. This staged ordering is
+   required because RDS Proxy rejects auth entries without current
+   `username`/`password` versions. Never copy the Aurora master credential into
+   an application secret.
 5. Run `terraform init`, `terraform plan -out=<environment>.tfplan`, inspect
    the complete plan, and apply that exact plan. Never apply a speculative plan
    from CI.
@@ -45,7 +46,9 @@ a weighted CNAME and cannot be the zone apex. The primary workload region is
    ```
 
 7. Populate the remaining secret values using
-   `docs/runbooks/secret-management.md`.
+   `docs/runbooks/secret-management.md`. Confirm the platform and workflow URLs
+   use `indus_platform`, the market URL uses `indus_market_writer`, and the
+   migration URL uses `indus_migrator`.
 8. Set an explicit environment kubeconfig, run
    `scripts/aws/bootstrap-argocd.sh <environment>` to preview, then repeat with
    `--apply`. Argo CD owns everything after the root application.

@@ -43,12 +43,14 @@ workload["roles"] = {
   "reportsConsumer" => roles.fetch("reports_consumer"),
   "marketData" => roles.fetch("market_data"),
   "researchWorker" => roles.fetch("research_worker"),
+  "databaseMigrator" => roles.fetch("database_migrator"),
   "webPublisher" => roles.fetch("web_publisher")
 }
 workload["secrets"] = {
   "platformApi" => secrets.fetch("platform_api"),
   "marketData" => secrets.fetch("market_data"),
-  "researchWorker" => secrets.fetch("research_worker")
+  "researchWorker" => secrets.fetch("research_worker"),
+  "databaseMigration" => secrets.fetch("database_migration")
 }
 workload["config"].merge!(
   "rdsProxyEndpoint" => data.fetch("rds_proxy"),

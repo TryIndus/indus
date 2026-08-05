@@ -25,9 +25,17 @@ locals {
   })
 
   secret_names = {
-    database_proxy  = "${local.name}/database-proxy"
-    platform_api    = "${local.name}/platform-api"
-    market_data     = "${local.name}/market-data"
-    research_worker = "${local.name}/research-worker"
+    database_platform  = "${local.name}/database-platform"
+    database_market    = "${local.name}/database-market"
+    database_migration = "${local.name}/database-migration"
+    platform_api       = "${local.name}/platform-api"
+    market_data        = "${local.name}/market-data"
+    research_worker    = "${local.name}/research-worker"
   }
+
+  rds_proxy_secret_keys = toset([
+    "database_platform",
+    "database_market",
+    "database_migration",
+  ])
 }
