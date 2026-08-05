@@ -21,7 +21,7 @@ Never implement a future revamp phase merely because it appears in the plan. Sta
 - Preserve unrelated user changes in a dirty worktree.
 - Make the smallest coherent change that fully addresses the request.
 - Do not combine feature work, infrastructure work, dependency upgrades, and unrelated cleanup in one PR.
-- Treat `main` as production. Do not push directly to it.
+- Treat `main` as production. Merges currently trigger the Vercel production deployment, so every merge is a release; do not push directly to it.
 - Do not mutate production data, cloud resources, secrets, or external services without explicit authorization.
 - Prefer forward-only database fixes after a migration has reached any shared environment.
 - Never expose credentials, tokens, private prompts, or full provider payloads in logs, tests, commits, or responses.
@@ -76,7 +76,7 @@ The approved target architecture replaces the application runtime incrementally 
 
 ### Application and Provider Boundaries
 
-- Keep provider credentials server-only. Only Supabase URL and anonymous key may use `NEXT_PUBLIC_*`.
+- Keep provider credentials server-only. Never place secrets in `NEXT_PUBLIC_*`; currently public values include the Supabase URL, Supabase anonymous key, and optional Vercel hostname.
 - Validate environment variables through `lib/env.ts` and shared schemas in `lib/schemas/api.ts`.
 - Keep shared Zod API schemas in `lib/schemas/api.ts` so routes and tests use the same contracts.
 - Authenticate protected application routes in `middleware.ts`.
