@@ -11,9 +11,9 @@ Required objects:
 | Secret | Required JSON keys |
 |---|---|
 | `indus-<env>/database-proxy` | `username`, `password` for the least-privilege `indus_app` database role |
-| `indus-<env>/platform-api` | `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY_BASE`, `GEMINI_API_KEY` |
+| `indus-<env>/platform-api` | `DATABASE_URL`, `SECRET_KEY_BASE`, `GEMINI_API_KEY` |
 | `indus-<env>/market-data` | `DATABASE_URL`, `ALPACA_API_KEY`, `ALPACA_SECRET_KEY` |
-| `indus-<env>/research-worker` | `DATABASE_URL`, `REDIS_URL`, `GEMINI_API_KEY`, `TEMPORAL_API_KEY` |
+| `indus-<env>/research-worker` | `DATABASE_URL`, `GEMINI_API_KEY`, `TEMPORAL_API_KEY` |
 
 `DATABASE_URL` points at RDS Proxy with TLS verification and the same
 `indus_app` credential held by the proxy secret. Rails currently uses a static
@@ -22,7 +22,10 @@ new database credential, updating both proxy and workload secret versions,
 waiting for proxy readiness, and restarting Rails/worker deployments through a
 reviewed GitOps annotation change. Keep the prior version staged until all
 connections and jobs are healthy, then revoke it. Kafka credentials are never
-stored: Rails and Rust refresh MSK IAM tokens from IRSA.
+stored: Rails and Rust refresh MSK IAM tokens from IRSA. Redis credentials are
+also never stored in AWS environments: platform-api and Sidekiq sign
+short-lived ElastiCache connection tokens from their own IRSA roles. The cache
+endpoint, cache name, port, and IAM user ID are non-secret GitOps values.
 
 Gemini rotation: add a new provider key, update both authorized secrets,
 restart API and research workers, run one synthetic model evaluation, then

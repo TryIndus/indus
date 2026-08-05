@@ -52,6 +52,24 @@ ruby -e '
 
 ruby -e '
   require "yaml"
+  ARGV.each do |file|
+    documents = YAML.load_stream(File.read(file)).compact
+    %w[platform-api sidekiq].each do |name|
+      deployment = documents.find { |doc| doc["kind"] == "Deployment" && doc.dig("metadata", "name") == name }
+      abort "#{file} is missing #{name}" unless deployment
+      env = deployment.dig("spec", "template", "spec", "containers", 0, "env").to_h { |item| [item["name"], item["value"]] }
+      required = %w[REDIS_AUTH_MODE REDIS_ENDPOINT REDIS_PORT REDIS_IAM_CACHE_NAME REDIS_IAM_USER]
+      abort "#{file} has incomplete Redis IAM configuration for #{name}" unless (required - env.keys).empty?
+      abort "#{file} does not enable Redis IAM for #{name}" unless env["REDIS_AUTH_MODE"] == "iam"
+    end
+    projected = documents.select { |doc| doc["kind"] == "SecretProviderClass" }
+      .flat_map { |doc| doc.dig("spec", "secretObjects", 0, "data") || [] }
+    abort "#{file} still projects REDIS_URL" if projected.any? { |item| item["key"] == "REDIS_URL" }
+  end
+' "$render_dir"/platform-*.yaml
+
+ruby -e '
+  require "yaml"
   Dir["infra/gitops/**/*.{yaml,yml}"].each do |file|
     YAML.load_stream(File.read(file)) { |_document| }
   end
@@ -60,6 +78,7 @@ ruby -e '
 jq -e . infra/helm/indus-platform/values.schema.json >/dev/null
 shellcheck infra/images/web-publisher/publish.sh scripts/evaluate-cutover.sh scripts/validate-phase4.sh scripts/aws/*.sh
 ruby -c scripts/hydrate-gitops.rb >/dev/null
+ruby scripts/test/hydrate_gitops_test.rb
 ruby -c scripts/update-gitops-images.rb >/dev/null
 if command -v actionlint >/dev/null 2>&1; then
   actionlint .github/workflows/*.yml

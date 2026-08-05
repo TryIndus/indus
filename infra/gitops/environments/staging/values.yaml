@@ -23,6 +23,9 @@ secrets:
 config:
   rdsProxyEndpoint: replace-staging.proxy.ca-central-1.rds.amazonaws.com
   redisEndpoint: replace-staging.serverless.cac1.cache.amazonaws.com
+  redisPort: 6379
+  redisCacheName: indus-staging
+  redisUser: indus-staging-app
   mskBootstrapBrokers: replace-staging.kafka-serverless.ca-central-1.amazonaws.com:9098
   artifactBucket: indus-staging-artifacts-333333333333
   rawEventsBucket: indus-staging-raw-events-333333333333

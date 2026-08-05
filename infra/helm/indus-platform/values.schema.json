@@ -30,6 +30,15 @@
     },
     "roles": { "type": "object" },
     "secrets": { "type": "object" },
-    "config": { "type": "object" }
+    "config": {
+      "type": "object",
+      "required": ["redisEndpoint", "redisPort", "redisCacheName", "redisUser"],
+      "properties": {
+        "redisEndpoint": { "type": "string", "minLength": 3, "pattern": "^[A-Za-z0-9.-]+$" },
+        "redisPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "redisCacheName": { "type": "string", "minLength": 1 },
+        "redisUser": { "type": "string", "minLength": 1 }
+      }
+    }
   }
 }

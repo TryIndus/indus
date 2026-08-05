@@ -29,8 +29,13 @@ output "identity" {
 
 output "data_endpoints" {
   value = {
-    rds_proxy             = aws_db_proxy.this.endpoint
-    redis                 = aws_elasticache_serverless_cache.this.endpoint
+    rds_proxy = aws_db_proxy.this.endpoint
+    redis = {
+      endpoint   = aws_elasticache_serverless_cache.this.endpoint[0].address
+      port       = aws_elasticache_serverless_cache.this.endpoint[0].port
+      cache_name = aws_elasticache_serverless_cache.this.name
+      user_name  = aws_elasticache_user.application.user_name
+    }
     msk_bootstrap_brokers = aws_msk_serverless_cluster.this.bootstrap_brokers_sasl_iam
     artifact_bucket       = aws_s3_bucket.this["artifacts"].id
     raw_events_bucket     = aws_s3_bucket.this["raw-events"].id

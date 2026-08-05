@@ -228,10 +228,20 @@ resource "aws_vpc_security_group_ingress_rule" "redis_from_eks" {
 }
 
 resource "aws_elasticache_user" "application" {
-  user_id       = "${var.project}-${var.environment}-app"
-  user_name     = "application"
-  access_string = "on ~${var.environment}:* +@all -@dangerous"
-  engine        = "redis"
+  user_id   = "${var.project}-${var.environment}-app"
+  user_name = "${var.project}-${var.environment}-app"
+  access_string = join(" ", [
+    "on",
+    "~*",
+    "+bitfield", "+bitfield_ro", "+brpop", "+client|setinfo", "+del", "+discard", "+evalsha", "+exec",
+    "+exists", "+expire", "+get", "+hello", "+hdel", "+hget", "+hgetall", "+hincrby", "+hlen",
+    "+hmget", "+hset", "+hsetnx", "+incr", "+incrby", "+info", "+lindex", "+llen", "+lmove",
+    "+lpop", "+lpush", "+lrange", "+lrem", "+mget", "+mset", "+multi", "+ping", "+pttl",
+    "+rpop", "+rpush", "+sadd", "+scard", "+script|load", "+set", "+sismember", "+smembers",
+    "+srem", "+ttl", "+type", "+unlink", "+zadd", "+zcard", "+zincrby", "+zrange", "+zrem",
+    "+zpopmin", "+zremrangebyrank", "+zremrangebyscore",
+  ])
+  engine = "valkey"
 
   authentication_mode {
     type = "iam"
@@ -241,7 +251,7 @@ resource "aws_elasticache_user" "application" {
 }
 
 resource "aws_elasticache_user_group" "this" {
-  engine        = "redis"
+  engine        = "valkey"
   user_group_id = "${var.project}-${var.environment}"
   user_ids      = [aws_elasticache_user.application.user_id]
   tags          = local.common_tags

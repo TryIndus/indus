@@ -25,6 +25,9 @@ secrets:
 config:
   rdsProxyEndpoint: replace-development.proxy.ca-central-1.rds.amazonaws.com
   redisEndpoint: replace-development.serverless.cac1.cache.amazonaws.com
+  redisPort: 6379
+  redisCacheName: indus-development
+  redisUser: indus-development-app
   mskBootstrapBrokers: replace-development.kafka-serverless.ca-central-1.amazonaws.com:9098
   artifactBucket: indus-development-artifacts-222222222222
   rawEventsBucket: indus-development-raw-events-222222222222

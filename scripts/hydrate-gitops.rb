@@ -22,6 +22,7 @@ cluster = outputs.fetch("cluster")
 edge = outputs.fetch("edge")
 identity = outputs.fetch("identity")
 data = outputs.fetch("data_endpoints")
+redis = data.fetch("redis")
 roles = outputs.fetch("workload_role_arns")
 secrets = outputs.fetch("secret_arns")
 observability = outputs.fetch("observability")
@@ -51,7 +52,10 @@ workload["secrets"] = {
 }
 workload["config"].merge!(
   "rdsProxyEndpoint" => data.fetch("rds_proxy"),
-  "redisEndpoint" => data.fetch("redis"),
+  "redisEndpoint" => redis.fetch("endpoint"),
+  "redisPort" => redis.fetch("port"),
+  "redisCacheName" => redis.fetch("cache_name"),
+  "redisUser" => redis.fetch("user_name"),
   "mskBootstrapBrokers" => data.fetch("msk_bootstrap_brokers"),
   "artifactBucket" => data.fetch("artifact_bucket"),
   "rawEventsBucket" => data.fetch("raw_events_bucket")

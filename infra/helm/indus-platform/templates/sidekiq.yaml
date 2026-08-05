@@ -22,6 +22,7 @@ spec:
         checksum/config: {{ toJson .Values.config | sha256sum }}
     spec:
       serviceAccountName: sidekiq
+      automountServiceAccountToken: true
       terminationGracePeriodSeconds: 90
       securityContext:
         {{- include "indus.podSecurityContext" . | nindent 8 }}
@@ -39,6 +40,11 @@ spec:
             - { name: COGNITO_JWT_ISSUER, value: {{ .Values.identity.issuer | quote }} }
             - { name: COGNITO_CLIENT_ID, value: {{ .Values.identity.audience | quote }} }
             - { name: AWS_REGION, value: {{ .Values.aws.region | quote }} }
+            - { name: REDIS_AUTH_MODE, value: "iam" }
+            - { name: REDIS_ENDPOINT, value: {{ .Values.config.redisEndpoint | quote }} }
+            - { name: REDIS_PORT, value: {{ .Values.config.redisPort | quote }} }
+            - { name: REDIS_IAM_CACHE_NAME, value: {{ .Values.config.redisCacheName | quote }} }
+            - { name: REDIS_IAM_USER, value: {{ .Values.config.redisUser | quote }} }
             - { name: KAFKA_BROKERS, value: {{ .Values.config.mskBootstrapBrokers | quote }} }
             - { name: KAFKA_AUTH_MODE, value: "msk_iam" }
             - { name: OTEL_SERVICE_NAME, value: "sidekiq" }

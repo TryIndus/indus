@@ -62,11 +62,6 @@ data "aws_iam_policy_document" "platform_api" {
     resources = [aws_s3_bucket.this["artifacts"].arn, "${aws_s3_bucket.this["artifacts"].arn}/*"]
   }
   statement {
-    sid       = "ConnectToCache"
-    actions   = ["elasticache:Connect"]
-    resources = [aws_elasticache_serverless_cache.this.arn, aws_elasticache_user.application.arn]
-  }
-  statement {
     sid = "PublishDomainEvents"
     actions = [
       "kafka-cluster:Connect",
@@ -89,6 +84,22 @@ resource "aws_iam_role_policy" "platform_api" {
   policy = data.aws_iam_policy_document.platform_api.json
 }
 
+data "aws_iam_policy_document" "redis_connect" {
+  statement {
+    sid       = "ConnectAsApplicationCacheUser"
+    actions   = ["elasticache:Connect"]
+    resources = [aws_elasticache_serverless_cache.this.arn, aws_elasticache_user.application.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "redis_connect" {
+  for_each = toset(["platform_api", "sidekiq"])
+
+  name   = "redis-connect"
+  role   = aws_iam_role.workload[each.key].id
+  policy = data.aws_iam_policy_document.redis_connect.json
+}
+
 data "aws_iam_policy_document" "research_worker" {
   statement {
     sid       = "ReadOwnRuntimeSecret"
@@ -104,11 +115,6 @@ data "aws_iam_policy_document" "research_worker" {
     sid       = "ManageReportArtifacts"
     actions   = ["s3:AbortMultipartUpload", "s3:GetObject", "s3:ListBucket", "s3:PutObject"]
     resources = [aws_s3_bucket.this["artifacts"].arn, "${aws_s3_bucket.this["artifacts"].arn}/*"]
-  }
-  statement {
-    sid       = "ConnectToCache"
-    actions   = ["elasticache:Connect"]
-    resources = [aws_elasticache_serverless_cache.this.arn, aws_elasticache_user.application.arn]
   }
   statement {
     sid = "WorkflowDomainEvents"

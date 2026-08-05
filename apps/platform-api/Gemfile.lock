@@ -487,7 +487,9 @@ PLATFORMS
 
 DEPENDENCIES
   aws-msk-iam-sasl-signer (~> 0.1.1)
+  aws-sdk-core (~> 3.254)
   aws-sdk-s3 (~> 1.228)
+  aws-sigv4 (~> 1.12)
   bootsnap
   brakeman
   bundler-audit
