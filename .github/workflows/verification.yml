@@ -292,11 +292,32 @@ jobs:
           cargo clippy --locked --all-targets --all-features -- -D warnings
           cargo test --locked --all-targets
           cargo build --locked --release
+  aws-platform:
+    name: AWS platform definitions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: 1.15.5
+          terraform_wrapper: false
+
+      - name: Install Helm
+        uses: azure/setup-helm@bf6a7d304bc2fdb57e0331155b7ebf2c504acf0a # v4
+        with:
+          version: v4.2.3
+
+      - name: Validate infrastructure and GitOps definitions
+        run: scripts/validate-phase4.sh
 
   required:
     name: Required verification
     if: always()
-    needs: [core, database, integration, browser, authenticated, contracts, platform-api, replacement-web, market-data]
+    needs: [core, database, integration, browser, authenticated, contracts, platform-api, replacement-web, market-data, aws-platform]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -311,6 +332,7 @@ jobs:
           PLATFORM_API_RESULT: ${{ needs.platform-api.result }}
           REPLACEMENT_WEB_RESULT: ${{ needs.replacement-web.result }}
           MARKET_DATA_RESULT: ${{ needs.market-data.result }}
+          AWS_PLATFORM_RESULT: ${{ needs.aws-platform.result }}
         run: |
           test "$CORE_RESULT" = "success"
           test "$DATABASE_RESULT" = "success"
@@ -321,3 +343,4 @@ jobs:
           test "$PLATFORM_API_RESULT" = "success"
           test "$REPLACEMENT_WEB_RESULT" = "success"
           test "$MARKET_DATA_RESULT" = "success"
+          test "$AWS_PLATFORM_RESULT" = "success"

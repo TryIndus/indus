@@ -83,6 +83,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 | `bun run test:accessibility` | Run WCAG A/AA accessibility checks |
 | `bun run test:performance` | Run production-mode local performance budgets |
 | `bun run test:local` | Run the complete local quality sequence |
+| `bun run test:phase4` | Validate Terraform, Helm, GitOps, workflow, and operational script definitions offline |
 
 See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, security boundaries, quota policy, and troubleshooting.
 
@@ -98,6 +99,8 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 | [Local Distributed Platform](./docs/runbooks/local-distributed-platform.md) | Start and verify the complete replacement stack locally |
 | [Report Workflow Recovery](./docs/runbooks/report-workflow-recovery.md) | Cancel, replay, and dependency recovery procedures |
 | [Migration Rehearsal](./docs/runbooks/migration-rehearsal.md) | Supabase export, Cognito limitations, reconciliation, and rollback |
+| [AWS Bootstrap](./docs/runbooks/aws-bootstrap.md) | Safe account, Terraform, secret, GitOps, and environment bootstrap order |
+| [Migration and Cutover](./docs/runbooks/migration-cutover.md) | Rehearsal gates, gradual traffic movement, abort thresholds, and rollback window |
 
 ## Features
 
