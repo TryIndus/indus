@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: bundler
+    directory: /apps/platform-api
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: cargo
+    directory: /services/market-data
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: terraform
+    directory: /infra/terraform/bootstrap/shared
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+  - package-ecosystem: terraform
+    directory: /infra/terraform/environments/development
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5

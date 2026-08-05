@@ -1,0 +1,121 @@
+name: Release immutable images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/platform-api/**
+      - apps/web/**
+      - services/market-data/**
+      - contracts/**
+      - infra/images/**
+      - .github/workflows/release-images.yml
+  workflow_dispatch:
+
+concurrency:
+  group: release-images-${{ github.sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: platform-api
+            context: apps/platform-api
+            dockerfile: apps/platform-api/Dockerfile
+          - name: market-data
+            context: services/market-data
+            dockerfile: services/market-data/Dockerfile
+          - name: web
+            context: .
+            dockerfile: infra/images/web-publisher/Dockerfile
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@00943011d9042930efac3dcd3a170e4273319bc8 # v5.1.0
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          role-session-name: indus-build-${{ github.run_id }}
+
+      - name: Log in to shared ECR
+        shell: bash
+        run: aws ecr get-login-password | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+      - name: Configure Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Build and publish once
+        id: build
+        shell: bash
+        env:
+          IMAGE: ${{ env.ECR_REGISTRY }}/indus/${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          docker buildx build \
+            --platform linux/amd64 \
+            --file "${{ matrix.dockerfile }}" \
+            --tag "$IMAGE:sha-${GITHUB_SHA}" \
+            --provenance mode=max \
+            --metadata-file build-metadata.json \
+            --push \
+            "${{ matrix.context }}"
+          digest="$(jq -r '.["containerimage.digest"]' build-metadata.json)"
+          test "${digest#sha256:}" != "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          jq -n --arg name "${{ matrix.name }}" --arg image "$IMAGE@$digest" --arg commit "$GITHUB_SHA" \
+            '{name: $name, image: $image, commit: $commit}' > release.json
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ env.ECR_REGISTRY }}/indus/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false
+
+      - name: Fail on unresolved high or critical findings
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/indus/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+
+      - name: Sign image and attest SBOM
+        shell: bash
+        env:
+          IMAGE: ${{ env.ECR_REGISTRY }}/indus/${{ matrix.name }}@${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "$IMAGE"
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$IMAGE"
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-${{ matrix.name }}-${{ github.sha }}
+          path: |
+            release.json
+            sbom.spdx.json
+            build-metadata.json
+          if-no-files-found: error
+          retention-days: 90
