@@ -16,13 +16,19 @@ function responseFor(path: string): unknown {
 }
 
 function context(authenticated: boolean, resolve: (path: string) => unknown | Promise<unknown> = responseFor, mutate: (path: string, method: string, body: unknown, idempotencyKey: string) => unknown | Promise<unknown> = (_path, _method, body) => body): AppContext {
+  let authState = authenticated
   return {
-    auth: { getUser: vi.fn(async () => authenticated ? { id: 'user-1', email: 'user@example.test' } : null), signIn: vi.fn(), signOut: vi.fn(), accessToken: vi.fn(async () => null) },
+    auth: {
+      getUser: vi.fn(async () => authState ? { id: 'user-1', email: 'user@example.test' } : null),
+      signIn: vi.fn(async () => { authState = true }),
+      signOut: vi.fn(async () => { authState = false }),
+      accessToken: vi.fn(async () => null),
+    },
     api: {
       get: async (path, schema) => schema.parse(await resolve(path)),
       mutate: async (path, method, body, schema, idempotencyKey) => schema.parse(await mutate(path, method, body, idempotencyKey)),
     },
-    queryClient: new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+    queryClient: new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } }),
     marketStream: unavailableMarketStream,
   }
 }
@@ -114,6 +120,69 @@ describe('application routing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
     await waitFor(() => expect(mutation).toHaveBeenCalled())
     expect(mutation).toHaveBeenCalledWith('/v1/favorites', 'POST', { symbol: 'TSLA', instrument_type: 'equity' }, expect.stringMatching(/^[0-9a-f-]{36}$/))
+  })
+
+  it('redirects an authenticated user away from the sign-in page', async () => {
+    const router = await renderPath('/auth', true)
+
+    expect(router.state.location.pathname).toBe('/dashboard')
+    expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
+  })
+
+  it('completes the sign-in and sign-out navigation lifecycle', async () => {
+    const router = await renderPath('/auth', false)
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'investor@example.test' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }))
+
+    expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
+    expect(router.state.location.pathname).toBe('/dashboard')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/auth'))
+  })
+
+  it('renders a stable not-found boundary', async () => {
+    await renderPath('/not-a-route', false)
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Return to dashboard' })).toHaveAttribute('href', '/dashboard')
+  })
+
+  it('renders a bounded mutation error without provider detail', async () => {
+    await renderPath('/favorites', true, undefined, async () => { throw new Error('sensitive provider detail') })
+    await screen.findByText('No favorites yet')
+    fireEvent.change(screen.getByLabelText('Symbol'), { target: { value: 'AAPL' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The favorite could not be updated')
+    expect(screen.queryByText(/sensitive provider detail/)).not.toBeInTheDocument()
+  })
+
+  it('retries a failed read through the visible recovery control', async () => {
+    let attempts = 0
+    const resolver = vi.fn((path: string) => {
+      if (path === '/v1/market/summary' && attempts++ < 2) throw new Error('temporary outage')
+      return responseFor(path)
+    })
+    await renderPath('/dashboard', true, resolver)
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('No instruments yet')).toBeVisible()
+    expect(resolver).toHaveBeenCalledTimes(3)
+  })
+
+  it('sends a bounded idempotent profile update', async () => {
+    const mutation = vi.fn((_path: string, _method: string, body: unknown) => ({
+      ...responseFor('/v1/me') as object,
+      display_name: (body as { display_name: string }).display_name,
+    }))
+    await renderPath('/settings', true, undefined, mutation)
+    fireEvent.change(await screen.findByLabelText('Display name'), { target: { value: 'Updated Investor' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(mutation).toHaveBeenCalled())
+    expect(mutation).toHaveBeenCalledWith('/v1/me', 'PATCH', { display_name: 'Updated Investor' }, expect.stringMatching(/^[0-9a-f-]{36}$/))
+    expect(await screen.findByDisplayValue('Updated Investor')).toBeVisible()
   })
 })
 

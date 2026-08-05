@@ -37,6 +37,31 @@ RSpec.describe ModelGateway do
       .to raise_error(ModelGateway::Error) { |error| expect(error.category).to eq(:invalid_response) }
   end
 
+  it "classifies non-JSON provider output without returning it" do
+    allow(adapter).to receive(:generate).and_return(ModelResult.new(text: "sensitive provider payload", model: "test", usage: {}))
+
+    expect { gateway.execute(task: "financial_chat", input: { messages: [ { role: "user", content: "Hello" } ] }) }
+      .to raise_error(ModelGateway::Error) { |error|
+        expect(error.category).to eq(:invalid_response)
+        expect(error.message).not_to include("sensitive")
+      }
+  end
+
+  it "rejects malformed chat roles, content, and citations" do
+    invalid = [
+      { "message" => { "role" => "user", "content" => "Wrong role" } },
+      { "message" => { "role" => "assistant", "content" => "" } },
+      { "message" => { "role" => "assistant", "content" => "Answer" },
+        "sources" => [ { "label" => "Source", "uri" => "file:///secret", "as_of" => "2026-08-05T12:00:00Z" } ] }
+    ]
+
+    invalid.each do |payload|
+      allow(adapter).to receive(:generate).and_return(ModelResult.new(text: payload.to_json, model: "test", usage: {}))
+      expect { gateway.execute(task: "financial_chat", input: { messages: [ { role: "user", content: "Hello" } ] }) }
+        .to raise_error(ModelGateway::Error) { |error| expect(error.category).to eq(:invalid_response) }
+    end
+  end
+
   it "accepts the versioned explanation and chat golden fixtures" do
     explanation = ModelResult.new(text: file_fixture("model_explanations_golden.json").read, model: "fixture", usage: {})
     chat = ModelResult.new(text: file_fixture("model_chat_golden.json").read, model: "fixture", usage: {})

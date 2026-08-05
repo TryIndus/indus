@@ -43,4 +43,34 @@ RSpec.describe Models::GeminiAdapter do
     allow(ENV).to receive(:fetch).with("GEMINI_API_KEY").and_raise(KeyError)
     expect { described_class.from_env }.to raise_error(ModelGateway::Error, /not configured/)
   end
+
+  it "classifies provider throttling and availability failures without returning their body" do
+    {
+      "429" => :rate_limited,
+      "500" => :unavailable
+    }.each do |status, category|
+      adapter = described_class.new(api_key: "key", model: "gemini-test",
+        transport: FakeGeminiTransport.new(body: "sensitive provider payload", status: status))
+
+      expect { adapter.generate(prompt: "hello", purpose: "test") }
+        .to raise_error(ModelGateway::Error) { |error|
+          expect(error.category).to eq(category)
+          expect(error.message).not_to include("sensitive")
+        }
+    end
+  end
+
+  it "classifies malformed JSON and network timeouts" do
+    malformed = described_class.new(api_key: "key", model: "gemini-test",
+      transport: FakeGeminiTransport.new(body: "provider payload"))
+    expect { malformed.generate(prompt: "hello", purpose: "test") }
+      .to raise_error(ModelGateway::Error) { |error| expect(error.category).to eq(:invalid_response) }
+
+    transport = Class.new do
+      def self.start(*) = raise(Timeout::Error)
+    end
+    unavailable = described_class.new(api_key: "key", model: "gemini-test", transport: transport)
+    expect { unavailable.generate(prompt: "hello", purpose: "test") }
+      .to raise_error(ModelGateway::Error) { |error| expect(error.category).to eq(:unavailable) }
+  end
 end
