@@ -24,6 +24,8 @@ class HydrateGitopsTest < Minitest::Test
       assert_includes stdout, "redisPort: 6380"
       assert_includes stdout, "redisCacheName: indus-development"
       assert_includes stdout, "redisUser: indus-development-app"
+      assert_includes stdout, "databaseMigrator: arn:aws:iam::111111111111:role/database-migrator"
+      assert_includes stdout, "databaseMigration: arn:aws:secretsmanager:ca-central-1:111111111111:secret:database-migration"
     end
   end
 
@@ -55,7 +57,8 @@ class HydrateGitopsTest < Minitest::Test
       "secret_arns" => {
         "platform_api" => "arn:aws:secretsmanager:ca-central-1:111111111111:secret:platform-api",
         "market_data" => "arn:aws:secretsmanager:ca-central-1:111111111111:secret:market-data",
-        "research_worker" => "arn:aws:secretsmanager:ca-central-1:111111111111:secret:research-worker"
+        "research_worker" => "arn:aws:secretsmanager:ca-central-1:111111111111:secret:research-worker",
+        "database_migration" => "arn:aws:secretsmanager:ca-central-1:111111111111:secret:database-migration"
       },
       "observability" => { "prometheus_remote_write_url" => "https://aps.example/api/v1/remote_write" }
     }
@@ -63,7 +66,7 @@ class HydrateGitopsTest < Minitest::Test
 
   def role_arns
     %w[
-      load_balancer market_data otel_collector platform_api platform_outbox
+      database_migrator load_balancer market_data otel_collector platform_api platform_outbox
       reports_consumer research_worker sidekiq web_publisher
     ].to_h do |name|
       [ name, "arn:aws:iam::111111111111:role/#{name.tr("_", "-")}" ]
