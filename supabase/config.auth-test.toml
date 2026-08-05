@@ -1,15 +1,17 @@
 project_id = "indus-auth-tests"
 
+# Keep CI service ports below Linux's ephemeral range to avoid collisions during image pulls.
+
 [api]
 enabled = true
-port = 55521
+port = 15421
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
-port = 55522
-shadow_port = 55520
+port = 15422
+shadow_port = 15420
 health_timeout = "2m"
 major_version = 17
 
@@ -22,8 +24,8 @@ enabled = false
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:3100"
-additional_redirect_urls = ["http://127.0.0.1:3100/auth/callback"]
+site_url = "http://localhost:3100"
+additional_redirect_urls = ["http://localhost:3100/auth/callback"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10

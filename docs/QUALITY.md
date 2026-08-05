@@ -78,15 +78,25 @@ Indus uses test-driven development for new behavior and regressions: define the 
 
 Tests should verify externally meaningful behavior instead of implementation details. A small production change may therefore be supported by schema tests, unit cases, database assertions, and browser coverage rather than a single oversized test file.
 
+Migration characterization tests use the `@characterization` tag alongside their normal verification layer. They preserve externally visible authentication, validation, error-envelope, and transport behavior that replacement Rails, React, or Rust services must match intentionally. Change a characterized contract only with an explicit migration decision and corresponding consumer updates.
+
 Run the full sequence with:
 
 ```bash
 bun run test:local
 ```
 
+## Pull request verification
+
+GitHub Actions runs the same locked Bun toolchain used locally. The core job installs from `bun.lock`, runs Biome, type-checking, unit coverage, the production build, and a production dependency audit with non-secret test configuration. Separate jobs replay every migration and database security assertion against an isolated PostgreSQL container, exercise public HTTP contracts, verify public and authenticated accessibility, run the product in Chromium, Firefox, WebKit, and mobile Chromium, and enforce production-mode performance budgets. They never receive deployed Supabase, Alpaca, Gemini, Vercel, or AWS credentials.
+
+The stable `Required verification` job aggregates the required layers as they are introduced. Configure branch protection against that job only after its first successful run on GitHub, so the repository never depends on a check name that has not been registered.
+
+Pull request workflows must use `pull_request`, least-privilege permissions, pinned actions, and disposable test services. Do not use `pull_request_target` for code execution or upload authenticated browser traces containing session material.
+
 The database layer always uses a temporary Supabase project on dedicated test ports. It resets and removes only that isolated project, so an existing local Supabase stack and its data are not modified.
 
-The authenticated browser layer follows the same isolation model. It starts a temporary Supabase Auth, API, and database stack on ports `55521` and `55522`, applies every migration, provisions a confirmed test user through the local admin API, and removes the stack on exit. Docker must be available, and no deployed credentials are required.
+The authenticated browser layer follows the same isolation model. It starts a temporary Supabase Auth, API, and database stack on ports `15421` and `15422`, applies every migration, provisions a confirmed test user through the local admin API, and removes the stack on exit. These ports stay below Linux's ephemeral range to avoid collisions during image pulls. Docker must be available, and no deployed credentials are required.
 
 ## Enforced budgets
 

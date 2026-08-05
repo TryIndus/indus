@@ -21,6 +21,12 @@ test("@authenticated dashboard loads with a verified session", async ({ page }) 
 	await expect(page.getByRole("heading", { name: "Your Favorites" })).toBeVisible();
 });
 
+test("@authenticated auth page redirects an existing session", async ({ page }) => {
+	await page.goto("/auth");
+	await expect(page).toHaveURL(/\/dashboard$/);
+	await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+});
+
 test("@authenticated queryless crypto route renders its empty state", async ({ page }) => {
 	await page.goto("/crypto");
 	await expect(page).toHaveURL(/\/crypto$/);
@@ -34,14 +40,32 @@ test("@authenticated reports route renders for the current tenant", async ({ pag
 	await expect(page.getByRole("heading", { name: "Your Reports" })).toBeVisible();
 });
 
-test("@authenticated dashboard has no serious accessibility violations", async ({ page }) => {
-	await expect(page).toHaveTitle("Indus");
-	const results = await new AxeBuilder({ page })
-		.withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-		.analyze();
-	const seriousViolations = results.violations.filter(({ impact }) =>
-		["serious", "critical"].includes(impact ?? ""),
-	);
+test("@authenticated reports API returns only the current tenant collection", async ({ page }) => {
+	const response = await page.request.get("/api/reports");
 
-	expect(seriousViolations).toEqual([]);
+	expect(response.status()).toBe(200);
+	expect(await response.json()).toEqual({ reports: [] });
+});
+
+test("@authenticated settings route renders for the current tenant", async ({ page }) => {
+	await page.goto("/settings");
+	await expect(page).toHaveURL(/\/settings$/);
+	await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+});
+
+test("@authenticated critical product routes have no serious accessibility violations", async ({
+	page,
+}) => {
+	for (const path of ["/dashboard", "/crypto", "/reports", "/settings"]) {
+		await page.goto(path);
+		await expect(page).toHaveTitle("Indus");
+		const results = await new AxeBuilder({ page })
+			.withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+			.analyze();
+		const seriousViolations = results.violations.filter(({ impact }) =>
+			["serious", "critical"].includes(impact ?? ""),
+		);
+
+		expect(seriousViolations, `${path} accessibility violations`).toEqual([]);
+	}
 });
