@@ -1,7 +1,7 @@
 FROM rust:1.96.0-bookworm AS build
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends cmake libssl-dev pkg-config \
+    && apt-get install --yes --no-install-recommends cmake libcurl4-openssl-dev libssl-dev pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
