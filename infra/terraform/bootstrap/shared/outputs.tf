@@ -4,3 +4,4 @@ output "state_role_arns" { value = { for key, role in aws_iam_role.state : key =
 output "ecr_repository_arns" { value = { for key, repository in aws_ecr_repository.this : key => repository.arn } }
 output "ecr_repository_urls" { value = { for key, repository in aws_ecr_repository.this : key => repository.repository_url } }
 output "github_build_role_arn" { value = aws_iam_role.github_build.arn }
+output "github_promotion_role_arn" { value = aws_iam_role.github_promotion.arn }

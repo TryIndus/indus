@@ -19,6 +19,11 @@ variable "edge_region" {
 variable "vpc_cidr" { type = string }
 variable "domain_name" { type = string }
 variable "route53_zone_name" { type = string }
+variable "legacy_origin_hostname" { type = string }
+variable "replacement_traffic_weight" {
+  type    = number
+  default = 0
+}
 variable "cognito_callback_urls" { type = list(string) }
 variable "cognito_logout_urls" { type = list(string) }
 variable "shared_ecr_repository_arns" { type = map(string) }
@@ -58,6 +63,8 @@ module "environment" {
   database_instance_count     = 2
   domain_name                 = var.domain_name
   route53_zone_name           = var.route53_zone_name
+  legacy_origin_hostname      = var.legacy_origin_hostname
+  replacement_traffic_weight  = var.replacement_traffic_weight
   cognito_callback_urls       = var.cognito_callback_urls
   cognito_logout_urls         = var.cognito_logout_urls
   cluster_public_access_cidrs = []

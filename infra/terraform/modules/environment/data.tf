@@ -157,7 +157,7 @@ resource "aws_iam_role" "rds_proxy" {
 data "aws_iam_policy_document" "rds_proxy" {
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_rds_cluster.this.master_user_secret[0].secret_arn]
+    resources = [aws_secretsmanager_secret.workload["database_proxy"].arn]
   }
   statement {
     actions   = ["kms:Decrypt"]
@@ -188,8 +188,8 @@ resource "aws_db_proxy" "this" {
 
   auth {
     auth_scheme = "SECRETS"
-    iam_auth    = "REQUIRED"
-    secret_arn  = aws_rds_cluster.this.master_user_secret[0].secret_arn
+    iam_auth    = "DISABLED"
+    secret_arn  = aws_secretsmanager_secret.workload["database_proxy"].arn
   }
 
   tags = local.common_tags

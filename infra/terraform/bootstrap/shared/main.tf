@@ -219,6 +219,58 @@ resource "aws_iam_role_policy" "github_build" {
   policy = data.aws_iam_policy_document.github_build.json
 }
 
+data "aws_iam_policy_document" "github_promotion_assume" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values = [
+        "repo:${var.github_repository}:environment:development",
+        "repo:${var.github_repository}:environment:staging",
+        "repo:${var.github_repository}:environment:production",
+      ]
+    }
+  }
+}
+
+resource "aws_iam_role" "github_promotion" {
+  name                 = "indus-github-promotion-verifier"
+  assume_role_policy   = data.aws_iam_policy_document.github_promotion_assume.json
+  max_session_duration = 3600
+  tags                 = local.common_tags
+}
+
+data "aws_iam_policy_document" "github_promotion" {
+  statement {
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+  statement {
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+    resources = values(aws_ecr_repository.this)[*].arn
+  }
+}
+
+resource "aws_iam_role_policy" "github_promotion" {
+  name   = "verify-release-images"
+  role   = aws_iam_role.github_promotion.id
+  policy = data.aws_iam_policy_document.github_promotion.json
+}
+
 data "aws_iam_policy_document" "state_assume" {
   for_each = var.environment_account_ids
 

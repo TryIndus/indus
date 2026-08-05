@@ -107,6 +107,23 @@ variable "route53_zone_name" {
   description = "Existing public Route 53 hosted-zone name."
 }
 
+variable "legacy_origin_hostname" {
+  type        = string
+  description = "Legacy hostname retained as a weighted DNS target during cutover; null outside the rollback window."
+  default     = null
+}
+
+variable "replacement_traffic_weight" {
+  type        = number
+  description = "Replacement percentage expressed as a Route 53 weight from 0 through 100."
+  default     = 100
+
+  validation {
+    condition     = var.replacement_traffic_weight >= 0 && var.replacement_traffic_weight <= 100
+    error_message = "replacement_traffic_weight must be between 0 and 100."
+  }
+}
+
 variable "cognito_callback_urls" {
   type        = list(string)
   description = "Exact OAuth callback URLs."

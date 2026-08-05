@@ -62,11 +62,6 @@ data "aws_iam_policy_document" "platform_api" {
     resources = [aws_s3_bucket.this["artifacts"].arn, "${aws_s3_bucket.this["artifacts"].arn}/*"]
   }
   statement {
-    sid       = "ConnectThroughRdsProxy"
-    actions   = ["rds-db:connect"]
-    resources = ["arn:${data.aws_partition.current.partition}:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser:*/indus_app"]
-  }
-  statement {
     sid       = "ConnectToCache"
     actions   = ["elasticache:Connect"]
     resources = [aws_elasticache_serverless_cache.this.arn, aws_elasticache_user.application.arn]
@@ -109,11 +104,6 @@ data "aws_iam_policy_document" "research_worker" {
     sid       = "ManageReportArtifacts"
     actions   = ["s3:AbortMultipartUpload", "s3:GetObject", "s3:ListBucket", "s3:PutObject"]
     resources = [aws_s3_bucket.this["artifacts"].arn, "${aws_s3_bucket.this["artifacts"].arn}/*"]
-  }
-  statement {
-    sid       = "ConnectThroughRdsProxy"
-    actions   = ["rds-db:connect"]
-    resources = ["arn:${data.aws_partition.current.partition}:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser:*/indus_app"]
   }
   statement {
     sid       = "ConnectToCache"
@@ -159,11 +149,6 @@ data "aws_iam_policy_document" "market_data" {
     sid       = "ArchiveRawEvents"
     actions   = ["s3:AbortMultipartUpload", "s3:GetObject", "s3:ListBucket", "s3:PutObject"]
     resources = [aws_s3_bucket.this["raw-events"].arn, "${aws_s3_bucket.this["raw-events"].arn}/*"]
-  }
-  statement {
-    sid       = "ConnectThroughRdsProxy"
-    actions   = ["rds-db:connect"]
-    resources = ["arn:${data.aws_partition.current.partition}:rds-db:${var.aws_region}:${data.aws_caller_identity.current.account_id}:dbuser:*/market_writer"]
   }
   statement {
     sid = "MarketTopics"
@@ -229,11 +214,17 @@ data "aws_iam_policy_document" "otel" {
     resources = [aws_prometheus_workspace.this.arn]
   }
   statement {
-    sid = "PublishTelemetry"
+    sid = "PublishLogs"
     actions = [
       "logs:CreateLogStream",
       "logs:DescribeLogStreams",
       "logs:PutLogEvents",
+    ]
+    resources = ["${aws_cloudwatch_log_group.application.arn}:*"]
+  }
+  statement {
+    sid = "PublishTraces"
+    actions = [
       "xray:GetSamplingRules",
       "xray:GetSamplingStatisticSummaries",
       "xray:GetSamplingTargets",

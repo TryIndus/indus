@@ -511,12 +511,38 @@ resource "aws_s3_bucket_policy" "web" {
 }
 
 resource "aws_route53_record" "application" {
-  zone_id = data.aws_route53_zone.public.zone_id
-  name    = var.domain_name
-  type    = "A"
-  alias {
-    name                   = aws_cloudfront_distribution.this.domain_name
-    zone_id                = aws_cloudfront_distribution.this.hosted_zone_id
-    evaluate_target_health = false
+  zone_id        = data.aws_route53_zone.public.zone_id
+  name           = var.domain_name
+  type           = "CNAME"
+  ttl            = 60
+  records        = [aws_cloudfront_distribution.this.domain_name]
+  set_identifier = "replacement"
+  weighted_routing_policy {
+    weight = var.replacement_traffic_weight
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.domain_name != trimsuffix(var.route53_zone_name, ".")
+      error_message = "Weighted CNAME cutover requires a subdomain, not the hosted-zone apex."
+    }
+    precondition {
+      condition     = var.replacement_traffic_weight == 100 || var.legacy_origin_hostname != null
+      error_message = "A legacy origin is required until replacement traffic reaches 100."
+    }
+  }
+}
+
+resource "aws_route53_record" "legacy" {
+  count = var.legacy_origin_hostname == null ? 0 : 1
+
+  zone_id        = data.aws_route53_zone.public.zone_id
+  name           = var.domain_name
+  type           = "CNAME"
+  ttl            = 60
+  records        = [var.legacy_origin_hostname]
+  set_identifier = "legacy"
+  weighted_routing_policy {
+    weight = 100 - var.replacement_traffic_weight
   }
 }

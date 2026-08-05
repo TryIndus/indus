@@ -25,6 +25,7 @@ locals {
   })
 
   secret_names = {
+    database_proxy  = "${local.name}/database-proxy"
     platform_api    = "${local.name}/platform-api"
     market_data     = "${local.name}/market-data"
     research_worker = "${local.name}/research-worker"

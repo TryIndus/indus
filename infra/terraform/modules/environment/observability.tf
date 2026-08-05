@@ -17,6 +17,13 @@ resource "aws_prometheus_workspace" "this" {
   tags  = local.common_tags
 }
 
+resource "aws_cloudwatch_log_group" "application" {
+  name              = "/aws/eks/${local.name}/application"
+  retention_in_days = local.production ? 365 : 30
+  kms_key_id        = aws_kms_key.logs.arn
+  tags              = local.common_tags
+}
+
 data "aws_iam_policy_document" "amp_alert_assume" {
   statement {
     actions = ["sts:AssumeRole"]

@@ -19,6 +19,15 @@ images = {
 images.each_value do |image|
   abort "image must include an immutable sha256 digest" unless image.match?(/@sha256:[0-9a-f]{64}\z/)
 end
+expected_repositories = {
+  "platformApi" => "/indus/platform-api@sha256:",
+  "marketData" => "/indus/market-data@sha256:",
+  "researchWorker" => "/indus/platform-api@sha256:",
+  "web" => "/indus/web@sha256:"
+}
+images.each do |name, image|
+  abort "#{name} image belongs to an unexpected repository" unless image.include?(expected_repositories.fetch(name))
+end
 
 target_path = File.join(__dir__, "..", "infra", "gitops", "environments", environment, "values.yaml")
 target = YAML.safe_load(File.read(target_path), permitted_classes: [], permitted_symbols: [], aliases: false)
