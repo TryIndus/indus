@@ -96,7 +96,7 @@ Pull request workflows must use `pull_request`, least-privilege permissions, pin
 
 The database layer always uses a temporary Supabase project on dedicated test ports. It resets and removes only that isolated project, so an existing local Supabase stack and its data are not modified.
 
-The authenticated browser layer follows the same isolation model. It starts a temporary Supabase Auth, API, and database stack on ports `55521` and `55522`, applies every migration, provisions a confirmed test user through the local admin API, and removes the stack on exit. Docker must be available, and no deployed credentials are required.
+The authenticated browser layer follows the same isolation model. It starts a temporary Supabase Auth, API, and database stack on ports `15421` and `15422`, applies every migration, provisions a confirmed test user through the local admin API, and removes the stack on exit. These ports stay below Linux's ephemeral range to avoid collisions during image pulls. Docker must be available, and no deployed credentials are required.
 
 ## Enforced budgets
 
