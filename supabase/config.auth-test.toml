@@ -1,15 +1,17 @@
 project_id = "indus-auth-tests"
 
+# Keep CI service ports below Linux's ephemeral range to avoid collisions during image pulls.
+
 [api]
 enabled = true
-port = 55521
+port = 15421
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [db]
-port = 55522
-shadow_port = 55520
+port = 15422
+shadow_port = 15420
 health_timeout = "2m"
 major_version = 17
 
