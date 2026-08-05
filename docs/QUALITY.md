@@ -78,6 +78,8 @@ Indus uses test-driven development for new behavior and regressions: define the 
 
 Tests should verify externally meaningful behavior instead of implementation details. A small production change may therefore be supported by schema tests, unit cases, database assertions, and browser coverage rather than a single oversized test file.
 
+Migration characterization tests use the `@characterization` tag alongside their normal verification layer. They preserve externally visible authentication, validation, error-envelope, and transport behavior that replacement Rails, React, or Rust services must match intentionally. Change a characterized contract only with an explicit migration decision and corresponding consumer updates.
+
 Run the full sequence with:
 
 ```bash
