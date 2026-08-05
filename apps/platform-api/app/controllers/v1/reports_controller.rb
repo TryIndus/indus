@@ -44,5 +44,21 @@ module V1
       report.destroy!
       head :no_content
     end
+
+    def cancel
+      report = policy_scope(Report).find(params[:id])
+      authorize report, :update?
+      if %w[queued generating].include?(report.status)
+        Report.transaction do
+          report.lock!
+          previous_status = report.status
+          report.update!(status: "cancelled", failure_code: nil)
+          Reports::LifecycleEvent.emit!(report: report, previous_status: previous_status,
+            correlation_id: request.request_id, idempotency_key: request.headers["Idempotency-Key"])
+        end
+        Reports::TemporalClient.from_env.cancel_report(report.workflow_id) if report.workflow_id.present?
+      end
+      render json: report_json(report.reload)
+    end
   end
 end
