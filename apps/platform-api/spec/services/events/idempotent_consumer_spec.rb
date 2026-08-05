@@ -19,4 +19,13 @@ RSpec.describe Events::IdempotentConsumer do
     expect { consumer.process(payload) { raise "failed" } }.to raise_error("failed")
     expect(ConsumedEvent.count).to eq(0)
   end
+
+  it "rejects an unsupported envelope before invoking a side effect" do
+    payload["envelope"]["schema_version"] = 2
+    side_effect = proc { raise "must not run" }
+
+    expect { described_class.new(name: "report-workflow-starter").process(payload, &side_effect) }
+      .to raise_error(ArgumentError, /schema version/)
+    expect(ConsumedEvent.count).to eq(0)
+  end
 end

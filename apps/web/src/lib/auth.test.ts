@@ -22,4 +22,17 @@ describe('authentication adapter selection', () => {
     expect(await auth.getUser()).toEqual({ id: 'e2e-user', email: 'investor@example.test' })
     expect(await auth.accessToken()).toBe('e2e-access-token')
   })
+
+  it('supports the complete local E2E sign-in and sign-out lifecycle', async () => {
+    vi.stubEnv('VITE_E2E_AUTH', 'true')
+    const auth = createAuthAdapter()
+
+    await auth.signIn('ignored@example.test', 'ignored')
+    expect(await auth.getUser()).toEqual({ id: 'e2e-user', email: 'investor@example.test' })
+    expect(await auth.accessToken()).toBe('e2e-access-token')
+
+    await auth.signOut()
+    expect(await auth.getUser()).toBeNull()
+    expect(await auth.accessToken()).toBeNull()
+  })
 })

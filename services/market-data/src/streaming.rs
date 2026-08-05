@@ -204,6 +204,20 @@ mod tests {
     }
 
     #[test]
+    fn distinguishes_per_user_quota_from_global_capacity() {
+        let limits = StreamLimits::new(1, 2, metrics());
+        let first = limits.acquire("user-1").unwrap();
+        assert_eq!(limits.acquire("user-1").err(), Some(LimitError::UserQuota));
+        let second = limits.acquire("user-2").unwrap();
+        assert_eq!(
+            limits.acquire("user-3").err(),
+            Some(LimitError::GlobalQuota)
+        );
+        drop((first, second));
+        assert_eq!(limits.active(), 0);
+    }
+
+    #[test]
     fn reconnect_replays_after_last_event_and_reports_evicted_cursor() {
         let hub = StreamHub::new(4, 2, Duration::from_secs(30));
         for id in ["1", "2", "3"] {

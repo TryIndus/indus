@@ -258,4 +258,44 @@ mod tests {
         assert_eq!(first.event_id, replay.event_id);
         assert_eq!(first.idempotency_key, replay.idempotency_key);
     }
+
+    #[test]
+    fn decoding_rejects_unknown_topics_missing_envelopes_and_future_versions() {
+        assert!(matches!(
+            NormalizedEvent::decode("market.unknown.v1", &[]),
+            Err(EventError::UnsupportedTopic(_))
+        ));
+
+        let missing = MarketQuoteEvent::default().encode_to_vec();
+        assert!(matches!(
+            NormalizedEvent::decode(QUOTES_TOPIC, &missing),
+            Err(EventError::MissingEnvelope)
+        ));
+
+        let mut quote = MarketQuoteEvent {
+            envelope: Some(envelope("market.quote.v1", "future", Utc::now())),
+            ..Default::default()
+        };
+        quote.envelope.as_mut().unwrap().schema_version = SCHEMA_VERSION + 1;
+        assert!(matches!(
+            NormalizedEvent::decode(QUOTES_TOPIC, &quote.encode_to_vec()),
+            Err(EventError::UnsupportedVersion(2))
+        ));
+    }
+
+    #[test]
+    fn timestamp_validation_rejects_missing_and_out_of_range_values() {
+        assert!(matches!(
+            timestamp(None, "observed_at"),
+            Err(EventError::MissingTimestamp("observed_at"))
+        ));
+        let invalid = Timestamp {
+            seconds: i64::MAX,
+            nanos: 0,
+        };
+        assert!(matches!(
+            timestamp(Some(&invalid), "observed_at"),
+            Err(EventError::InvalidTimestamp("observed_at"))
+        ));
+    }
 }

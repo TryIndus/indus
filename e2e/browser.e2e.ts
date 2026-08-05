@@ -19,7 +19,7 @@ test("@browser landing page exposes the primary product path", async ({ page }) 
 });
 
 test("@browser public pages do not overflow the viewport", async ({ page }) => {
-	for (const path of ["/", "/auth"]) {
+	for (const path of ["/", "/auth", "/help"]) {
 		await page.goto(path);
 		const dimensions = await page.evaluate(() => ({
 			scrollWidth: document.documentElement.scrollWidth,

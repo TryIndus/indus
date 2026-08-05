@@ -41,6 +41,19 @@ RSpec.describe Events::OutboxReplay do
     expect { service.call(failed: true, limit: 1_001) }.to raise_error(described_class::SelectionError, /limit/)
   end
 
+  it "intersects selectors and applies the limit without touching nonmatches" do
+    selected = create_event(topic: "reports.lifecycle.v1", last_error: "failed", next_attempt_at: now + 5.minutes,
+      created_at: now - 2.minutes)
+    create_event(topic: "audit.security.v1", last_error: "failed", created_at: now - 2.minutes)
+    newer = create_event(topic: "reports.lifecycle.v1", last_error: "failed", created_at: now + 1.minute)
+
+    result = service.call(topic: "reports.lifecycle.v1", failed: true, created_before: now, limit: 1, execute: true)
+
+    expect(result.event_ids).to eq([ selected.id ])
+    expect(selected.reload.next_attempt_at).to be_nil
+    expect(newer.reload.last_error).to eq("failed")
+  end
+
   def create_event(**attributes)
     OutboxEvent.create!({ topic: "reports.lifecycle.v1", aggregate_type: "Report", aggregate_id: SecureRandom.uuid,
       payload: { envelope: Events::Envelope.build(event_id: SecureRandom.uuid, event_type: "report.queued",

@@ -108,7 +108,7 @@ module Reports
     def execute(input)
       heartbeat("mark-failed")
       report = Report.find(input.fetch("report_id"))
-      return { "status" => report.status } if %w[completed cancelled].include?(report.status)
+      return { "status" => report.status } if %w[completed cancelled failed].include?(report.status)
 
       Report.transaction do
         report.lock!

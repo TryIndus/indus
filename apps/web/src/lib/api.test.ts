@@ -44,4 +44,45 @@ describe('Rails API client', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
     await expect(createApiClient('https://api.example.test', async () => 'token').mutate('/v1/resources/1', 'DELETE', undefined, z.undefined(), 'mutation-2')).resolves.toBeUndefined()
   })
+
+  it('does not make a request when token resolution fails', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(createApiClient('https://api.example.test', async () => { throw new Error('identity unavailable') })
+      .get('/v1/value', z.unknown())).rejects.toThrow('identity unavailable')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('propagates cancellation to reads and mutations', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+    const client = createApiClient('https://api.example.test', async () => 'token')
+
+    await client.get('/v1/value', z.object({ ok: z.boolean() }), controller.signal)
+    await client.mutate('/v1/value', 'PATCH', { ok: true }, z.object({ ok: z.boolean() }), 'mutation-3', controller.signal)
+
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ signal: controller.signal }))
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({ signal: controller.signal }))
+  })
+
+  it('never includes an error response body in the public error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"secret":"provider detail"}', { status: 429 })))
+
+    const error = await createApiClient('https://api.example.test', async () => 'token')
+      .get('/v1/value', z.unknown()).catch(cause => cause)
+
+    expect(error).toMatchObject({ message: 'The request could not be completed.', status: 429 })
+    expect(JSON.stringify(error)).not.toContain('provider detail')
+  })
+
+  it('keeps wire serializers in snake case and omits absent optional fields', async () => {
+    const { favoriteRequest, portfolioRequest, reportRequest, userUpdateRequest } = await import('./api')
+
+    expect(favoriteRequest({ symbol: 'BTC/USD', instrumentType: 'crypto' })).toEqual({ symbol: 'BTC/USD', instrument_type: 'crypto' })
+    expect(portfolioRequest({ name: 'Core', baseCurrency: 'CAD' })).toEqual({ name: 'Core', base_currency: 'CAD' })
+    expect(reportRequest({ symbol: 'AAPL' })).toEqual({ symbol: 'AAPL' })
+    expect(JSON.parse(JSON.stringify(userUpdateRequest({})))).toEqual({})
+  })
 })

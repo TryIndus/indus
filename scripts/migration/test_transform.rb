@@ -56,11 +56,71 @@ class MigrationTransformTest < Minitest::Test
     assert_match(/orphaned owner/, error.message)
   end
 
+  def test_rejects_duplicate_identities_and_malformed_auth_metadata
+    write_rows("auth_users", %w[id email raw_user_meta_data created_at],
+      [ USER_ID, "Investor@example.test", "{}", at ],
+      [ "00000000-0000-4000-8000-000000000004", "investor@example.test", "{}", at ])
+    error = assert_raises(IndusMigration::Error) { transform! }
+    assert_match(/duplicate auth email/, error.message)
+
+    write("auth_users", %w[id email raw_user_meta_data created_at],
+      [ USER_ID, "investor@example.test", "{bad-json", at ])
+    error = assert_raises(IndusMigration::Error) { transform! }
+    assert_match(/invalid auth metadata/, error.message)
+  end
+
+  def test_rejects_unsupported_report_and_usage_state
+    write("reports", %w[id user_id symbol company_name status report_content summary created_at],
+      [ REPORT_ID, USER_ID, "AAPL", "Apple", "unknown", "Report", "Summary", at ])
+    error = assert_raises(IndusMigration::Error) { transform! }
+    assert_match(/unsupported legacy report status/, error.message)
+
+    write("reports", %w[id user_id symbol company_name status report_content summary created_at],
+      [ REPORT_ID, USER_ID, "AAPL", "Apple", "completed", "Report", "Summary", at ])
+    write("ai_usage_windows", %w[user_id function_name window_type window_start request_count],
+      [ USER_ID, "generate-report", "day", at, "0" ])
+    error = assert_raises(IndusMigration::Error) { transform! }
+    assert_match(/invalid usage request count/, error.message)
+  end
+
+  def test_validator_detects_row_tampering_and_identity_count_drift
+    transform!
+    favorites = File.join(@target, "favorites.csv")
+    File.write(favorites, File.read(favorites).sub("BTC/USD", "ETH/USD"))
+    error = assert_raises(IndusMigration::Error) { IndusMigration::Validator.new(@target).run }
+    assert_match(/favorites checksum mismatch/, error.message)
+
+    FileUtils.remove_entry_secure(@target)
+    transform!
+    File.open(File.join(@target, "cognito_identities.jsonl"), "ab") { |file| file.puts("{}") }
+    error = assert_raises(IndusMigration::Error) { IndusMigration::Validator.new(@target).run }
+    assert_match(/identity count mismatch/, error.message)
+  end
+
+  def test_requires_an_https_identity_issuer
+    error = assert_raises(IndusMigration::Error) do
+      IndusMigration::Transformer.new(source_directory: @source, target_directory: @target,
+        issuer: "http://identity.example")
+    end
+    assert_match(/HTTPS URL/, error.message)
+  end
+
   private
 
   def at = "2026-08-05T12:00:00Z"
 
+  def transform!
+    IndusMigration::Transformer.new(source_directory: @source, target_directory: @target,
+      issuer: "https://project.supabase.co/auth/v1").run
+  end
+
   def write(name, headers, row)
     CSV.open(File.join(@source, "#{name}.csv"), "wb", write_headers: true, headers: headers) { |csv| csv << row }
+  end
+
+  def write_rows(name, headers, *rows)
+    CSV.open(File.join(@source, "#{name}.csv"), "wb", write_headers: true, headers: headers) do |csv|
+      rows.each { |row| csv << row }
+    end
   end
 end
