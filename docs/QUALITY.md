@@ -86,7 +86,7 @@ bun run test:local
 
 ## Pull request verification
 
-GitHub Actions runs the same locked Bun toolchain used locally. The core job installs from `bun.lock`, runs Biome, type-checking, unit coverage, the production build, and a production dependency audit with non-secret test configuration. It never receives deployed Supabase, Alpaca, Gemini, Vercel, or AWS credentials.
+GitHub Actions runs the same locked Bun toolchain used locally. The core job installs from `bun.lock`, runs Biome, type-checking, unit coverage, the production build, and a production dependency audit with non-secret test configuration. Separate jobs replay every migration and database security assertion against an isolated PostgreSQL container and exercise public HTTP contracts in Chromium. They never receive deployed Supabase, Alpaca, Gemini, Vercel, or AWS credentials.
 
 The stable `Required verification` job aggregates the required layers as they are introduced. Configure branch protection against that job only after its first successful run on GitHub, so the repository never depends on a check name that has not been registered.
 
