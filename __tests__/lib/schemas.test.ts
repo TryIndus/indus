@@ -79,9 +79,7 @@ describe("alpacaQuerySchema", () => {
 	});
 
 	it("rejects equal and negative time boundaries", () => {
-		expect(alpacaQuerySchema.safeParse({ symbol: "AAPL", start: 20, end: 20 }).success).toBe(
-			false,
-		);
+		expect(alpacaQuerySchema.safeParse({ symbol: "AAPL", start: 20, end: 20 }).success).toBe(false);
 		expect(alpacaQuerySchema.safeParse({ symbol: "AAPL", start: -1 }).success).toBe(false);
 	});
 
@@ -177,12 +175,10 @@ describe("batchExplainSchema", () => {
 
 	it("rejects oversized or unsafe metric identifiers", () => {
 		expect(
-			batchExplainSchema.safeParse([{ symbol: "AAPL", metric: "x".repeat(81), value: 1 }])
-				.success,
+			batchExplainSchema.safeParse([{ symbol: "AAPL", metric: "x".repeat(81), value: 1 }]).success,
 		).toBe(false);
 		expect(
-			batchExplainSchema.safeParse([{ symbol: "AAPL", metric: "price<script>", value: 1 }])
-				.success,
+			batchExplainSchema.safeParse([{ symbol: "AAPL", metric: "price<script>", value: 1 }]).success,
 		).toBe(false);
 	});
 });
@@ -301,9 +297,9 @@ describe("contextChatSchema", () => {
 	});
 
 	it("rejects oversized user and conversation fields", () => {
-		expect(contextChatSchema.safeParse({ ...validInput, newMessage: "x".repeat(4_001) }).success).toBe(
-			false,
-		);
+		expect(
+			contextChatSchema.safeParse({ ...validInput, newMessage: "x".repeat(4_001) }).success,
+		).toBe(false);
 		expect(
 			contextChatSchema.safeParse({
 				...validInput,
@@ -313,9 +309,7 @@ describe("contextChatSchema", () => {
 		expect(
 			contextChatSchema.safeParse({
 				...validInput,
-				messages: [
-					{ id: "msg-1", role: "user", content: "x".repeat(8_001), createdAt: 1 },
-				],
+				messages: [{ id: "msg-1", role: "user", content: "x".repeat(8_001), createdAt: 1 }],
 			}).success,
 		).toBe(false);
 	});
