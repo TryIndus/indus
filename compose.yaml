@@ -38,6 +38,9 @@ services:
       DATABASE_URL: postgres://indus:indus-local-password@postgres:5432/indus_development
       REDIS_URL: redis://redis:6379/0
       RAILS_ENV: development
+      CORS_ORIGINS: http://127.0.0.1:14173
+      SUPABASE_JWT_ISSUER: ${SUPABASE_JWT_ISSUER:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
     ports:
       - "127.0.0.1:13000:3000"
     depends_on:
@@ -52,6 +55,8 @@ services:
       context: ./apps/web
       args:
         VITE_API_URL: http://127.0.0.1:13000
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_PUBLIC_SUPABASE_KEY: ${VITE_SUPABASE_ANON_KEY:-}
     ports:
       - "127.0.0.1:14173:4173"
     depends_on:

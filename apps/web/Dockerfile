@@ -8,9 +8,13 @@ RUN bun install --frozen-lockfile
 COPY . .
 
 ARG VITE_API_URL=http://127.0.0.1:13000
-ENV VITE_API_URL=${VITE_API_URL}
+ARG VITE_SUPABASE_URL
+ARG VITE_PUBLIC_SUPABASE_KEY
 
-RUN bun run build
+RUN VITE_API_URL="${VITE_API_URL}" \
+    VITE_SUPABASE_URL="${VITE_SUPABASE_URL}" \
+    VITE_SUPABASE_ANON_KEY="${VITE_PUBLIC_SUPABASE_KEY}" \
+    bun run build
 
 FROM oven/bun:1.3.13-alpine
 
