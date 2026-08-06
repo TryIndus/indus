@@ -37,7 +37,7 @@ Audit events record actor, action, resource, outcome, correlation ID, and bounde
 
 ## Model gateway
 
-The gateway selects a server-configured model by task. Prompt templates, output schemas, tool allowlists, timeouts, and quotas are application-owned and versioned independently from the Gemini adapter. Provider-specific response objects never leave the adapter. Normalized errors distinguish authentication, quota, timeout, safety rejection, malformed output, and upstream availability so callers can apply bounded retry behavior.
+The gateway selects a server-configured model by task. Prompt templates, structured output schemas, server-side evidence allowlists, timeouts, and quotas are application-owned and versioned independently from the Gemini adapter. Citations must exactly match one of the bounded evidence records supplied by the server; provider-specific response objects never leave the adapter. Normalized errors distinguish authentication, quota, timeout, safety rejection, malformed output, and upstream availability so callers can apply bounded retry behavior.
 
 Live model calls are not part of deterministic CI. Fixture-backed contract tests and golden evaluations cover request construction, output validation, safety failures, timeouts, and malformed responses. Phase 4 injects the personal Gemini token from Secrets Manager without rebuilding an image.
 

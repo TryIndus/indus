@@ -24,13 +24,15 @@ RSpec.describe Models::GeminiAdapter do
 
   it "normalizes provider content and usage" do
     transport = FakeGeminiTransport.new(body: fixture)
+    schema = { type: "object", required: [ "message" ] }
     result = described_class.new(api_key: "not-a-real-key", model: "gemini-test", transport: transport)
-      .generate(prompt: "Explain revenue", purpose: "metric_explanation")
+      .generate(prompt: "Explain revenue", purpose: "metric_explanation", response_schema: schema)
 
     expect(result.to_h).to eq(text: "Revenue increased 12% year over year.", model: "gemini-test",
       usage: { "promptTokenCount" => 10, "candidatesTokenCount" => 8, "totalTokenCount" => 18 })
     expect(transport.request["x-goog-api-key"]).to eq("not-a-real-key")
-    expect(JSON.parse(transport.request.body)).to include("generationConfig" => include("temperature" => 0.2))
+    expect(JSON.parse(transport.request.body)).to include("generationConfig" => include(
+      "temperature" => 0.2, "responseMimeType" => "application/json", "responseSchema" => schema.stringify_keys))
   end
 
   it "fails closed when the provider returns no content" do

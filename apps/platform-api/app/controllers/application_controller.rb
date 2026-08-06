@@ -12,11 +12,12 @@ class ApplicationController < ActionController::API
   rescue_from ActiveRecord::RecordInvalid, with: :render_invalid
   rescue_from AiUsageLimiter::LimitExceeded, with: :render_rate_limited
   rescue_from ActionController::BadRequest, ActionController::ParameterMissing, with: :render_bad_request
-  rescue_from ModelGateway::Error, with: :render_upstream_failure
+  rescue_from ModelGateway::Error, with: :render_model_failure
   rescue_from FundamentalsProvider::Error, with: :render_upstream_failure
   rescue_from FundamentalsProvider::InvalidSymbol, with: :render_bad_request
   rescue_from FundamentalsProvider::NotFound, with: :render_not_found
   rescue_from ActiveRecord::RecordNotUnique, with: :render_conflict
+  rescue_from ActiveRecord::DeleteRestrictionError, ActiveRecord::InvalidForeignKey, with: :render_conflict
 
   private
 
@@ -61,15 +62,32 @@ class ApplicationController < ActionController::API
   end
 
   def render_bad_request(error) = render_problem(status: :bad_request, code: "bad_request", title: "Malformed request", detail: error.message)
+  def render_model_failure(error)
+    return render_bad_request(error) if error.category == :invalid_request
+
+    render_upstream_failure
+  end
   def render_upstream_failure = render_problem(status: :bad_gateway, code: "upstream_unavailable", title: "Upstream provider unavailable")
   def render_conflict = render_problem(status: :conflict, code: "resource_conflict", title: "Resource conflict")
 
   def render_problem(status:, code:, title:, detail: nil, errors: nil)
     numeric_status = Rack::Utils.status_code(status)
+    record_failed_mutation(code, numeric_status) if numeric_status >= 400
     body = { type: "about:blank", title: title, status: numeric_status, code: code,
       request_id: request.request_id.presence || SecureRandom.uuid }
     body[:detail] = detail.to_s.byteslice(0, 2_000) if detail.present?
     body[:errors] = errors if errors.present?
     render json: body, status: numeric_status, content_type: "application/problem+json"
+  end
+
+  def record_failed_mutation(code, status)
+    return unless mutation_request? && Current.user
+
+    uuid = /\A[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\z/i
+    resource_id = params[:id].to_s if params[:id].to_s.match?(uuid)
+    AuditEvent.create!(user: Current.user, action: "#{controller_name}.#{action_name}",
+      resource_type: controller_name.singularize.classify, resource_id: resource_id,
+      metadata: { request_id: request.request_id, method: request.request_method, path: request.path,
+        outcome: "failure", status: status, error_code: code }, occurred_at: Time.current)
   end
 end

@@ -28,6 +28,19 @@ RSpec.describe Fundamentals::YahooAdapter do
     expect(transport.request["User-Agent"]).to eq("Indus/1.0")
   end
 
+  it "fetches a bounded symbol batch in one provider request" do
+    body = { quoteResponse: { result: [
+      { symbol: "AAPL", regularMarketPrice: 218.27, regularMarketChangePercent: 1.1 },
+      { symbol: "MSFT", regularMarketPrice: 410.0, regularMarketChangePercent: -0.2 }
+    ] } }.to_json
+    transport = FakeFundamentalsTransport.new(body: body)
+
+    snapshots = described_class.new(transport: transport).fetch_many(symbols: %w[aapl MSFT], timeout: 2)
+
+    expect(snapshots.keys).to contain_exactly("AAPL", "MSFT")
+    expect(URI.decode_www_form(transport.request.uri.query).to_h).to eq("symbols" => "AAPL,MSFT")
+  end
+
   it "rejects malformed symbols before making a provider request" do
     transport = instance_double(Class)
     expect { described_class.new(transport: transport).fetch(symbol: "bad symbol") }

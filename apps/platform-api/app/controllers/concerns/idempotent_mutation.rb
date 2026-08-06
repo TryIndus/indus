@@ -3,6 +3,7 @@ require "digest"
 module IdempotentMutation
   IDEMPOTENCY_TTL = 24.hours
   KEY_FORMAT = /\A[A-Za-z0-9._:-]{16,128}\z/
+  REPLAYED_RESPONSE_HEADERS = %w[Location].freeze
 
   private
 
@@ -49,7 +50,8 @@ module IdempotentMutation
     yield
     record_successful_mutation if response.status.between?(200, 299)
     record.update!(response_status: response.status,
-      response_body: { "body" => response.body.to_s, "content_type" => response.media_type })
+      response_body: { "body" => response.body.to_s, "content_type" => response.media_type,
+        "headers" => REPLAYED_RESPONSE_HEADERS.to_h { |header| [ header, response.headers[header] ] }.compact })
   end
 
   def request_fingerprint
@@ -59,6 +61,7 @@ module IdempotentMutation
   def replay_idempotent_response(record)
     response.set_header("Idempotency-Replayed", "true")
     self.content_type = record.response_body["content_type"] if record.response_body["content_type"]
+    record.response_body.fetch("headers", {}).each { |header, value| response.set_header(header, value) }
     self.response_body = record.response_body.fetch("body")
     self.status = record.response_status
   end
@@ -71,7 +74,8 @@ module IdempotentMutation
     body = parsed_response_body
     AuditEvent.create!(user: Current.user, action: "#{controller_name}.#{action_name}",
       resource_type: controller_name.singularize.classify, resource_id: body.is_a?(Hash) ? body["id"] : params[:id],
-      metadata: { request_id: request.request_id, method: request.request_method, path: request.path }, occurred_at: Time.current)
+      metadata: { request_id: request.request_id, method: request.request_method, path: request.path,
+        outcome: "success", status: response.status }, occurred_at: Time.current)
   end
 
   def parsed_response_body

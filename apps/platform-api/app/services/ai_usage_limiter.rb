@@ -9,8 +9,10 @@ class AiUsageLimiter
   end
 
   def consume!
-    AiUsageWindow.transaction do
-      usage = AiUsageWindow.lock.find_or_create_by!(user: @user, operation: @operation, window_started_at: @window)
+    # QuotaRecord owns a dedicated connection pool so this transaction commits even when
+    # the caller's idempotent mutation later rolls back after a provider failure.
+    AiUsageWindow.transaction(requires_new: true, joinable: false) do
+      usage = AiUsageWindow.lock.find_or_create_by!(user_id: @user.id, operation: @operation, window_started_at: @window)
       raise LimitExceeded, "AI request quota exceeded" if usage.request_count >= @limit
 
       usage.increment!(:request_count)

@@ -35,6 +35,7 @@ RSpec.describe "tenant API boundaries", type: :request do
     post "/v1/favorites", params: { symbol: " aapl ", instrument_type: "equity" }, headers: headers
     expect(response).to have_http_status(:created)
     expect(JSON.parse(response.body)).to include("symbol" => "AAPL")
+    expect(response.headers["Location"]).to match(%r{\A/v1/favorites/[0-9a-f-]{36}\z})
     expect(User.find_by!(external_subject: "current-user").favorites.pluck(:symbol)).to eq([ "AAPL" ])
   end
 
@@ -50,19 +51,26 @@ RSpec.describe "tenant API boundaries", type: :request do
       post "/v1/reports", params: { symbol: "msft" }, headers: headers
     end.to change(Report, :count).by(1).and change(OutboxEvent, :count).by(1)
     expect(response).to have_http_status(:accepted)
-    expect(OutboxEvent.last.payload).to include("symbol" => "MSFT")
+    expect(OutboxEvent.last.payload).to include("symbol" => "MSFT", "envelope" => include(
+      "event_id" => OutboxEvent.last.id, "schema_version" => 1, "event_type" => "report.requested",
+      "producer" => "platform-api", "idempotency_key" => headers.fetch("Idempotency-Key"),
+      "tenant_id" => Report.last.user_id))
+    expect(OutboxEvent.last.payload.dig("envelope", "correlation_id")).to be_present
     expect(AuditEvent.last.attributes).to include("action" => "reports.create", "resource_type" => "Report",
       "resource_id" => Report.last.id)
+    expect(AuditEvent.last.metadata).to include("outcome" => "success", "status" => 202)
   end
 
   it "replays the same write without duplicating side effects or audit events" do
     expect do
       post "/v1/reports", params: { symbol: "MSFT" }, headers: headers
       @original_response = JSON.parse(response.body)
+      @original_location = response.headers["Location"]
       post "/v1/reports", params: { symbol: "MSFT" }, headers: headers
     end.to change(Report, :count).by(1).and change(OutboxEvent, :count).by(1).and change(AuditEvent, :count).by(1)
     expect(response).to have_http_status(:accepted)
     expect(response.headers["Idempotency-Replayed"]).to eq("true")
+    expect(response.headers["Location"]).to eq(@original_location)
     expect(JSON.parse(response.body)).to eq(@original_response)
   end
 
@@ -82,30 +90,33 @@ RSpec.describe "tenant API boundaries", type: :request do
     end
     favorite = user.favorites.create!(symbol: "AAPL")
     expect do
-      delete "/v1/favorites/AAPL?instrument_type=equity", headers: headers
-      delete "/v1/favorites/AAPL?instrument_type=equity", headers: headers
+      delete "/v1/favorites/#{favorite.id}", headers: headers
+      delete "/v1/favorites/#{favorite.id}", headers: headers
     end.to change(Favorite, :count).by(-1).and change(AuditEvent, :count).by(1)
     expect(response).to have_http_status(:no_content)
     expect(response.body).to eq("")
     expect(response.headers["Idempotency-Replayed"]).to eq("true")
+    expect(AuditEvent.last.resource_id).to eq(favorite.id)
   end
 
-  it "does not write an outbox event when report validation fails" do
-    audit_count = AuditEvent.count
+  it "audits report validation failures without writing an outbox event" do
+    outbox_count = OutboxEvent.count
     expect do
       post "/v1/reports", params: { symbol: "not a symbol" }, headers: headers
-    end.not_to change(OutboxEvent, :count)
-    expect(AuditEvent.count).to eq(audit_count)
+    end.to change(AuditEvent, :count).by(1)
+    expect(OutboxEvent.count).to eq(outbox_count)
     expect(response).to have_http_status(:unprocessable_content)
+    expect(AuditEvent.last.metadata).to include("outcome" => "failure", "status" => 422,
+      "error_code" => "validation_failed")
   end
 
   it "returns the bounded market contract when a provider is unavailable" do
     provider = instance_double(FundamentalsProvider)
-    allow(provider).to receive(:fetch).and_raise(FundamentalsProvider::Error)
+    allow(provider).to receive(:fetch_many).and_raise(FundamentalsProvider::Error)
     allow(FundamentalsProvider).to receive(:default).and_return(provider)
     get "/v1/market/summary", headers: headers
-    expect(response).to have_http_status(:ok)
-    expect(JSON.parse(response.body)).to eq("indices" => [], "watchlist" => [])
+    expect(response).to have_http_status(:bad_gateway)
+    expect(JSON.parse(response.body)).to include("code" => "upstream_unavailable")
   end
 
   it "returns a bounded bad-request response for missing model parameters" do
@@ -115,6 +126,9 @@ RSpec.describe "tenant API boundaries", type: :request do
   end
 
   it "does not expose model provider errors" do
+    snapshot = FundamentalsSnapshot.new(symbol: "AAPL", as_of: Time.current,
+      metrics: { "regularMarketPrice" => 200.0 }, source_reference: "fixture:AAPL")
+    allow(FundamentalsProvider).to receive(:default).and_return(instance_double(FundamentalsProvider, fetch: snapshot))
     gateway = instance_double(ModelGateway)
     allow(gateway).to receive(:execute).and_raise(ModelGateway::Error.new(:unavailable, "sensitive provider detail"))
     allow(ModelGateway).to receive(:default).and_return(gateway)

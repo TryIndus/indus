@@ -27,8 +27,7 @@ module V1
       authorize report
       Report.transaction do
         report.save!
-        OutboxEvent.create!(topic: "report.requested", aggregate_type: "Report", aggregate_id: report.id,
-          payload: { report_id: report.id, user_id: Current.user.id, symbol: report.symbol, focus: attributes[:focus] })
+        create_report_outbox_event(report, attributes[:focus])
       end
       response.set_header("Location", "/v1/reports/#{report.id}")
       render json: report_json(report), status: :accepted
@@ -39,6 +38,18 @@ module V1
       authorize report
       report.destroy!
       head :no_content
+    end
+
+    private
+
+    def create_report_outbox_event(report, focus)
+      event_id = SecureRandom.uuid
+      occurred_at = Time.current
+      envelope = { event_id: event_id, schema_version: 1, event_type: "report.requested", producer: "platform-api",
+        occurred_at: occurred_at.iso8601, correlation_id: request.request_id, causation_id: request.request_id,
+        idempotency_key: request.headers["Idempotency-Key"], tenant_id: Current.user.id }
+      OutboxEvent.create!(id: event_id, topic: "report.requested", aggregate_type: "Report", aggregate_id: report.id,
+        payload: { envelope: envelope, report_id: report.id, user_id: Current.user.id, symbol: report.symbol, focus: focus })
     end
   end
 end

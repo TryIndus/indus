@@ -13,8 +13,41 @@ RSpec.describe "domain constraints" do
     expect { portfolio.positions.create!(symbol: "AAPL", quantity: 0, average_cost: 1) }.to raise_error(ActiveRecord::RecordInvalid)
   end
 
+  it "validates position decimals before PostgreSQL can round or overflow them" do
+    portfolio = user.portfolios.create!(name: "Decimal boundaries")
+    valid = portfolio.positions.new(symbol: "AAPL", quantity: "999999999999999999.1234567890",
+      average_cost: "99999999999999.12345678")
+    expect(valid).to be_valid
+
+    [
+      { quantity: "1.12345678901", average_cost: "1" },
+      { quantity: "9999999999999999999", average_cost: "1" },
+      { quantity: "1", average_cost: "1.123456789" },
+      { quantity: "1", average_cost: "999999999999999.1" }
+    ].each do |attributes|
+      expect(portfolio.positions.new({ symbol: SecureRandom.hex(2).upcase }.merge(attributes))).not_to be_valid
+    end
+  end
+
   it "restricts reports to durable workflow states" do
     expect { user.reports.create!(symbol: "AAPL", status: "mystery") }.to raise_error(ActiveRecord::RecordInvalid)
+  end
+
+  it "enforces report and portfolio tenant consistency in the model and database" do
+    other = User.create!(issuer: "issuer", external_subject: SecureRandom.uuid,
+      email: "other-domain@example.test", display_name: "Other")
+    portfolio = other.portfolios.create!(name: "Private")
+    report = user.reports.new(symbol: "AAPL", title: "Cross-tenant report", portfolio: portfolio)
+    expect(report).not_to be_valid
+    expect(report.errors[:portfolio]).to include("must belong to the report owner")
+
+    now = Time.current
+    expect do
+      ApplicationRecord.transaction(requires_new: true) do
+        Report.insert_all!([ { user_id: user.id, portfolio_id: portfolio.id, symbol: "AAPL", title: "Invalid owner",
+          status: "queued", created_at: now, updated_at: now } ])
+      end
+    end.to raise_error(ActiveRecord::StatementInvalid)
   end
 
   it "rejects symbols with repeated or trailing separators" do
