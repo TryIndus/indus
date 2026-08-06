@@ -5,7 +5,7 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**createFavorite**](FavoritesApi.md#createfavoriteoperation) | **POST** /v1/favorites | Add an instrument to the authenticated user\&#39;s favorites. |
-| [**deleteFavorite**](FavoritesApi.md#deletefavorite) | **DELETE** /v1/favorites/{symbol} | Remove an instrument from the authenticated user\&#39;s favorites. |
+| [**deleteFavorite**](FavoritesApi.md#deletefavorite) | **DELETE** /v1/favorites/{favorite_id} | Remove an instrument from the authenticated user\&#39;s favorites. |
 | [**listFavorites**](FavoritesApi.md#listfavorites) | **GET** /v1/favorites | List favorites owned by the authenticated user. |
 
 
@@ -89,7 +89,7 @@ example().catch(console.error);
 
 ## deleteFavorite
 
-> deleteFavorite(symbol, idempotencyKey)
+> deleteFavorite(favoriteId, idempotencyKey)
 
 Remove an instrument from the authenticated user\&#39;s favorites.
 
@@ -112,7 +112,7 @@ async function example() {
 
   const body = {
     // string
-    symbol: symbol_example,
+    favoriteId: 38400000-8cf0-11bd-b23e-10b96e4ef00d,
     // string | Unique client-generated key. Reuse with a different payload returns `409`.
     idempotencyKey: idempotencyKey_example,
   } satisfies DeleteFavoriteRequest;
@@ -134,7 +134,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **symbol** | `string` |  | [Defaults to `undefined`] |
+| **favoriteId** | `string` |  | [Defaults to `undefined`] |
 | **idempotencyKey** | `string` | Unique client-generated key. Reuse with a different payload returns &#x60;409&#x60;. | [Defaults to `undefined`] |
 
 ### Return type

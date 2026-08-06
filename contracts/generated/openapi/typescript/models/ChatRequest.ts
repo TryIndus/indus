@@ -46,7 +46,7 @@ export interface ChatRequest {
      */
     portfolioId?: string;
     /**
-     *
+     * Message content is additionally limited to 8,000 UTF-8 bytes in aggregate.
      * @type {Array<ChatMessage>}
      * @memberof ChatRequest
      */

@@ -20,13 +20,13 @@ import { mapValues } from '../runtime';
  */
 export interface UpdatePositionRequest {
     /**
-     * Positive base-10 decimal encoded as a string to avoid binary rounding.
+     * Positive base-10 decimal with at most 18 integer and 10 fractional digits, encoded as a string.
      * @type {string}
      * @memberof UpdatePositionRequest
      */
     quantity?: string;
     /**
-     * Non-negative base-10 decimal encoded as a string.
+     * Non-negative base-10 decimal with at most 14 integer and 8 fractional digits, encoded as a string.
      * @type {string}
      * @memberof UpdatePositionRequest
      */
