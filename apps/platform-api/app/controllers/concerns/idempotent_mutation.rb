@@ -20,27 +20,29 @@ module IdempotentMutation
 
   def run_idempotent_transaction(key)
     attempts = 0
-    IdempotencyRecord.transaction(requires_new: true) do
-      record = IdempotencyRecord.find_or_initialize_by(user: Current.user, key: key)
-      record.lock! if record.persisted?
-      fingerprint = request_fingerprint
+    begin
+      IdempotencyRecord.transaction(requires_new: true) do
+        record = IdempotencyRecord.find_or_initialize_by(user: Current.user, key: key)
+        record.lock! if record.persisted?
+        fingerprint = request_fingerprint
 
-      if record.persisted? && record.expires_at > Time.current
-        if record.request_fingerprint != fingerprint
-          render_idempotency_conflict
-        elsif record.response_status
-          replay_idempotent_response(record)
+        if record.persisted? && record.expires_at > Time.current
+          if record.request_fingerprint != fingerprint
+            render_idempotency_conflict
+          elsif record.response_status
+            replay_idempotent_response(record)
+          else
+            execute_idempotent_mutation(record, fingerprint) { yield }
+          end
         else
           execute_idempotent_mutation(record, fingerprint) { yield }
         end
-      else
-        execute_idempotent_mutation(record, fingerprint) { yield }
       end
+    rescue ActiveRecord::RecordNotUnique
+      attempts += 1
+      retry if attempts < 2
+      raise
     end
-  rescue ActiveRecord::RecordNotUnique
-    attempts += 1
-    retry if attempts < 2
-    raise
   end
 
   def execute_idempotent_mutation(record, fingerprint)

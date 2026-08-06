@@ -30,6 +30,16 @@ RSpec.describe "security and failure boundaries", type: :request do
     expect(IdempotencyRecord.count).to eq(0)
   end
 
+  it "bounds retries when idempotency reservation repeatedly loses a uniqueness race" do
+    allow(IdempotencyRecord).to receive(:transaction).and_raise(ActiveRecord::RecordNotUnique)
+
+    post "/v1/favorites", params: { symbol: "AAPL", instrument_type: "equity" }, headers: write_headers
+
+    expect(response).to have_http_status(:conflict)
+    expect(IdempotencyRecord).to have_received(:transaction).twice
+    expect(Favorite.count).to eq(0)
+  end
+
   it "rate limits model work without invoking the provider" do
     user = User.create!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub"),
       email: claims.fetch("email"), display_name: "Boundary")
