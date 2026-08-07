@@ -118,14 +118,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("@authenticated dashboard loads with a verified session", async ({ page }) => {
-	await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Your research desk." })).toBeVisible();
 	await expect(page.getByRole("heading", { name: "Your Favorites" })).toBeVisible();
 });
 
 test("@authenticated auth page redirects an existing session", async ({ page }) => {
 	await page.goto("/auth");
 	await expect(page).toHaveURL(/\/dashboard$/);
-	await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Your research desk." })).toBeVisible();
 });
 
 test("@authenticated queryless crypto route renders its empty state", async ({ page }) => {
@@ -173,7 +173,8 @@ test("@authenticated company research connects chart ranges to the grounded anal
 	await page.getByText("33.1", { exact: true }).last().hover();
 	await expect(page.getByText(/Read it with growth and margins/)).toBeVisible();
 
-	await page.getByRole("button", { name: "Ask Indus" }).click();
+	const companySnapshot = page.getByRole("region", { name: "AAPL company snapshot" });
+	await companySnapshot.getByRole("button", { name: "Ask Indus" }).click();
 	const analyst = page.getByRole("dialog", { name: /Valuation|Company overview/ });
 	await expect(analyst).toBeVisible();
 	await expect(analyst.getByText(/Grounded in the company fundamentals/)).toBeVisible();

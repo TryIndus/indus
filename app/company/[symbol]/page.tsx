@@ -213,7 +213,10 @@ export default function CompanyPage() {
 
 			{financialData && !isLoading && (
 				<div className="space-y-5">
-					<section className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm sm:p-7">
+					<section
+						className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card p-5 shadow-sm sm:p-7"
+						aria-label={`${financialData.symbol} company snapshot`}
+					>
 						<div className="pointer-events-none absolute -right-24 -top-28 size-80 rounded-full bg-primary/[0.07] blur-3xl" />
 						<div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
 							<div className="min-w-0">
