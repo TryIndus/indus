@@ -1,7 +1,8 @@
 import type { Item } from "@/lib/prompts";
 
 // localStorage key for persistent cache
-const STORAGE_KEY = "indus_explanations_cache";
+const STORAGE_KEY = "indus_explanations_cache_v2";
+const CACHE_TTL_MS = 15 * 60 * 1000;
 
 // Load cache from localStorage on initialization
 function loadCacheFromStorage(): Map<string, string> {
@@ -9,8 +10,24 @@ function loadCacheFromStorage(): Map<string, string> {
 	try {
 		const stored = localStorage.getItem(STORAGE_KEY);
 		if (stored) {
-			const parsed = JSON.parse(stored);
-			return new Map(Object.entries(parsed));
+			const parsed: unknown = JSON.parse(stored);
+			if (
+				parsed &&
+				typeof parsed === "object" &&
+				"savedAt" in parsed &&
+				typeof parsed.savedAt === "number" &&
+				Date.now() - parsed.savedAt < CACHE_TTL_MS &&
+				"entries" in parsed &&
+				parsed.entries &&
+				typeof parsed.entries === "object"
+			) {
+				return new Map(
+					Object.entries(parsed.entries).filter(
+						(entry): entry is [string, string] => typeof entry[1] === "string",
+					),
+				);
+			}
+			localStorage.removeItem(STORAGE_KEY);
 		}
 	} catch (_e) {
 		// Silently fail - cache will be empty
@@ -22,8 +39,10 @@ function loadCacheFromStorage(): Map<string, string> {
 function saveCacheToStorage(cache: Map<string, string>) {
 	if (typeof window === "undefined") return;
 	try {
-		const obj = Object.fromEntries(cache);
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+		localStorage.setItem(
+			STORAGE_KEY,
+			JSON.stringify({ savedAt: Date.now(), entries: Object.fromEntries(cache) }),
+		);
 	} catch (_e) {
 		// Silently fail - cache won't persist but app will continue working
 	}
@@ -32,6 +51,7 @@ function saveCacheToStorage(cache: Map<string, string>) {
 // Global cache and loading state - initialized from localStorage
 const explanationCache = loadCacheFromStorage();
 const loadingState = new Map<string, boolean>();
+const errorState = new Map<string, string>();
 
 // Cache update listeners - now keyed by cache key
 const cacheListeners = new Map<string, Set<() => void>>();
@@ -54,6 +74,10 @@ export function getCachedExplanation(symbol: string, metric: string) {
 
 export function isLoading(symbol: string, metric: string) {
 	return !!loadingState.get(makeKey(symbol, metric));
+}
+
+export function getExplanationError(symbol: string, metric: string) {
+	return errorState.get(makeKey(symbol, metric));
 }
 
 export function subscribeToCacheUpdates(symbol: string, metric: string, callback: () => void) {
@@ -87,10 +111,10 @@ export async function fetchExplanation(
 		return;
 	}
 
-	// If batch preload is in progress, wait for it instead of starting a new one
+	// If another metric is loading, wait and then re-check this metric instead of dropping it.
 	if (pendingBatchRequest) {
 		await pendingBatchRequest;
-		return;
+		if (explanationCache.has(key) || loadingState.get(key)) return;
 	}
 
 	// Since we removed individual API endpoint, use batch API for single items
@@ -114,6 +138,7 @@ export async function batchPreload(items: Item[]) {
 
 	for (const item of toFetch) {
 		const key = makeKey(item.symbol, item.metric);
+		errorState.delete(key);
 		loadingState.set(key, true);
 		notifyCacheUpdate(key);
 	}
@@ -130,7 +155,11 @@ export async function batchPreload(items: Item[]) {
 			const data = await res.json();
 
 			if (!res.ok) {
-				throw new Error(`Explanation request failed with status ${res.status}`);
+				const message =
+					data && typeof data === "object" && typeof data.error === "string"
+						? data.error
+						: "This explanation is temporarily unavailable.";
+				throw new Error(message);
 			}
 
 			if (data && typeof data === "object" && data.explanations) {
@@ -142,8 +171,14 @@ export async function batchPreload(items: Item[]) {
 				}
 				saveCacheToStorage(explanationCache);
 			}
-		} catch {
-			// Transient provider and network failures remain retryable.
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "This explanation is temporarily unavailable.";
+			for (const item of toFetch) {
+				const key = makeKey(item.symbol, item.metric);
+				errorState.set(key, message);
+				notifyCacheUpdate(key);
+			}
 		} finally {
 			for (const item of toFetch) {
 				const key = makeKey(item.symbol, item.metric);

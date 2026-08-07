@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/observability/logger";
 import { type Item, makeBatchPrompt } from "@/lib/prompts";
-import { batchExplainSchema, geminiTextResponseSchema } from "@/lib/schemas/api";
+import {
+	batchExplainSchema,
+	geminiTextResponseSchema,
+	valueAnalysisSchema,
+} from "@/lib/schemas/api";
 import { type AiAccessClient, checkAiAccess, getAiQuotaHeaders } from "@/lib/security/ai-access";
 import { createClient } from "@/lib/supabase/server";
 import { VALUE_ANALYSIS_SYSTEM_PROMPT } from "@/lib/system-prompts";
@@ -31,9 +35,10 @@ function parseStructuredExplanations(
 		return Object.fromEntries(
 			items.map((item, index) => {
 				const explanation = (parsed as Record<string, unknown>)[String(index + 1)];
+				const validated = valueAnalysisSchema.safeParse(explanation);
 				return [
 					explanationKey(item),
-					explanation === undefined ? DEFAULT_EXPLANATION : JSON.stringify(explanation),
+					validated.success ? JSON.stringify(validated.data) : DEFAULT_EXPLANATION,
 				];
 			}),
 		);
@@ -85,6 +90,10 @@ export async function POST(req: Request) {
 			},
 			body: JSON.stringify({
 				contents: [{ parts: [{ text: fullPrompt }] }],
+				generationConfig: {
+					responseMimeType: "application/json",
+					temperature: 0.2,
+				},
 			}),
 		});
 

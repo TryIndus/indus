@@ -108,13 +108,13 @@ export const contextChatSchema = z.object({
 		metricGroups: metricGroupsSchema,
 		chart: z
 			.object({
+				range: z.string().trim().min(1).max(10),
 				interval: z.string().trim().min(1).max(20),
 				points: z.array(chartPointSchema).max(100),
 				latestPrice: finiteNumberSchema,
-				dayChangePct: finiteNumberSchema,
+				rangeChangePct: finiteNumberSchema,
 			})
 			.optional(),
-		cachedExplanations: z.record(metricKeySchema, z.string().max(500)),
 		trigger: z.object({
 			metricKey: metricKeySchema,
 			metricLabel: z.string().trim().min(1).max(120),
@@ -164,6 +164,14 @@ export const geminiTextResponseSchema = z.object({
 		)
 		.min(1),
 });
+
+export const valueAnalysisSchema = z
+	.object({
+		metric_display: z.string().trim().min(1).max(240),
+		insight: z.string().trim().min(1).max(800),
+		evaluation: z.enum(["green", "red", "neutral", "amber"]),
+	})
+	.strict();
 
 export const envSchema = z.object({
 	NEXT_PUBLIC_SUPABASE_URL: z.url(),

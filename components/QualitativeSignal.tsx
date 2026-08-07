@@ -15,23 +15,23 @@ type QualitativeSignalProps = {
 const evaluationConfig = {
 	green: {
 		color: "bg-green-500",
-		label: "Strong",
-		description: "Favorable",
+		label: "Positive",
+		description: "Positive directional read",
 	},
 	red: {
 		color: "bg-red-500",
-		label: "Weak",
-		description: "Concerning",
+		label: "Negative",
+		description: "Negative directional read",
 	},
 	amber: {
 		color: "bg-amber-500",
-		label: "Caution",
-		description: "Mixed",
+		label: "Mixed",
+		description: "Mixed directional read",
 	},
 	neutral: {
 		color: "bg-gray-400",
-		label: "Neutral",
-		description: "Typical",
+		label: "Context needed",
+		description: "More context needed",
 	},
 };
 
@@ -59,6 +59,9 @@ const QualitativeSignal: React.FC<QualitativeSignalProps> = ({
 			<div
 				className={cn("rounded-full", config.color, sizeClass)}
 				title={`${config.description} - ${config.label}`}
+				aria-hidden={showLabel ? "true" : undefined}
+				role={showLabel ? undefined : "img"}
+				aria-label={showLabel ? undefined : config.description}
 			/>
 			{showLabel && <span className="text-xs text-muted-foreground">{config.label}</span>}
 		</div>

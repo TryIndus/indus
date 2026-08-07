@@ -13,7 +13,6 @@ const validChatRequest = {
 			financialHealth: { totalCash: 60_000_000_000 },
 			dividends: { dividendYield: 0.004 },
 		},
-		cachedExplanations: {},
 		trigger: { metricKey: "pe_ratio", metricLabel: "P/E Ratio", value: 28.5 },
 	},
 	messages: [],
