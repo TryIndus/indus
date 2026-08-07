@@ -137,8 +137,8 @@ function ProductPreview() {
 							“Where is the tension in these numbers?”
 						</p>
 						<p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-							A 24.3% net margin and 33.1× P/E connect profitability to the price paid for
-							earnings. Compare earnings growth next; it is the missing piece in this view.
+							A 24.3% net margin and 33.1× P/E connect profitability to the price paid for earnings.
+							Compare earnings growth next; it is the missing piece in this view.
 						</p>
 						<div className="mt-auto pt-6">
 							<div className="flex items-center gap-2 border-t border-primary/15 pt-3 text-[10px] text-muted-foreground">
@@ -160,7 +160,10 @@ export default function LandingPage() {
 			<div className="pointer-events-none absolute left-1/2 top-[-360px] h-[720px] w-[900px] -translate-x-1/2 rounded-full bg-primary/[0.08] blur-[140px]" />
 
 			<header className="relative z-20 border-b border-border/60 bg-background/75 backdrop-blur-xl">
-				<nav className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8" aria-label="Main navigation">
+				<nav
+					className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8"
+					aria-label="Main navigation"
+				>
 					<Link href="/" className="flex items-center gap-2.5" aria-label="Indus home">
 						<BrandMark />
 						<span className="text-lg font-bold tracking-[-0.04em]">Indus</span>
@@ -214,7 +217,12 @@ export default function LandingPage() {
 									<ArrowRight className="size-4" />
 								</Link>
 							</Button>
-							<Button size="lg" variant="outline" asChild className="h-12 rounded-full px-7 text-sm">
+							<Button
+								size="lg"
+								variant="outline"
+								asChild
+								className="h-12 rounded-full px-7 text-sm"
+							>
 								<Link href="/auth">
 									Explore an example
 									<ChevronRight className="size-4" />
@@ -246,7 +254,10 @@ export default function LandingPage() {
 
 							<div className="divide-y divide-border/70 border-y border-border/70">
 								{researchSteps.map((step) => (
-									<div key={step.number} className="group grid grid-cols-[auto_1fr] gap-5 py-7 sm:grid-cols-[70px_auto_1fr] sm:items-start">
+									<div
+										key={step.number}
+										className="group grid grid-cols-[auto_1fr] gap-5 py-7 sm:grid-cols-[70px_auto_1fr] sm:items-start"
+									>
 										<span className="hidden font-mono text-xs text-muted-foreground sm:block">
 											{step.number}
 										</span>
@@ -266,7 +277,10 @@ export default function LandingPage() {
 					</div>
 				</section>
 
-				<section id="principles" className="scroll-mt-20 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
+				<section
+					id="principles"
+					className="scroll-mt-20 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28"
+				>
 					<div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
 						<div>
 							<p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">
@@ -277,8 +291,8 @@ export default function LandingPage() {
 							</h2>
 						</div>
 						<p className="max-w-md text-sm leading-6 text-muted-foreground">
-							Every layer is designed to show what is known, what is delayed, and what the model
-							can actually support.
+							Every layer is designed to show what is known, what is delayed, and what the model can
+							actually support.
 						</p>
 					</div>
 
@@ -300,7 +314,10 @@ export default function LandingPage() {
 								copy: "The analyst is constrained to the company evidence supplied in the current research view.",
 							},
 						].map((principle) => (
-							<div key={principle.title} className="surface-hairline rounded-2xl border border-border/70 bg-card p-6 lg:p-7">
+							<div
+								key={principle.title}
+								className="surface-hairline rounded-2xl border border-border/70 bg-card p-6 lg:p-7"
+							>
 								<principle.icon className="size-5 text-primary" />
 								<h3 className="mt-10 font-semibold tracking-tight">{principle.title}</h3>
 								<p className="mt-3 text-sm leading-6 text-muted-foreground">{principle.copy}</p>

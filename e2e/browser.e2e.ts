@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 
 test("@browser landing page exposes the primary product path", async ({ page }) => {
 	await page.goto("/");
-	await expect(page.getByRole("heading", { name: /Financial intelligence, in context/ })).toBeVisible();
+	await expect(
+		page.getByRole("heading", { name: /Financial intelligence, in context/ }),
+	).toBeVisible();
 	for (const name of [
 		"Sign in",
 		"Open Indus",

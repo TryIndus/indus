@@ -55,8 +55,10 @@ async function readErrorResponse(response: Response): Promise<string> {
 			: null;
 
 	if (response.status === 401) return "Your session has expired. Sign in again to use the analyst.";
-	if (response.status === 429) return providerMessage ?? "The analyst is at its request limit. Try again shortly.";
-	if (response.status >= 500) return "The analyst is temporarily unavailable. Your research view is still intact.";
+	if (response.status === 429)
+		return providerMessage ?? "The analyst is at its request limit. Try again shortly.";
+	if (response.status >= 500)
+		return "The analyst is temporarily unavailable. Your research view is still intact.";
 	return providerMessage ?? "The analyst could not complete that request.";
 }
 
@@ -212,7 +214,10 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 					let bufferedContent = "";
 
 					const applyPayload = (payload: StreamPayload | null) => {
-						if (payload?.error) throw new Error("The analyst lost its connection before finishing. Try regenerating the answer.");
+						if (payload?.error)
+							throw new Error(
+								"The analyst lost its connection before finishing. Try regenerating the answer.",
+							);
 						if (!payload?.delta) return;
 						accumulatedContent += payload.delta;
 						setState((prev) => ({
@@ -270,9 +275,7 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 					messages: prev.messages.filter((msg) => msg.id !== assistantMessageId),
 					sending: false,
 					error:
-						error instanceof Error
-							? error.message
-							: "The analyst could not complete that request.",
+						error instanceof Error ? error.message : "The analyst could not complete that request.",
 				}));
 			} finally {
 				if (abortControllerRef.current === controller) abortControllerRef.current = null;

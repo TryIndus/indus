@@ -9,7 +9,9 @@ describe("makeBatchPrompt", () => {
 	});
 
 	it("keeps the sign when compacting negative currency values", () => {
-		const prompt = makeBatchPrompt([{ symbol: "TEST", metric: "total_cash", value: -2_500_000_000 }]);
+		const prompt = makeBatchPrompt([
+			{ symbol: "TEST", metric: "total_cash", value: -2_500_000_000 },
+		]);
 
 		expect(prompt).toContain("TEST total cash: -$2.50B");
 	});

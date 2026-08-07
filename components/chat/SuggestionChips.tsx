@@ -8,7 +8,10 @@ interface SuggestionChipsProps {
 	triggerMetric?: string;
 }
 
-export const SuggestionChips: React.FC<SuggestionChipsProps> = ({ onSendMessage, triggerMetric }) => {
+export const SuggestionChips: React.FC<SuggestionChipsProps> = ({
+	onSendMessage,
+	triggerMetric,
+}) => {
 	const suggestions = triggerMetric
 		? [
 				`Explain ${triggerMetric.toLowerCase()}`,
@@ -19,19 +22,21 @@ export const SuggestionChips: React.FC<SuggestionChipsProps> = ({ onSendMessage,
 
 	return (
 		<div>
-			<p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Suggested questions</p>
+			<p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+				Suggested questions
+			</p>
 			<div className="flex flex-wrap gap-2">
-			{suggestions.map((suggestion) => (
-				<Button
-					key={suggestion}
-					variant="ghost"
-					size="sm"
-					onClick={() => onSendMessage(suggestion)}
-					className="h-auto rounded-full border border-border bg-background/70 px-3 py-1.5 text-[10px] text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-				>
-					{suggestion}
-				</Button>
-			))}
+				{suggestions.map((suggestion) => (
+					<Button
+						key={suggestion}
+						variant="ghost"
+						size="sm"
+						onClick={() => onSendMessage(suggestion)}
+						className="h-auto rounded-full border border-border bg-background/70 px-3 py-1.5 text-[10px] text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+					>
+						{suggestion}
+					</Button>
+				))}
 			</div>
 		</div>
 	);

@@ -72,8 +72,7 @@ export function buildPageContext({
 					v: point.v,
 				})),
 				latestPrice: chartData.latestPrice ?? financialData.regularMarketPrice ?? 0,
-				rangeChangePct:
-					chartData.rangeChangePct ?? financialData.regularMarketChangePercent ?? 0,
+				rangeChangePct: chartData.rangeChangePct ?? financialData.regularMarketChangePercent ?? 0,
 			}
 		: undefined;
 

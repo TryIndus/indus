@@ -63,7 +63,11 @@ const cachedExplanationFixture = JSON.stringify({
 async function mockCompanyResearch(page: Page) {
 	const requestedTimeframes: string[] = [];
 	await page.route("**/api/stock-data?**", async (route) => {
-		await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data: companyFixture }) });
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({ data: companyFixture }),
+		});
 	});
 	await page.route("**/api/alpaca?**", async (route) => {
 		const url = new URL(route.request().url());
@@ -83,7 +87,12 @@ async function mockCompanyResearch(page: Page) {
 		await route.fulfill({
 			status: 200,
 			contentType: "application/json",
-			body: JSON.stringify({ data, isEmpty: false, totalBars: data.length, earliestTimestamp: data[0].time }),
+			body: JSON.stringify({
+				data,
+				isEmpty: false,
+				totalBars: data.length,
+				earliestTimestamp: data[0].time,
+			}),
 		});
 	});
 	await page.route("**/api/stream/**", async (route) => {

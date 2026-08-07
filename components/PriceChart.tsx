@@ -15,10 +15,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	CHART_RANGES,
+	type ChartRangeValue,
 	filterRangeData,
 	getChartRange,
 	getRangeStartTimestamp,
-	type ChartRangeValue,
 } from "@/lib/charts/ranges";
 import type { PageChartData } from "@/lib/types";
 
@@ -158,7 +158,6 @@ export default function PriceChart({
 	const [selectedRange, setSelectedRange] = useState<ChartRangeValue>("1D");
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [retryNonce, setRetryNonce] = useState(0);
 	const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
 	const [showReconnecting, setShowReconnecting] = useState(false);
 	const [latestSnapshot, setLatestSnapshot] = useState<ChartSnapshot | null>(null);
@@ -261,8 +260,18 @@ export default function PriceChart({
 			},
 			crosshair: {
 				mode: CrosshairMode.Normal,
-				vertLine: { color: palette.crosshair, width: 1, style: 2, labelBackgroundColor: palette.text },
-				horzLine: { color: palette.crosshair, width: 1, style: 2, labelBackgroundColor: palette.text },
+				vertLine: {
+					color: palette.crosshair,
+					width: 1,
+					style: 2,
+					labelBackgroundColor: palette.text,
+				},
+				horzLine: {
+					color: palette.crosshair,
+					width: 1,
+					style: 2,
+					labelBackgroundColor: palette.text,
+				},
 			},
 			rightPriceScale: {
 				borderColor: palette.border,
@@ -276,7 +285,12 @@ export default function PriceChart({
 				barSpacing: 8,
 				minBarSpacing: 0.5,
 			},
-			handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+			handleScroll: {
+				mouseWheel: true,
+				pressedMouseMove: true,
+				horzTouchDrag: true,
+				vertTouchDrag: false,
+			},
 			handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
 		});
 
@@ -333,7 +347,10 @@ export default function PriceChart({
 			});
 			applySeriesData(historicalDataRef.current);
 		});
-		themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
 
 		return () => {
 			resizeObserver.disconnect();
@@ -347,7 +364,7 @@ export default function PriceChart({
 
 	useEffect(() => {
 		void loadHistoricalData();
-	}, [loadHistoricalData, retryNonce]);
+	}, [loadHistoricalData]);
 
 	useEffect(() => {
 		if (selectedRange !== "1D") {
@@ -442,7 +459,10 @@ export default function PriceChart({
 					: "Connecting";
 
 	return (
-		<section className={`overflow-hidden rounded-[1.35rem] border border-border/70 bg-card shadow-sm ${className}`} aria-label={`${symbol} price chart`}>
+		<section
+			className={`overflow-hidden rounded-[1.35rem] border border-border/70 bg-card shadow-sm ${className}`}
+			aria-label={`${symbol} price chart`}
+		>
 			<div className="border-b border-border/70 px-4 py-4 sm:px-5">
 				<div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
 					<div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-3">
@@ -450,15 +470,23 @@ export default function PriceChart({
 							<div className="flex items-center gap-2">
 								<h2 className="font-mono text-sm font-bold tracking-[0.12em]">{symbol}</h2>
 								<span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-									<span className={`size-1.5 rounded-full ${realtimeStatus === "connected" ? "bg-primary" : "bg-muted-foreground/60"}`} />
+									<span
+										className={`size-1.5 rounded-full ${realtimeStatus === "connected" ? "bg-primary" : "bg-muted-foreground/60"}`}
+									/>
 									{statusLabel}
 								</span>
 							</div>
 							{snapshot && (
 								<div className="mt-1 flex items-baseline gap-2">
-									<span className="font-mono text-2xl font-semibold tracking-[-0.04em]">{formatPrice(snapshot.close)}</span>
-									<span className={`font-mono text-xs font-medium ${positive ? "text-primary" : "text-destructive"}`}>
-										{positive ? "+" : ""}{formatPrice(snapshot.change)} ({positive ? "+" : ""}{snapshot.changePercent.toFixed(2)}%)
+									<span className="font-mono text-2xl font-semibold tracking-[-0.04em]">
+										{formatPrice(snapshot.close)}
+									</span>
+									<span
+										className={`font-mono text-xs font-medium ${positive ? "text-primary" : "text-destructive"}`}
+									>
+										{positive ? "+" : ""}
+										{formatPrice(snapshot.change)} ({positive ? "+" : ""}
+										{snapshot.changePercent.toFixed(2)}%)
 									</span>
 								</div>
 							)}
@@ -482,7 +510,11 @@ export default function PriceChart({
 					</div>
 
 					{showControls && (
-						<div className="flex w-full items-center gap-1 overflow-x-auto rounded-full border border-border bg-background/65 p-1 xl:w-auto" aria-label="Chart range">
+						<div
+							className="flex w-full items-center gap-1 overflow-x-auto rounded-full border border-border bg-background/65 p-1 xl:w-auto"
+							role="group"
+							aria-label="Chart range"
+						>
 							{CHART_RANGES.map((range) => (
 								<button
 									key={range.value}
@@ -509,14 +541,20 @@ export default function PriceChart({
 					className="w-full overflow-hidden rounded-xl"
 					style={{ height: `clamp(340px, 52vw, ${height}px)` }}
 					role="img"
-					aria-label={snapshot ? `${symbol} ${selectedRange} chart. Latest price ${formatPrice(snapshot.close)}, change ${snapshot.changePercent.toFixed(2)} percent.` : `${symbol} ${selectedRange} price chart`}
+					aria-label={
+						snapshot
+							? `${symbol} ${selectedRange} chart. Latest price ${formatPrice(snapshot.close)}, change ${snapshot.changePercent.toFixed(2)} percent.`
+							: `${symbol} ${selectedRange} price chart`
+					}
 				/>
 
 				{isLoading && (
 					<div className="absolute inset-2 z-10 flex items-center justify-center rounded-xl bg-card/90 backdrop-blur-sm sm:inset-3">
 						<div className="text-center">
 							<RefreshCw className="mx-auto size-5 animate-spin text-primary" />
-							<p className="mt-3 text-xs text-muted-foreground">Loading {selectedRange} market history…</p>
+							<p className="mt-3 text-xs text-muted-foreground">
+								Loading {selectedRange} market history…
+							</p>
 						</div>
 					</div>
 				)}
@@ -529,7 +567,12 @@ export default function PriceChart({
 							</span>
 							<h3 className="mt-4 text-sm font-semibold">Chart unavailable</h3>
 							<p className="mt-2 text-xs leading-5 text-muted-foreground">{error}</p>
-							<Button variant="outline" size="sm" onClick={() => setRetryNonce((value) => value + 1)} className="mt-4 rounded-full">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => void loadHistoricalData()}
+								className="mt-4 rounded-full"
+							>
 								<RefreshCw className="size-3.5" />
 								Try again
 							</Button>

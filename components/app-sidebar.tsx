@@ -2,8 +2,8 @@
 
 import {
 	Bitcoin,
-	ChevronUp,
 	ChartNoAxesCombined,
+	ChevronUp,
 	FileText,
 	HelpCircle,
 	LogOut,
@@ -129,14 +129,14 @@ export function AppSidebar() {
 					{footerItems.map((item) => (
 						<SidebarMenuItem key={item.title}>
 							<SidebarMenuButton asChild>
-							<Link
-								href={item.url}
+								<Link
+									href={item.url}
 									aria-label={item.title}
-								className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+									className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
 								>
 									<item.icon className="w-5 h-5" />
 									<span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
-							</Link>
+								</Link>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 					))}

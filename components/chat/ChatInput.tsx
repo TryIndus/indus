@@ -75,7 +75,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, sending, on
 				</Button>
 			</div>
 			{sending && (
-				<button type="button" onClick={onStop} className="mx-auto mt-2 inline-flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground">
+				<button
+					type="button"
+					onClick={onStop}
+					className="mx-auto mt-2 inline-flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+				>
 					<Square className="size-2.5 fill-current" />
 					Stop generating
 				</button>

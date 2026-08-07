@@ -26,8 +26,8 @@ import type { FinancialData, PageChartData } from "@/lib/types";
 import {
 	formatCurrency,
 	formatLargeNumber,
-	formatPercentagePoints,
 	formatPercent,
+	formatPercentagePoints,
 	formatRatio,
 } from "@/lib/utils";
 
@@ -114,14 +114,21 @@ export default function CompanyPage() {
 			const result: unknown = await response.json().catch(() => null);
 			if (!response.ok || !result || typeof result !== "object" || !("data" in result)) {
 				const message =
-					result && typeof result === "object" && "error" in result && typeof result.error === "string"
+					result &&
+					typeof result === "object" &&
+					"error" in result &&
+					typeof result.error === "string"
 						? result.error
 						: "Financial data is temporarily unavailable.";
 				throw new Error(message);
 			}
 			setFinancialData(result.data as FinancialData);
 		} catch (stockError) {
-			setError(stockError instanceof Error ? stockError.message : "Financial data is temporarily unavailable.");
+			setError(
+				stockError instanceof Error
+					? stockError.message
+					: "Financial data is temporarily unavailable.",
+			);
 		} finally {
 			setIsLoading(false);
 		}
@@ -144,7 +151,9 @@ export default function CompanyPage() {
 						<Building2 className="size-5" />
 					</span>
 					<h1 className="mt-5 text-xl font-semibold">No company selected</h1>
-					<p className="mt-2 text-sm text-muted-foreground">Choose a valid ticker to open a research view.</p>
+					<p className="mt-2 text-sm text-muted-foreground">
+						Choose a valid ticker to open a research view.
+					</p>
 					<Button onClick={() => router.push("/search")} className="mt-5 rounded-full">
 						Search companies
 					</Button>
@@ -155,13 +164,23 @@ export default function CompanyPage() {
 
 	return (
 		<div className="mx-auto w-full max-w-[1500px] px-4 pb-14 pt-1 sm:px-6 lg:px-8">
-			<Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")} className="mb-4 -ml-2 rounded-full text-muted-foreground">
+			<Button
+				variant="ghost"
+				size="sm"
+				onClick={() => router.push("/dashboard")}
+				className="mb-4 -ml-2 rounded-full text-muted-foreground"
+			>
 				<ArrowLeft className="size-4" />
 				Dashboard
 			</Button>
 
 			{isLoading && (
-				<div className="space-y-4" aria-live="polite" aria-label={`Loading ${symbol} financial data`}>
+				<div
+					className="space-y-4"
+					role="status"
+					aria-live="polite"
+					aria-label={`Loading ${symbol} financial data`}
+				>
 					<div className="h-44 animate-pulse rounded-[1.5rem] border border-border/70 bg-card" />
 					<div className="h-[520px] animate-pulse rounded-[1.5rem] border border-border/70 bg-card" />
 				</div>
@@ -176,7 +195,11 @@ export default function CompanyPage() {
 						<h1 className="mt-5 text-xl font-semibold">We couldn’t open {symbol}</h1>
 						<p className="mt-2 text-sm leading-6 text-muted-foreground">{error}</p>
 						<div className="mt-5 flex justify-center gap-2">
-							<Button variant="outline" onClick={() => router.push("/search")} className="rounded-full">
+							<Button
+								variant="outline"
+								onClick={() => router.push("/search")}
+								className="rounded-full"
+							>
 								Search another
 							</Button>
 							<Button onClick={() => void fetchStockData(symbol)} className="rounded-full">
@@ -245,9 +268,12 @@ export default function CompanyPage() {
 											{financialData.regularMarketPrice.toFixed(2)}
 										</p>
 										{isNumber(financialData.regularMarketChangePercent) && (
-											<p className={`mt-1 font-mono text-xs font-semibold ${financialData.regularMarketChangePercent >= 0 ? "text-primary" : "text-destructive"}`}>
+											<p
+												className={`mt-1 font-mono text-xs font-semibold ${financialData.regularMarketChangePercent >= 0 ? "text-primary" : "text-destructive"}`}
+											>
 												{financialData.regularMarketChangePercent >= 0 ? "+" : ""}
-												{financialData.regularMarketChange?.toFixed(2) ?? "0.00"} ({financialData.regularMarketChangePercent >= 0 ? "+" : ""}
+												{financialData.regularMarketChange?.toFixed(2) ?? "0.00"} (
+												{financialData.regularMarketChangePercent >= 0 ? "+" : ""}
 												{financialData.regularMarketChangePercent.toFixed(2)}%)
 											</p>
 										)}
@@ -271,15 +297,23 @@ export default function CompanyPage() {
 						</div>
 					</section>
 
-					<section aria-label="Key company metrics" className="grid overflow-hidden rounded-2xl border border-border/70 bg-card sm:grid-cols-2 lg:grid-cols-4">
+					<section
+						aria-label="Key company metrics"
+						className="grid overflow-hidden rounded-2xl border border-border/70 bg-card sm:grid-cols-2 lg:grid-cols-4"
+					>
 						{[
 							["Market cap", formatCurrency(financialData.marketCap)],
 							["Revenue (TTM)", formatCurrency(financialData.revenue)],
 							["Net margin", formatPercent(financialData.netProfitMargins)],
 							["Revenue growth", formatPercent(financialData.revenueGrowth)],
 						].map(([label, value]) => (
-							<div key={label} className="border-b border-border/70 p-4 last:border-b-0 sm:odd:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
-								<p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+							<div
+								key={label}
+								className="border-b border-border/70 p-4 last:border-b-0 sm:odd:border-r lg:border-b-0 lg:border-r lg:last:border-r-0"
+							>
+								<p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+									{label}
+								</p>
 								<p className="mt-2 font-mono text-lg font-semibold tracking-[-0.03em]">{value}</p>
 							</div>
 						))}
@@ -293,14 +327,22 @@ export default function CompanyPage() {
 					/>
 
 					<div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-						<section className="rounded-[1.35rem] border border-primary/25 bg-primary/[0.055] p-5 sm:p-6" aria-labelledby="analyst-heading">
+						<section
+							className="rounded-[1.35rem] border border-primary/25 bg-primary/[0.055] p-5 sm:p-6"
+							aria-labelledby="analyst-heading"
+						>
 							<div className="flex items-start justify-between gap-4">
 								<div>
 									<div className="flex items-center gap-2 text-primary">
 										<BrainCircuit className="size-4" />
-										<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]">Indus analyst</p>
+										<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]">
+											Indus analyst
+										</p>
 									</div>
-									<h2 id="analyst-heading" className="font-display mt-3 text-3xl font-medium tracking-[-0.03em]">
+									<h2
+										id="analyst-heading"
+										className="font-display mt-3 text-3xl font-medium tracking-[-0.03em]"
+									>
 										Interrogate the numbers.
 									</h2>
 								</div>
@@ -310,7 +352,8 @@ export default function CompanyPage() {
 								</span>
 							</div>
 							<p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-								The analyst receives this company’s visible fundamentals and the latest chart points—not an open-ended mandate to invent context.
+								The analyst receives this company’s visible fundamentals and the latest chart
+								points—not an open-ended mandate to invent context.
 							</p>
 							<div className="mt-6 grid gap-2 sm:grid-cols-2">
 								{researchLenses.map((lens) => (
@@ -332,42 +375,73 @@ export default function CompanyPage() {
 						</section>
 
 						{financialData.longBusinessSummary ? (
-							<section className="rounded-[1.35rem] border border-border/70 bg-card p-5 sm:p-6" aria-labelledby="overview-heading">
-								<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Business</p>
-								<h2 id="overview-heading" className="mt-3 text-lg font-semibold tracking-[-0.025em]">Company overview</h2>
+							<section
+								className="rounded-[1.35rem] border border-border/70 bg-card p-5 sm:p-6"
+								aria-labelledby="overview-heading"
+							>
+								<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+									Business
+								</p>
+								<h2
+									id="overview-heading"
+									className="mt-3 text-lg font-semibold tracking-[-0.025em]"
+								>
+									Company overview
+								</h2>
 								<p className="mt-4 text-sm leading-6 text-muted-foreground">
 									{showFullDescription
 										? financialData.longBusinessSummary
 										: `${financialData.longBusinessSummary.slice(0, 420)}${financialData.longBusinessSummary.length > 420 ? "…" : ""}`}
 								</p>
 								{financialData.longBusinessSummary.length > 420 && (
-									<Button variant="ghost" size="sm" onClick={() => setShowFullDescription((value) => !value)} className="mt-3 -ml-3 rounded-full text-primary">
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => setShowFullDescription((value) => !value)}
+										className="mt-3 -ml-3 rounded-full text-primary"
+									>
 										{showFullDescription ? "Show less" : "Read full profile"}
-										{showFullDescription ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+										{showFullDescription ? (
+											<ChevronUp className="size-3.5" />
+										) : (
+											<ChevronDown className="size-3.5" />
+										)}
 									</Button>
 								)}
 								<div className="mt-6 grid grid-cols-2 gap-4 border-t border-border/70 pt-5 text-xs">
 									<div>
 										<p className="text-muted-foreground">Enterprise value</p>
-										<p className="mt-1 font-mono font-medium">{formatCurrency(financialData.enterpriseValue)}</p>
+										<p className="mt-1 font-mono font-medium">
+											{formatCurrency(financialData.enterpriseValue)}
+										</p>
 									</div>
 									<div>
 										<p className="text-muted-foreground">Employees</p>
-										<p className="mt-1 font-mono font-medium">{formatLargeNumber(financialData.employees)}</p>
+										<p className="mt-1 font-mono font-medium">
+											{formatLargeNumber(financialData.employees)}
+										</p>
 									</div>
 								</div>
 							</section>
 						) : null}
 					</div>
 
-					<section className="rounded-[1.35rem] border border-border/70 bg-card p-4 sm:p-6" aria-labelledby="metrics-heading">
+					<section
+						className="rounded-[1.35rem] border border-border/70 bg-card p-4 sm:p-6"
+						aria-labelledby="metrics-heading"
+					>
 						<div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
 							<div>
-								<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">Fundamentals</p>
-								<h2 id="metrics-heading" className="mt-2 text-xl font-semibold tracking-[-0.025em]">Financial metrics</h2>
+								<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+									Fundamentals
+								</p>
+								<h2 id="metrics-heading" className="mt-2 text-xl font-semibold tracking-[-0.025em]">
+									Financial metrics
+								</h2>
 							</div>
 							<p className="max-w-lg text-xs leading-5 text-muted-foreground">
-								Select a label for its definition. Select a value for a grounded interpretation and a direct path into the analyst.
+								Select a label for its definition. Select a value for a grounded interpretation and
+								a direct path into the analyst.
 							</p>
 						</div>
 						<FinancialTable data={financialData} onChatTrigger={contextChat.openWithMetric} />

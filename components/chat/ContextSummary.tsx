@@ -78,11 +78,14 @@ export const ContextSummary: React.FC<ContextSummaryProps> = ({ context }) => {
 							<strong>Context prepared:</strong> {new Date(context.asOf).toLocaleString()}
 						</div>
 
-						{buildSummaryText() && <div className="pt-1 text-muted-foreground">{buildSummaryText()}</div>}
+						{buildSummaryText() && (
+							<div className="pt-1 text-muted-foreground">{buildSummaryText()}</div>
+						)}
 
 						{context.chart && (
 							<div>
-								<strong>Chart data:</strong> {context.chart.points.length} price points · {context.chart.range} range
+								<strong>Chart data:</strong> {context.chart.points.length} price points ·{" "}
+								{context.chart.range} range
 							</div>
 						)}
 

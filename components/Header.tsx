@@ -9,8 +9,8 @@ import {
 	BreadcrumbList,
 	BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export function Header() {
 	const pathname = usePathname();
@@ -28,11 +28,11 @@ export function Header() {
 				<SidebarTrigger />
 				<div className="h-4 w-px bg-border" />
 				<Breadcrumb>
-				<BreadcrumbList className="flex items-center space-x-1">
-					<BreadcrumbItem>
-						<BreadcrumbPage className="text-muted-foreground">{current}</BreadcrumbPage>
-					</BreadcrumbItem>
-				</BreadcrumbList>
+					<BreadcrumbList className="flex items-center space-x-1">
+						<BreadcrumbItem>
+							<BreadcrumbPage className="text-muted-foreground">{current}</BreadcrumbPage>
+						</BreadcrumbItem>
+					</BreadcrumbList>
 				</Breadcrumb>
 			</div>
 			<Button variant="outline" size="sm" asChild className="rounded-full bg-card/70">

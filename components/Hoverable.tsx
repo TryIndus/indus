@@ -87,7 +87,9 @@ const Hoverable: React.FC<HoverableProps> = ({
 					</span>
 					<div>
 						<p className="text-sm font-medium">Reading this metric</p>
-						<p className="text-xs text-muted-foreground">Grounding the answer in {symbol}’s value.</p>
+						<p className="text-xs text-muted-foreground">
+							Grounding the answer in {symbol}’s value.
+						</p>
 					</div>
 				</div>
 			);
@@ -116,7 +118,11 @@ const Hoverable: React.FC<HoverableProps> = ({
 		}
 
 		if (!explanation) {
-			return <div className="text-sm text-muted-foreground">Preparing a grounded interpretation of this value.</div>;
+			return (
+				<div className="text-sm text-muted-foreground">
+					Preparing a grounded interpretation of this value.
+				</div>
+			);
 		}
 
 		const valueAnalysis = parseExplanation(explanation);
@@ -200,9 +206,9 @@ const Hoverable: React.FC<HoverableProps> = ({
 					type="button"
 					onMouseEnter={handleIntent}
 					onFocus={() => {
-					handleIntent();
-					setOpen(true);
-				}}
+						handleIntent();
+						setOpen(true);
+					}}
 					onClick={() => setOpen(true)}
 					className="inline-flex cursor-help items-center gap-1.5 rounded-sm underline decoration-dotted decoration-2 underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
 					aria-label={`${metricLabel || metric}: open AI interpretation`}
@@ -213,7 +219,9 @@ const Hoverable: React.FC<HoverableProps> = ({
 					)}
 				</button>
 			</HoverCardTrigger>
-			<HoverCardContent className="w-88 max-w-[calc(100vw-2rem)] border-primary/20 p-4 shadow-2xl">{renderContent()}</HoverCardContent>
+			<HoverCardContent className="w-88 max-w-[calc(100vw-2rem)] border-primary/20 p-4 shadow-2xl">
+				{renderContent()}
+			</HoverCardContent>
 		</HoverCard>
 	);
 };

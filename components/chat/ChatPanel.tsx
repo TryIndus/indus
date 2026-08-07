@@ -95,13 +95,25 @@ export function ChatPanel({
 							<span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
 								<BrainCircuit className="size-4" />
 							</span>
-							<ChatHeader triggerMetric={state.triggerMetric} companySymbol={state.initialContext?.symbol} />
+							<ChatHeader
+								triggerMetric={state.triggerMetric}
+								companySymbol={state.initialContext?.symbol}
+							/>
 						</div>
-						<Button variant="ghost" size="icon" onClick={onClose} className="size-8 rounded-full" aria-label="Close analyst">
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={onClose}
+							className="size-8 rounded-full"
+							aria-label="Close analyst"
+						>
 							<X className="size-4" />
 						</Button>
 					</div>
-					<div id="chat-grounding" className="mt-3 flex items-center gap-2 text-[10px] leading-4 text-muted-foreground">
+					<div
+						id="chat-grounding"
+						className="mt-3 flex items-center gap-2 text-[10px] leading-4 text-muted-foreground"
+					>
 						<ShieldCheck className="size-3.5 shrink-0 text-primary" />
 						Grounded in the company fundamentals and chart points supplied by this page.
 					</div>
@@ -119,7 +131,10 @@ export function ChatPanel({
 
 				{!hasUserMessages && (
 					<div className="px-4 pb-3 sm:px-5">
-						<SuggestionChips triggerMetric={state.triggerMetric?.label} onSendMessage={onSendMessage} />
+						<SuggestionChips
+							triggerMetric={state.triggerMetric?.label}
+							onSendMessage={onSendMessage}
+						/>
 					</div>
 				)}
 

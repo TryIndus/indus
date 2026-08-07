@@ -13,8 +13,8 @@ import type { FinancialData } from "@/lib/types";
 import {
 	formatCurrency,
 	formatLargeNumber,
-	formatPercentagePoints,
 	formatPercent,
+	formatPercentagePoints,
 	formatRatio,
 } from "@/lib/utils";
 import Hoverable from "./Hoverable";
