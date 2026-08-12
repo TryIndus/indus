@@ -114,9 +114,10 @@ test.beforeEach(async ({ page }) => {
 	}
 
 	await page.goto("/auth");
-	await page.getByPlaceholder("Email").fill(email);
-	await page.getByPlaceholder("Password").fill(password);
-	await page.getByRole("button", { name: "Sign In", exact: true }).click();
+	const signInForm = page.locator("form:visible");
+	await signInForm.getByRole("textbox", { name: "Email", exact: true }).fill(email);
+	await signInForm.locator('input[autocomplete="current-password"]').fill(password);
+	await signInForm.getByRole("button", { name: "Sign In", exact: true }).click();
 	await expect(page).toHaveURL(/\/dashboard$/);
 });
 
