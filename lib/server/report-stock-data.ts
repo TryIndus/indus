@@ -1,5 +1,7 @@
 import YahooFinance from "yahoo-finance2";
 import { logger } from "@/lib/observability/logger";
+import { executeWithRetry } from "@/lib/reliability/async";
+import { ResilientCache } from "@/lib/reliability/cache";
 import type { ReportStockData } from "@/lib/types";
 
 interface ReportQuote {
@@ -13,10 +15,11 @@ interface ReportQuote {
 }
 
 interface ReportStockDataProvider {
-	quote(symbol: string): Promise<ReportQuote>;
+	quote(symbol: string, signal?: AbortSignal): Promise<ReportQuote>;
 	quoteSummary(
 		symbol: string,
 		options: { modules: string[] },
+		signal?: AbortSignal,
 	): Promise<{
 		assetProfile?: { sector?: string; industry?: string };
 		defaultKeyStatistics?: { beta?: number };
@@ -35,52 +38,186 @@ interface ReportStockDataProvider {
 	}>;
 }
 
-const yahooFinance = new YahooFinance({ suppressNotices: ["yahooSurvey"] });
+const yahooFinance = new YahooFinance({
+	suppressNotices: ["yahooSurvey"],
+	versionCheck: false,
+	queue: { concurrency: 4 },
+});
 const defaultProvider: ReportStockDataProvider = {
-	quote: async (symbol) => (await yahooFinance.quote(symbol)) as unknown as ReportQuote,
-	quoteSummary: (symbol, options) =>
-		yahooFinance.quoteSummary(symbol, {
-			modules: options.modules as (
-				| "assetProfile"
-				| "defaultKeyStatistics"
-				| "financialData"
-				| "summaryDetail"
-			)[],
-		}),
+	quote: async (symbol, signal) =>
+		(await yahooFinance.quote(symbol, undefined, {
+			fetchOptions: { signal },
+		})) as unknown as ReportQuote,
+	quoteSummary: (symbol, options, signal) =>
+		yahooFinance.quoteSummary(
+			symbol,
+			{
+				modules: options.modules as (
+					| "assetProfile"
+					| "defaultKeyStatistics"
+					| "financialData"
+					| "summaryDetail"
+				)[],
+			},
+			{ fetchOptions: { signal } },
+		),
 };
+
+const reportStockDataCache = new ResilientCache<ReportStockData>({
+	freshForMs: 60_000,
+	staleForMs: 15 * 60_000,
+	maxEntries: 100,
+});
+
+interface ReportStockDataLoad {
+	data: ReportStockData;
+	degraded: boolean;
+}
+
+interface ReportStockDataOptions {
+	provider?: ReportStockDataProvider;
+	cache?: ResilientCache<ReportStockData>;
+	requestId?: string;
+}
+
+class PartialReportStockDataError extends Error {
+	constructor(public readonly data: ReportStockData) {
+		super("Yahoo returned partial report stock data");
+		this.name = "PartialReportStockDataError";
+	}
+}
+
+async function fetchReportStockData(
+	symbol: string,
+	provider: ReportStockDataProvider,
+	requestId?: string,
+): Promise<ReportStockDataLoad> {
+	const [quoteResult, summaryResult] = await Promise.allSettled([
+		executeWithRetry(({ signal }) => provider.quote(symbol, signal), {
+			operation: "yahoo.report_quote",
+			attempts: 2,
+			timeoutMs: 6_000,
+			onRetry: (error, nextAttempt) => {
+				logger.warn("provider.retry_scheduled", {
+					requestId,
+					provider: "yahoo",
+					operation: "report_quote",
+					symbol,
+					nextAttempt,
+					errorName: error instanceof Error ? error.name : "UnknownError",
+					errorMessage: error instanceof Error ? error.message : String(error),
+				});
+			},
+		}),
+		executeWithRetry(
+			({ signal }) =>
+				provider.quoteSummary(
+					symbol,
+					{
+						modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "assetProfile"],
+					},
+					signal,
+				),
+			{
+				operation: "yahoo.report_quote_summary",
+				attempts: 2,
+				timeoutMs: 6_000,
+				onRetry: (error, nextAttempt) => {
+					logger.warn("provider.retry_scheduled", {
+						requestId,
+						provider: "yahoo",
+						operation: "report_quote_summary",
+						symbol,
+						nextAttempt,
+						errorName: error instanceof Error ? error.name : "UnknownError",
+						errorMessage: error instanceof Error ? error.message : String(error),
+					});
+				},
+			},
+		),
+	]);
+	const quote = quoteResult.status === "fulfilled" ? quoteResult.value : null;
+	const rawSummary = summaryResult.status === "fulfilled" ? summaryResult.value : null;
+	const summary =
+		rawSummary && Object.values(rawSummary).some((value) => value !== undefined && value !== null)
+			? rawSummary
+			: null;
+
+	if (!quote && !summary) {
+		throw new AggregateError(
+			[
+				quoteResult.status === "rejected" ? quoteResult.reason : null,
+				summaryResult.status === "rejected" ? summaryResult.reason : null,
+			].filter(Boolean),
+			"Yahoo report stock data unavailable",
+		);
+	}
+
+	const degraded = !quote || !summary;
+	if (degraded) {
+		logger.warn("report.stock_data_partial", {
+			requestId,
+			symbol,
+			quoteAvailable: Boolean(quote),
+			summaryAvailable: Boolean(summary),
+		});
+	}
+
+	return {
+		degraded,
+		data: {
+			shortName: quote?.shortName,
+			longName: quote?.longName,
+			regularMarketPrice: quote?.regularMarketPrice,
+			regularMarketChange: quote?.regularMarketChange,
+			regularMarketChangePercent: quote?.regularMarketChangePercent,
+			marketCap: quote?.marketCap ?? summary?.summaryDetail?.marketCap,
+			peRatio: summary?.summaryDetail?.trailingPE,
+			sector: summary?.assetProfile?.sector,
+			industry: summary?.assetProfile?.industry,
+			beta: summary?.defaultKeyStatistics?.beta,
+			fiftyTwoWeekLow: summary?.summaryDetail?.fiftyTwoWeekLow,
+			fiftyTwoWeekHigh: summary?.summaryDetail?.fiftyTwoWeekHigh,
+			revenueGrowth: summary?.financialData?.revenueGrowth,
+			netProfitMargins: summary?.financialData?.profitMargins,
+			returnOnEquity: summary?.financialData?.returnOnEquity,
+			debtToEquity: summary?.financialData?.debtToEquity,
+		},
+	};
+}
 
 export async function loadReportStockData(
 	symbol: string,
-	provider: ReportStockDataProvider = defaultProvider,
+	options: ReportStockDataOptions = {},
 ): Promise<ReportStockData | null> {
+	const provider = options.provider ?? defaultProvider;
 	try {
-		const [quote, summary] = await Promise.all([
-			provider.quote(symbol),
-			provider.quoteSummary(symbol, {
-				modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "assetProfile"],
-			}),
-		]);
+		const activeCache =
+			options.cache ?? (provider === defaultProvider ? reportStockDataCache : null);
+		if (!activeCache) {
+			return (await fetchReportStockData(symbol, provider, options.requestId)).data;
+		}
 
-		return {
-			shortName: quote.shortName,
-			longName: quote.longName,
-			regularMarketPrice: quote.regularMarketPrice,
-			regularMarketChange: quote.regularMarketChange,
-			regularMarketChangePercent: quote.regularMarketChangePercent,
-			marketCap: quote.marketCap ?? summary.summaryDetail?.marketCap,
-			peRatio: summary.summaryDetail?.trailingPE,
-			sector: summary.assetProfile?.sector,
-			industry: summary.assetProfile?.industry,
-			beta: summary.defaultKeyStatistics?.beta,
-			fiftyTwoWeekLow: summary.summaryDetail?.fiftyTwoWeekLow,
-			fiftyTwoWeekHigh: summary.summaryDetail?.fiftyTwoWeekHigh,
-			revenueGrowth: summary.financialData?.revenueGrowth,
-			netProfitMargins: summary.financialData?.profitMargins,
-			returnOnEquity: summary.financialData?.returnOnEquity,
-			debtToEquity: summary.financialData?.debtToEquity,
-		};
+		const result = await activeCache.getOrLoad(symbol, async () => {
+			const loaded = await fetchReportStockData(symbol, provider, options.requestId);
+			if (loaded.degraded) {
+				throw new PartialReportStockDataError(loaded.data);
+			}
+			return loaded.data;
+		});
+		if (result.status === "stale") {
+			logger.warn("report.stock_data_stale_cache_used", {
+				requestId: options.requestId,
+				symbol,
+			});
+		}
+		return result.value;
 	} catch (error) {
+		if (error instanceof PartialReportStockDataError) {
+			return error.data;
+		}
 		logger.warn("report.stock_data_unavailable", {
+			requestId: options.requestId,
 			symbol,
 			errorMessage: error instanceof Error ? error.message : String(error),
 		});
