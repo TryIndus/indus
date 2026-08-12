@@ -173,15 +173,40 @@ export const valueAnalysisSchema = z
 	})
 	.strict();
 
-export const envSchema = z.object({
-	NEXT_PUBLIC_SUPABASE_URL: z.url(),
-	NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
-	ALPACA_API_KEY: z.string().min(1),
-	ALPACA_SECRET_KEY: z.string().min(1),
+const nonBlankEnvironmentValueSchema = z.string().trim().min(1);
+const httpUrlSchema = z.url().refine(
+	(value) => {
+		try {
+			const protocol = new URL(value).protocol;
+			return protocol === "http:" || protocol === "https:";
+		} catch {
+			return false;
+		}
+	},
+	{ message: "Expected an HTTP(S) URL" },
+);
+
+export const supabaseEnvSchema = z.object({
+	NEXT_PUBLIC_SUPABASE_URL: httpUrlSchema,
+	NEXT_PUBLIC_SUPABASE_ANON_KEY: nonBlankEnvironmentValueSchema,
+});
+
+export const alpacaEnvSchema = z.object({
+	ALPACA_API_KEY: nonBlankEnvironmentValueSchema,
+	ALPACA_SECRET_KEY: nonBlankEnvironmentValueSchema,
 	ALPACA_IS_PAPER: z
 		.enum(["true", "false"])
 		.default("true")
 		.transform((v) => v === "true"),
-	GEMINI_API_KEY: z.string().min(1),
+});
+
+export const geminiEnvSchema = z.object({
+	GEMINI_API_KEY: nonBlankEnvironmentValueSchema,
+});
+
+export const envSchema = z.object({
+	...supabaseEnvSchema.shape,
+	...alpacaEnvSchema.shape,
+	...geminiEnvSchema.shape,
 	NEXT_PUBLIC_VERCEL_URL: z.string().optional(),
 });
