@@ -55,6 +55,7 @@ test("@integration @characterization malformed model requests fail before authen
 	for (const { path, data, error } of cases) {
 		const response = await request.post(path, { data });
 		expect(response.status()).toBe(400);
+		expect(response.headers()["x-request-id"]).toMatch(/^[A-Za-z0-9._:-]+$/);
 		expect(await response.json()).toEqual({ error });
 	}
 });
@@ -106,6 +107,7 @@ test("@integration @characterization valid model requests require an authenticat
 
 	for (const response of responses) {
 		expect(response.status()).toBe(401);
+		expect(response.headers()["x-request-id"]).toMatch(/^[A-Za-z0-9._:-]+$/);
 		expect(await response.json()).toEqual({ error: "Unauthorized" });
 	}
 });
@@ -151,6 +153,35 @@ test("@integration @characterization public data endpoints preserve validation a
 		expect(response.status()).toBe(status);
 		expect(await response.json()).toMatchObject({ error });
 	}
+});
+
+test("@integration @characterization health checks expose liveness and configured readiness", async ({
+	request,
+}) => {
+	const live = await request.get("/api/health?mode=live", {
+		headers: { "x-request-id": "health-check-test" },
+	});
+	expect(live.status()).toBe(200);
+	expect(live.headers()["x-request-id"]).toBe("health-check-test");
+	expect(live.headers()["cache-control"]).toContain("no-store");
+	await expect(live.json()).resolves.toMatchObject({
+		status: "ok",
+		mode: "live",
+		checks: { process: "ok" },
+	});
+
+	const ready = await request.get("/api/health");
+	expect(ready.status()).toBe(200);
+	await expect(ready.json()).resolves.toMatchObject({
+		status: "ok",
+		mode: "ready",
+		checks: {
+			process: "ok",
+			supabase: "configured",
+			alpaca: "configured",
+			gemini: "configured",
+		},
+	});
 });
 
 test("@integration @characterization report resources validate identifiers and authentication", async ({
