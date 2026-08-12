@@ -41,12 +41,12 @@ const Hoverable: React.FC<HoverableProps> = ({
 	const [error, setError] = useState<string | undefined>();
 
 	const updateExplanation = useCallback(() => {
-		const cached = getCachedExplanation(symbol, metric);
+		const cached = getCachedExplanation(symbol, metric, value);
 		const currentlyLoading = isLoading(symbol, metric);
 		setExplanation(cached);
 		setLoading(currentlyLoading);
 		setError(getExplanationError(symbol, metric));
-	}, [symbol, metric]);
+	}, [symbol, metric, value]);
 
 	useEffect(() => {
 		updateExplanation();
@@ -58,7 +58,7 @@ const Hoverable: React.FC<HoverableProps> = ({
 	}, [symbol, metric, updateExplanation]);
 
 	const handleIntent = useCallback(() => {
-		const cached = getCachedExplanation(symbol, metric);
+		const cached = getCachedExplanation(symbol, metric, value);
 		const currentlyLoading = isLoading(symbol, metric);
 
 		if (!cached && !currentlyLoading) {

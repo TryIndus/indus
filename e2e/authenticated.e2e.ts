@@ -49,14 +49,17 @@ const companyFixture = {
 };
 
 const cachedExplanationFixture = JSON.stringify({
-	savedAt: Date.now(),
 	entries: {
-		AAPL_pe_ratio: JSON.stringify({
-			metric_display: "**P/E Ratio: 33.1**",
-			insight:
-				"This multiple shows how much investors pay for current earnings. Read it with growth and margins before forming a directional view.",
-			evaluation: "neutral",
-		}),
+		AAPL_pe_ratio: {
+			value: 33.1,
+			explanation: JSON.stringify({
+				metric_display: "**P/E Ratio: 33.1**",
+				insight:
+					"This multiple shows how much investors pay for current earnings. Read it with growth and margins before forming a directional view.",
+				evaluation: "neutral",
+			}),
+			savedAt: Date.now(),
+		},
 	},
 });
 
@@ -159,7 +162,7 @@ test("@authenticated company research connects chart ranges to the grounded anal
 }) => {
 	const requestedTimeframes = await mockCompanyResearch(page);
 	await page.addInitScript((cachedExplanation) => {
-		window.localStorage.setItem("indus_explanations_cache_v2", cachedExplanation);
+		window.localStorage.setItem("indus_explanations_cache_v3", cachedExplanation);
 	}, cachedExplanationFixture);
 	await page.goto("/company/AAPL");
 

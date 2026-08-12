@@ -1,11 +1,17 @@
 import type { Item } from "@/lib/prompts";
 
 // localStorage key for persistent cache
-const STORAGE_KEY = "indus_explanations_cache_v2";
+const STORAGE_KEY = "indus_explanations_cache_v3";
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
+interface ExplanationCacheEntry {
+	value: number;
+	explanation: string;
+	savedAt: number;
+}
+
 // Load cache from localStorage on initialization
-function loadCacheFromStorage(): Map<string, string> {
+function loadCacheFromStorage(): Map<string, ExplanationCacheEntry> {
 	if (typeof window === "undefined") return new Map();
 	try {
 		const stored = localStorage.getItem(STORAGE_KEY);
@@ -14,16 +20,27 @@ function loadCacheFromStorage(): Map<string, string> {
 			if (
 				parsed &&
 				typeof parsed === "object" &&
-				"savedAt" in parsed &&
-				typeof parsed.savedAt === "number" &&
-				Date.now() - parsed.savedAt < CACHE_TTL_MS &&
 				"entries" in parsed &&
 				parsed.entries &&
 				typeof parsed.entries === "object"
 			) {
 				return new Map(
 					Object.entries(parsed.entries).filter(
-						(entry): entry is [string, string] => typeof entry[1] === "string",
+						(entry): entry is [string, ExplanationCacheEntry] => {
+							const value = entry[1];
+							return (
+								value !== null &&
+								typeof value === "object" &&
+								"value" in value &&
+								typeof value.value === "number" &&
+								Number.isFinite(value.value) &&
+								"explanation" in value &&
+								typeof value.explanation === "string" &&
+								"savedAt" in value &&
+								typeof value.savedAt === "number" &&
+								Date.now() - value.savedAt < CACHE_TTL_MS
+							);
+						},
 					),
 				);
 			}
@@ -36,13 +53,10 @@ function loadCacheFromStorage(): Map<string, string> {
 }
 
 // Save cache to localStorage
-function saveCacheToStorage(cache: Map<string, string>) {
+function saveCacheToStorage(cache: Map<string, ExplanationCacheEntry>) {
 	if (typeof window === "undefined") return;
 	try {
-		localStorage.setItem(
-			STORAGE_KEY,
-			JSON.stringify({ savedAt: Date.now(), entries: Object.fromEntries(cache) }),
-		);
+		localStorage.setItem(STORAGE_KEY, JSON.stringify({ entries: Object.fromEntries(cache) }));
 	} catch (_e) {
 		// Silently fail - cache won't persist but app will continue working
 	}
@@ -67,9 +81,22 @@ function notifyCacheUpdate(key: string) {
 	}
 }
 
-export function getCachedExplanation(symbol: string, metric: string) {
+export function getCachedExplanation(symbol: string, metric: string, value: number) {
 	const key = makeKey(symbol, metric);
-	return explanationCache.get(key);
+	const entry = explanationCache.get(key);
+	if (
+		!entry ||
+		entry.value !== value ||
+		Date.now() - entry.savedAt < 0 ||
+		Date.now() - entry.savedAt >= CACHE_TTL_MS
+	) {
+		if (entry) {
+			explanationCache.delete(key);
+			saveCacheToStorage(explanationCache);
+		}
+		return undefined;
+	}
+	return entry.explanation;
 }
 
 export function isLoading(symbol: string, metric: string) {
@@ -107,14 +134,14 @@ export async function fetchExplanation(
 ): Promise<void> {
 	const key = makeKey(symbol, metric);
 
-	if (explanationCache.has(key) || loadingState.get(key)) {
+	if (getCachedExplanation(symbol, metric, value) || loadingState.get(key)) {
 		return;
 	}
 
 	// If another metric is loading, wait and then re-check this metric instead of dropping it.
 	if (pendingBatchRequest) {
 		await pendingBatchRequest;
-		if (explanationCache.has(key) || loadingState.get(key)) return;
+		if (getCachedExplanation(symbol, metric, value) || loadingState.get(key)) return;
 	}
 
 	// Since we removed individual API endpoint, use batch API for single items
@@ -130,7 +157,9 @@ export async function batchPreload(items: Item[]) {
 	}
 
 	// Only fetch if not already cached
-	const toFetch = items.filter((item) => !explanationCache.has(makeKey(item.symbol, item.metric)));
+	const toFetch = items.filter(
+		(item) => !getCachedExplanation(item.symbol, item.metric, item.value),
+	);
 
 	if (toFetch.length === 0) {
 		return;
@@ -163,9 +192,16 @@ export async function batchPreload(items: Item[]) {
 			}
 
 			if (data && typeof data === "object" && data.explanations) {
-				for (const [key, text] of Object.entries(data.explanations)) {
+				const explanations = data.explanations as Record<string, unknown>;
+				for (const item of toFetch) {
+					const key = makeKey(item.symbol, item.metric);
+					const text = explanations[key];
 					if (typeof text === "string") {
-						explanationCache.set(key, text);
+						explanationCache.set(key, {
+							value: item.value,
+							explanation: text,
+							savedAt: Date.now(),
+						});
 						notifyCacheUpdate(key);
 					}
 				}
