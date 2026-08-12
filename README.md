@@ -91,6 +91,7 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 | Document | Purpose |
 |---|---|
 | [Quality and Security Verification](./docs/QUALITY.md) | Security boundaries, local verification layers, budgets, and troubleshooting |
+| [Runtime Reliability](./docs/RELIABILITY.md) | Provider deadlines, retries, caching, fallbacks, rate limits, health checks, and diagnostics |
 | [Revamp Plan](./docs/REVAMP_PLAN.md) | In-progress application modernization plan retained during the revamp |
 
 ## Features
