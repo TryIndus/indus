@@ -77,6 +77,7 @@
 		"vitest": "3.2.7"
 	},
 	"overrides": {
+		"nanoid": "3.3.18",
 		"postcss": "8.5.23",
 		"sharp": "0.35.3",
 		"vite": "7.3.6"
