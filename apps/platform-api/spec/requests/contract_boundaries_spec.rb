@@ -24,6 +24,19 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
     expect(body.fetch("items").first.keys).to contain_exactly("id", "symbol", "instrument_type", "created_at")
   end
 
+  it "deletes exactly one favorite by its resource identifier" do
+    user = User.create!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub"),
+      email: claims.fetch("email"), display_name: "Contract")
+    equity = user.favorites.create!(symbol: "BTC/USD", instrument_type: "equity")
+    crypto = user.favorites.create!(symbol: "BTC/USD", instrument_type: "crypto")
+
+    delete "/v1/favorites/#{crypto.id}", headers: write_headers
+
+    expect(response).to have_http_status(:no_content)
+    expect(Favorite.pluck(:id)).to eq([ equity.id ])
+    expect(AuditEvent.last.resource_id).to eq(crypto.id)
+  end
+
   it "creates portfolios and positions from flat decimal-safe bodies" do
     post "/v1/portfolios", params: { name: "Core", base_currency: "USD" }, headers: write_headers
     portfolio = JSON.parse(response.body)
@@ -32,6 +45,32 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
       headers: write_headers.merge("Idempotency-Key" => SecureRandom.uuid)
     expect(response).to have_http_status(:created)
     expect(JSON.parse(response.body)).to include("quantity" => "2.5", "average_cost" => "180.25", "currency" => "USD")
+  end
+
+  it "preserves supported decimal precision and rejects values PostgreSQL would round or overflow" do
+    post "/v1/portfolios", params: { name: "Precise", base_currency: "USD" }, headers: write_headers
+    portfolio_id = JSON.parse(response.body).fetch("id")
+    endpoint = "/v1/portfolios/#{portfolio_id}/positions"
+
+    post endpoint, params: { symbol: "AAPL", instrument_type: "equity", quantity: "0.1234567890",
+      average_cost: "123.12345678", currency: "USD" },
+      headers: write_headers.merge("Idempotency-Key" => SecureRandom.uuid)
+    expect(response).to have_http_status(:created)
+    expect(JSON.parse(response.body)).to include("quantity" => "0.123456789", "average_cost" => "123.12345678")
+
+    [
+      { symbol: "MSFT", quantity: "1.12345678901", average_cost: "1" },
+      { symbol: "NVDA", quantity: "1", average_cost: "1.123456789" }
+    ].each do |values|
+      post endpoint, params: values.merge(instrument_type: "equity", currency: "USD"),
+        headers: write_headers.merge("Idempotency-Key" => SecureRandom.uuid)
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    post endpoint, params: { symbol: "AMZN", instrument_type: "equity", quantity: 1, average_cost: "1", currency: "USD" },
+      headers: write_headers.merge("Idempotency-Key" => SecureRandom.uuid), as: :json
+    expect(response).to have_http_status(:bad_request)
+    expect(Position.count).to eq(1)
   end
 
   it "returns a normalized fundamentals snapshot" do
@@ -54,13 +93,18 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
   end
 
   it "returns batch explanations and chat in their structured contracts" do
+    snapshot = FundamentalsSnapshot.new(symbol: "AAPL", as_of: Time.zone.parse("2026-08-05T10:00:00Z"),
+      metrics: { "regularMarketPrice" => 200.0 }, source_reference: "fixture:AAPL")
+    allow(FundamentalsProvider).to receive(:default).and_return(instance_double(FundamentalsProvider, fetch: snapshot))
     gateway = instance_double(ModelGateway)
-    allow(gateway).to receive(:execute).with(task: "metric_explanations", input: hash_including(metrics: [ "revenue" ]))
+    allow(gateway).to receive(:execute).with(task: "metric_explanations", input: hash_including(metrics: [ "revenue" ]),
+      evidence: instance_of(ModelEvidence))
       .and_return(ModelExecution.new(payload: { "explanations" => [ { "metric" => "revenue", "explanation" => "Revenue grew." } ] },
-        model: "fixture", usage: { input_tokens: 4, output_tokens: 3 }, task: "metric_explanations", prompt_version: "v1"))
-    allow(gateway).to receive(:execute).with(task: "financial_chat", input: hash_including(:messages))
+        model: "fixture", usage: { input_tokens: 4, output_tokens: 3 }, task: "metric_explanations", prompt_version: "v2"))
+    allow(gateway).to receive(:execute).with(task: "financial_chat", input: hash_including(:messages),
+      evidence: instance_of(ModelEvidence))
       .and_return(ModelExecution.new(payload: { "message" => { "role" => "assistant", "content" => "Grounded answer." } },
-        model: "fixture", usage: { input_tokens: 5, output_tokens: 2 }, task: "financial_chat", prompt_version: "v1"))
+        model: "fixture", usage: { input_tokens: 5, output_tokens: 2 }, task: "financial_chat", prompt_version: "v2"))
     allow(ModelGateway).to receive(:default).and_return(gateway)
 
     post "/v1/explanations", params: { symbol: "AAPL", metrics: [ "revenue" ] }, headers: write_headers
@@ -77,6 +121,9 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
       [ "/v1/explanations", { symbol: "A" * 21, metrics: [ "revenue" ] } ],
       [ "/v1/chat", { messages: "hello" } ],
       [ "/v1/chat", { messages: { role: "user", content: "hello" } } ],
+      [ "/v1/chat", { messages: Array.new(V1::ChatController::MAX_MESSAGES + 1) { { role: "user", content: "hello" } } } ],
+      [ "/v1/chat", { messages: [ { role: "user", content: "x" * (V1::ChatController::MAX_MESSAGE_LENGTH + 1) } ] } ],
+      [ "/v1/chat", { messages: Array.new(3) { { role: "user", content: "\u{1f680}" * 800 } } } ],
       [ "/v1/chat", { conversation_id: "not-a-uuid", messages: [ { role: "user", content: "hello" } ] } ],
       [ "/v1/chat", { symbol: "A" * 21, messages: [ { role: "user", content: "hello" } ] } ]
     ]
@@ -143,5 +190,8 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
     expect(response.headers["Access-Control-Allow-Origin"]).to eq("http://localhost:5173")
     options "/v1/me", headers: { "Origin" => "https://attacker.example", "Access-Control-Request-Method" => "GET" }
     expect(response.headers["Access-Control-Allow-Origin"]).to be_nil
+
+    get "/v1/me", headers: auth.merge("Origin" => "http://localhost:5173")
+    expect(response.headers["Access-Control-Expose-Headers"].downcase).to include("x-request-id")
   end
 end

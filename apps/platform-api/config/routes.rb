@@ -4,7 +4,7 @@ Rails.application.routes.draw do
 
   namespace :v1 do
     resource :me, only: %i[show update], controller: "me"
-    resources :favorites, param: :symbol, only: %i[index create destroy]
+    resources :favorites, only: %i[index create destroy]
     resources :portfolios do
       resources :positions, only: %i[index create update destroy]
     end

@@ -21,4 +21,12 @@ RSpec.describe AiUsageLimiter do
     described_class.new(user: user, operation: "report", now: now, limit: 1).consume!
     expect { described_class.new(user: user, operation: "explanation", now: now, limit: 1).consume! }.not_to raise_error
   end
+
+  it "bounds retries when concurrent inserts repeatedly violate the unique window" do
+    allow(AiUsageWindow).to receive(:transaction).and_raise(ActiveRecord::RecordNotUnique)
+
+    expect { described_class.new(user: user, operation: "report", now: now).consume! }
+      .to raise_error(ActiveRecord::RecordNotUnique)
+    expect(AiUsageWindow).to have_received(:transaction).exactly(AiUsageLimiter::MAX_CONFLICT_ATTEMPTS).times
+  end
 end

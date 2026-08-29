@@ -156,13 +156,13 @@ paths:
           $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/UnprocessableEntity"
-  /v1/favorites/{symbol}:
+  /v1/favorites/{favorite_id}:
     delete:
       tags: [Favorites]
       operationId: deleteFavorite
       summary: Remove an instrument from the authenticated user's favorites.
       parameters:
-        - $ref: "#/components/parameters/SymbolPath"
+        - $ref: "#/components/parameters/FavoriteId"
         - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "204":
@@ -656,6 +656,13 @@ components:
       schema:
         type: string
         format: uuid
+    FavoriteId:
+      name: favorite_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     PositionId:
       name: position_id
       in: path
@@ -1045,12 +1052,12 @@ components:
           maximum: 100000
     PositiveDecimal:
       type: string
-      pattern: "^(?:0*[1-9][0-9]*)(?:\\.[0-9]{1,8})?$|^0?\\.(?:0*[1-9][0-9]*)$"
-      description: Positive base-10 decimal encoded as a string to avoid binary rounding.
+      pattern: "^(?=.{1,29}$)(?=.*[1-9])(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,10})?$"
+      description: Positive base-10 decimal with at most 18 integer and 10 fractional digits, encoded as a string.
     NonNegativeDecimal:
       type: string
-      pattern: "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,8})?$"
-      description: Non-negative base-10 decimal encoded as a string.
+      pattern: "^(?:0|[1-9][0-9]{0,13})(?:\\.[0-9]{1,8})?$"
+      description: Non-negative base-10 decimal with at most 14 integer and 8 fractional digits, encoded as a string.
     Fundamentals:
       type: object
       additionalProperties: false
@@ -1215,7 +1222,8 @@ components:
         messages:
           type: array
           minItems: 1
-          maxItems: 40
+          maxItems: 8
+          description: Message content is additionally limited to 8,000 UTF-8 bytes in aggregate.
           items:
             $ref: "#/components/schemas/ChatMessage"
     ChatMessage:
@@ -1229,7 +1237,7 @@ components:
         content:
           type: string
           minLength: 1
-          maxLength: 10000
+          maxLength: 1000
     ChatResponse:
       type: object
       additionalProperties: false

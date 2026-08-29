@@ -40,7 +40,7 @@ export interface CreateFavoriteOperationRequest {
 }
 
 export interface DeleteFavoriteRequest {
-    symbol: string;
+    favoriteId: string;
     idempotencyKey: string;
 }
 
@@ -124,10 +124,10 @@ export class FavoritesApi extends runtime.BaseAPI {
      * Creates request options for deleteFavorite without sending the request
      */
     async deleteFavoriteRequestOpts(requestParameters: DeleteFavoriteRequest): Promise<runtime.RequestOpts> {
-        if (requestParameters['symbol'] == null) {
+        if (requestParameters['favoriteId'] == null) {
             throw new runtime.RequiredError(
-                'symbol',
-                'Required parameter "symbol" was null or undefined when calling deleteFavorite().'
+                'favoriteId',
+                'Required parameter "favoriteId" was null or undefined when calling deleteFavorite().'
             );
         }
 
@@ -155,8 +155,8 @@ export class FavoritesApi extends runtime.BaseAPI {
             }
         }
 
-        let urlPath = `/v1/favorites/{symbol}`;
-        urlPath = urlPath.replace('{symbol}', encodeURIComponent(String(requestParameters['symbol'])));
+        let urlPath = `/v1/favorites/{favorite_id}`;
+        urlPath = urlPath.replace('{favorite_id}', encodeURIComponent(String(requestParameters['favoriteId'])));
 
         return {
             path: urlPath,
