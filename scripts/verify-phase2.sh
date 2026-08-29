@@ -15,8 +15,8 @@ docker build --tag "$rails_image" tooling/rails
 docker run --rm \
   --entrypoint sh \
   --network indus_default \
-  --volume "$repo_root/apps/platform-api:/workspace" \
-  --workdir /workspace \
+  --volume "$repo_root:/workspace" \
+  --workdir /workspace/apps/platform-api \
   --env DATABASE_URL=postgres://indus:indus-local-password@postgres:5432/indus_test \
   --env REDIS_URL=redis://redis:6379/1 \
   --env RAILS_ENV=test \
