@@ -68,14 +68,28 @@ describe("alpacaQuerySchema", () => {
 		expect(result.success).toBe(false);
 	});
 
+	it("rejects zero and fractional limits", () => {
+		expect(alpacaQuerySchema.safeParse({ symbol: "AAPL", limit: "0" }).success).toBe(false);
+		expect(alpacaQuerySchema.safeParse({ symbol: "AAPL", limit: "1.5" }).success).toBe(false);
+	});
+
 	it("rejects reversed time boundaries", () => {
 		const result = alpacaQuerySchema.safeParse({ symbol: "AAPL", start: 20, end: 10 });
 		expect(result.success).toBe(false);
 	});
 
+	it("rejects equal and negative time boundaries", () => {
+		expect(alpacaQuerySchema.safeParse({ symbol: "AAPL", start: 20, end: 20 }).success).toBe(false);
+		expect(alpacaQuerySchema.safeParse({ symbol: "AAPL", start: -1 }).success).toBe(false);
+	});
+
 	it("rejects symbol control characters", () => {
 		const result = alpacaQuerySchema.safeParse({ symbol: "AAPL\nX-Header: value" });
 		expect(result.success).toBe(false);
+	});
+
+	it("rejects symbols beyond the provider and storage boundary", () => {
+		expect(alpacaQuerySchema.safeParse({ symbol: "A".repeat(21) }).success).toBe(false);
 	});
 
 	it("coerces string limit to number", () => {
@@ -101,6 +115,12 @@ describe("streamParamsSchema", () => {
 	it("rejects an empty stream symbol", () => {
 		const result = streamParamsSchema.safeParse({ symbol: "" });
 		expect(result.success).toBe(false);
+	});
+
+	it("normalizes crypto streams and rejects oversized symbols", () => {
+		const normalized = streamParamsSchema.safeParse({ symbol: " btc/usd " });
+		expect(normalized.success && normalized.data.symbol).toBe("BTC/USD");
+		expect(streamParamsSchema.safeParse({ symbol: "A".repeat(21) }).success).toBe(false);
 	});
 });
 
@@ -151,6 +171,15 @@ describe("batchExplainSchema", () => {
 			{ symbol: "AAPL", metric: "pe_ratio", value: Number.POSITIVE_INFINITY },
 		]);
 		expect(result.success).toBe(false);
+	});
+
+	it("rejects oversized or unsafe metric identifiers", () => {
+		expect(
+			batchExplainSchema.safeParse([{ symbol: "AAPL", metric: "x".repeat(81), value: 1 }]).success,
+		).toBe(false);
+		expect(
+			batchExplainSchema.safeParse([{ symbol: "AAPL", metric: "price<script>", value: 1 }]).success,
+		).toBe(false);
 	});
 });
 
@@ -266,6 +295,74 @@ describe("contextChatSchema", () => {
 		});
 		expect(result.success).toBe(false);
 	});
+
+	it("rejects oversized user and conversation fields", () => {
+		expect(
+			contextChatSchema.safeParse({ ...validInput, newMessage: "x".repeat(4_001) }).success,
+		).toBe(false);
+		expect(
+			contextChatSchema.safeParse({
+				...validInput,
+				context: { ...validInput.context, companyName: "x".repeat(201) },
+			}).success,
+		).toBe(false);
+		expect(
+			contextChatSchema.safeParse({
+				...validInput,
+				messages: [{ id: "msg-1", role: "user", content: "x".repeat(8_001), createdAt: 1 }],
+			}).success,
+		).toBe(false);
+	});
+
+	it("rejects malformed timestamps and cached provider payloads", () => {
+		expect(
+			contextChatSchema.safeParse({
+				...validInput,
+				context: { ...validInput.context, asOf: "yesterday" },
+			}).success,
+		).toBe(false);
+		expect(
+			contextChatSchema.safeParse({
+				...validInput,
+				context: {
+					...validInput.context,
+					cachedExplanations: { pe_ratio: "x".repeat(501) },
+				},
+			}).success,
+		).toBe(false);
+	});
+
+	it("rejects chart payloads beyond their bounded evidence contract", () => {
+		const point = { t: 1, o: 1, h: 1, l: 1, c: 1, v: 1 };
+		expect(
+			contextChatSchema.safeParse({
+				...validInput,
+				context: {
+					...validInput.context,
+					chart: {
+						interval: "1m",
+						points: Array.from({ length: 101 }, () => point),
+						latestPrice: 1,
+						dayChangePct: 0,
+					},
+				},
+			}).success,
+		).toBe(false);
+		expect(
+			contextChatSchema.safeParse({
+				...validInput,
+				context: {
+					...validInput.context,
+					chart: {
+						interval: "1m",
+						points: [{ ...point, v: -1 }],
+						latestPrice: 1,
+						dayChangePct: 0,
+					},
+				},
+			}).success,
+		).toBe(false);
+	});
 });
 
 describe("metricDefinitionQuerySchema", () => {
@@ -282,6 +379,11 @@ describe("metricDefinitionQuerySchema", () => {
 	it("rejects missing metric", () => {
 		const result = metricDefinitionQuerySchema.safeParse({});
 		expect(result.success).toBe(false);
+	});
+
+	it("rejects unsafe and oversized metric names", () => {
+		expect(metricDefinitionQuerySchema.safeParse({ metric: "<script>" }).success).toBe(false);
+		expect(metricDefinitionQuerySchema.safeParse({ metric: "x".repeat(81) }).success).toBe(false);
 	});
 });
 
@@ -300,6 +402,12 @@ describe("stockDataQuerySchema", () => {
 		const result = stockDataQuerySchema.safeParse({});
 		expect(result.success).toBe(false);
 	});
+
+	it("normalizes slash-delimited symbols and rejects oversized input", () => {
+		const normalized = stockDataQuerySchema.safeParse({ symbol: " btc/usd " });
+		expect(normalized.success && normalized.data.symbol).toBe("BTC/USD");
+		expect(stockDataQuerySchema.safeParse({ symbol: "A".repeat(21) }).success).toBe(false);
+	});
 });
 
 describe("generateReportSchema", () => {
@@ -316,6 +424,12 @@ describe("generateReportSchema", () => {
 	it("rejects unexpected fields", () => {
 		const result = generateReportSchema.safeParse({ symbol: "AAPL", extra: "field" });
 		expect(result.success).toBe(false);
+	});
+
+	it("normalizes valid symbols and rejects control characters", () => {
+		const normalized = generateReportSchema.safeParse({ symbol: " btc/usd " });
+		expect(normalized.success && normalized.data.symbol).toBe("BTC/USD");
+		expect(generateReportSchema.safeParse({ symbol: "AAPL\u0000MSFT" }).success).toBe(false);
 	});
 });
 
