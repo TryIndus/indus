@@ -1,5 +1,6 @@
 require "rails_helper"
 require "cgi"
+require Rails.root.join("app/services/fundamentals_provider")
 
 RSpec.describe "security and failure boundaries", type: :request do
   let(:claims) { { "iss" => "https://example.supabase.co/auth/v1", "sub" => "boundary-user", "email" => "boundary@example.test" } }
@@ -26,15 +27,25 @@ RSpec.describe "security and failure boundaries", type: :request do
 
     expect(response).to have_http_status(:bad_request)
     expect(OutboxEvent.count).to eq(0)
-    expect(AuditEvent.count).to eq(0)
+    expect(AuditEvent.last.metadata).to include("outcome" => "failure", "status" => 400)
     expect(IdempotencyRecord.count).to eq(0)
+  end
+
+  it "bounds retries when idempotency reservation repeatedly loses a uniqueness race" do
+    allow(IdempotencyRecord).to receive(:transaction).and_raise(ActiveRecord::RecordNotUnique)
+
+    post "/v1/favorites", params: { symbol: "AAPL", instrument_type: "equity" }, headers: write_headers
+
+    expect(response).to have_http_status(:conflict)
+    expect(IdempotencyRecord).to have_received(:transaction).twice
+    expect(Favorite.count).to eq(0)
   end
 
   it "rate limits model work without invoking the provider" do
     user = User.create!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub"),
       email: claims.fetch("email"), display_name: "Boundary")
     AiUsageWindow.create!(user: user, operation: "explanation", window_started_at: Time.current.beginning_of_hour,
-      request_count: ENV.fetch("AI_REQUESTS_PER_HOUR", 30).to_i)
+      request_count: AiUsageLimiter::LIMITS.fetch("explanation").fetch("hour"))
     allow(ModelGateway).to receive(:default)
 
     post "/v1/explanations", params: { symbol: "AAPL", metrics: [ "revenue" ] }, headers: write_headers
@@ -43,6 +54,30 @@ RSpec.describe "security and failure boundaries", type: :request do
     expect(response.headers["Retry-After"]).to eq("3600")
     expect(JSON.parse(response.body)).to include("code" => "rate_limited")
     expect(ModelGateway).not_to have_received(:default)
+  end
+
+  it "commits quota usage when a provider failure rolls back the idempotent response" do
+    user = User.create!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub"),
+      email: claims.fetch("email"), display_name: "Boundary")
+    hourly_limit = AiUsageLimiter::LIMITS.fetch("explanation").fetch("hour")
+    AiUsageWindow.create!(user_id: user.id, operation: "explanation", window_started_at: Time.current.beginning_of_hour,
+      request_count: hourly_limit - 1)
+    snapshot = FundamentalsSnapshot.new(symbol: "AAPL", as_of: Time.current,
+      metrics: { "regularMarketPrice" => 200.0 }, source_reference: "fixture:AAPL")
+    allow(FundamentalsProvider).to receive(:default).and_return(instance_double(FundamentalsProvider, fetch: snapshot))
+    gateway = instance_double(ModelGateway)
+    allow(gateway).to receive(:execute).and_raise(ModelGateway::Error.new(:unavailable, "provider unavailable"))
+    allow(ModelGateway).to receive(:default).and_return(gateway)
+
+    post "/v1/explanations", params: { symbol: "AAPL", metrics: [ "revenue" ] }, headers: write_headers
+    expect(response).to have_http_status(:bad_gateway)
+    expect(IdempotencyRecord.count).to eq(0)
+    expect(AiUsageWindow.find_by!(user_id: user.id, operation: "explanation", window_type: "hour").request_count)
+      .to eq(hourly_limit)
+
+    post "/v1/explanations", params: { symbol: "AAPL", metrics: [ "revenue" ] }, headers: write_headers
+    expect(response).to have_http_status(:too_many_requests)
+    expect(gateway).to have_received(:execute).once
   end
 
   it "cannot attach a report or position to another tenant's portfolio" do
@@ -60,6 +95,22 @@ RSpec.describe "security and failure boundaries", type: :request do
       headers: write_headers.merge("Idempotency-Key" => "request-boundary-0002")
     expect(response).to have_http_status(:not_found)
     expect(Position.count).to eq(0)
+  end
+
+  it "returns a conflict instead of deleting a portfolio referenced by a report" do
+    user = User.create!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub"),
+      email: claims.fetch("email"), display_name: "Boundary")
+    portfolio = user.portfolios.create!(name: "Referenced")
+    user.reports.create!(symbol: "AAPL", title: "AAPL report", portfolio: portfolio)
+
+    expect do
+      delete "/v1/portfolios/#{portfolio.id}", headers: write_headers
+    end.not_to change(Portfolio, :count)
+
+    expect(response).to have_http_status(:conflict)
+    expect(JSON.parse(response.body)).to include("code" => "resource_conflict")
+    expect(AuditEvent.last.attributes).to include("resource_type" => "Portfolio", "resource_id" => portfolio.id)
+    expect(AuditEvent.last.metadata).to include("outcome" => "failure", "status" => 409)
   end
 
   it "paginates without duplicating or skipping tenant records" do

@@ -10,7 +10,9 @@ module V1
       end
       as_of = attributes[:as_of].present? ? Time.iso8601(attributes[:as_of]) : Time.current
       AiUsageLimiter.new(user: Current.user, operation: "explanation").consume!
-      execution = ModelGateway.default.execute(task: "metric_explanations", input: { symbol: symbol, metrics: metrics, as_of: as_of.iso8601 })
+      evidence = ModelEvidence.for_fundamentals(FundamentalsProvider.default.fetch(symbol: symbol))
+      execution = ModelGateway.default.execute(task: "metric_explanations",
+        input: { symbol: symbol, metrics: metrics, as_of: as_of.iso8601 }, evidence: evidence)
       render json: { symbol: symbol, as_of: as_of.iso8601, explanations: execution.payload.fetch("explanations"), usage: execution.usage }
     rescue ArgumentError => error
       raise ActionController::BadRequest, error.message

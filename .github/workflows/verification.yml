@@ -155,10 +155,15 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
-      - name: Validate contracts and generated clients
+      - name: Validate contracts, compatibility, and generated clients
+        env:
+          CONTRACT_BASE_REVISION: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
         run: |
           contracts/scripts/validate.sh
+          contracts/scripts/check-breaking.sh "$CONTRACT_BASE_REVISION"
           contracts/scripts/verify-generated.sh
 
   platform-api:
@@ -206,7 +211,7 @@ jobs:
             --volume "$PWD:/workspace" --workdir /workspace \
             --env DATABASE_URL --env REDIS_URL --env RAILS_ENV \
             indus-rails-toolchain:8.1.3.1 \
-            -lc 'bundle install; bin/rails db:prepare; bundle exec rspec; bin/rubocop; bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error; bin/bundler-audit check --update'
+            -lc 'set -eu; bundle install; bin/rails db:prepare; bundle exec rspec; bin/rubocop; bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error; bin/bundler-audit check --update'
 
       - name: Build production image
         run: docker build apps/platform-api

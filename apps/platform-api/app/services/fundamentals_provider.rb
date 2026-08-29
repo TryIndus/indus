@@ -8,4 +8,5 @@ class FundamentalsProvider
   def self.default = Fundamentals::YahooAdapter.new
 
   def fetch(symbol:) = raise(NotImplementedError)
+  def fetch_many(symbols:, timeout:) = raise(NotImplementedError)
 end

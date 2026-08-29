@@ -38,7 +38,6 @@ The service fails closed when required identity, database, or model configuratio
 | `SUPABASE_JWT_SECRET` | Optional legacy HS256 verifier secret during migration; prefer JWKS signing keys |
 | `GEMINI_API_KEY` | Server-side Gemini credential |
 | `GEMINI_MODEL` | Model selection; defaults to `gemini-2.5-flash` |
-| `AI_REQUESTS_PER_HOUR` | Per-user explanation quota; defaults to 30 |
 | `OTEL_TRACES_EXPORTER` | Trace exporter; defaults to `none` so local and test runs make no export attempts |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint when the exporter is explicitly enabled |
 
@@ -62,7 +61,7 @@ migration hook alone reads the `indus_migrator` credential and assumes
 
 Every `/v1` request requires a verified bearer token. The token issuer and audience are fixed by server configuration, and Pundit scopes every tenant-owned query by the internal user identifier. Mutations require an `Idempotency-Key`; the mutation, audit event, and replay response commit in one transaction. Reusing a key with the same request replays the recorded response, while changing the request returns `409`. Reports are created together with an outbox event in that transaction; workers may process that event only after commit. Provider credentials and provider payloads do not cross the API boundary.
 
-Model-backed operations are owned by a task registry in `ModelGateway`. Each task pins a prompt version, declares an allowlisted tool set, validates structured provider output, normalizes usage and provider failures, and consumes a per-user quota before invocation.
+Model-backed operations are owned by a task registry in `ModelGateway`. Each task pins a prompt version, receives bounded server-side evidence, supplies Gemini with a structured response schema when supported, rejects unrecognized citations, normalizes usage and provider failures, and consumes a per-user quota before invocation. Quota writes use a dedicated database connection so a billable provider failure cannot roll the charge back with the surrounding idempotency transaction.
 
 Phase 3 publishes committed outbox rows to Kafka and starts durable report workflows through an idempotent consumer. Temporal uses stable workflow IDs and persistent activity leases to prevent overlapping model and artifact work. Research claims must cite allowlisted evidence with matching as-of values before artifacts are stored. See the [workflow architecture](../../docs/architecture/distributed-research-workflows.md) and [recovery runbook](../../docs/runbooks/report-workflow-recovery.md).
 

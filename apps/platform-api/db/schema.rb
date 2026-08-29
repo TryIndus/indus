@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_05_007000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_06_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -96,12 +96,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_007000) do
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
+    t.index ["id", "user_id"], name: "portfolios_report_ownership", unique: true
     t.index ["user_id", "name"], name: "index_portfolios_on_user_id_and_name", unique: true
     t.index ["user_id"], name: "index_portfolios_on_user_id"
   end
 
   create_table "positions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.decimal "average_cost", precision: 20, scale: 6, null: false
+    t.decimal "average_cost", precision: 22, scale: 8, null: false
     t.datetime "created_at", null: false
     t.string "currency", default: "USD", null: false
     t.string "instrument_type", default: "equity", null: false
@@ -132,7 +133,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_007000) do
     t.index ["report_id", "activity_key"], name: "report_activity_identity", unique: true
     t.index ["report_id"], name: "index_report_activity_executions_on_report_id"
     t.check_constraint "attempts >= 0", name: "report_activity_attempts_nonnegative"
-    t.check_constraint "status::text = ANY (ARRAY['running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "report_activity_status"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "report_activity_status"
   end
 
   create_table "report_sources", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -190,6 +191,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_05_007000) do
   add_foreign_key "positions", "portfolios"
   add_foreign_key "report_activity_executions", "reports", on_delete: :cascade
   add_foreign_key "report_sources", "reports", on_delete: :cascade
-  add_foreign_key "reports", "portfolios"
+  add_foreign_key "reports", "portfolios", column: ["portfolio_id", "user_id"], primary_key: ["id", "user_id"], name: "reports_portfolio_owner_fk"
   add_foreign_key "reports", "users"
 end
