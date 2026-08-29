@@ -9,4 +9,13 @@ class Report < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :title, presence: true, length: { maximum: 200 }
   validates :workflow_id, uniqueness: true, allow_nil: true
+  validate :portfolio_belongs_to_user
+
+  private
+
+  def portfolio_belongs_to_user
+    return if portfolio.nil? || user_id.nil? || portfolio.user_id == user_id
+
+    errors.add(:portfolio, "must belong to the report owner")
+  end
 end

@@ -1,4 +1,4 @@
-class AiUsageWindow < ApplicationRecord
+class AiUsageWindow < QuotaRecord
   belongs_to :user
   validates :operation, :window_started_at, presence: true
   validates :window_type, inclusion: { in: %w[hour day] }

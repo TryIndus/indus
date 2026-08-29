@@ -37,7 +37,7 @@ module V1
     end
 
     def position_params
-      if action_name == "create"
+      attributes = if action_name == "create"
         contract_params(:symbol, :instrument_type, :quantity, :average_cost, :currency,
           required: %i[symbol instrument_type quantity average_cost currency])
       else
@@ -45,6 +45,12 @@ module V1
         raise ActionController::BadRequest, "at least one field is required" if attributes.empty?
         attributes
       end
+      %i[quantity average_cost].each do |field|
+        if attributes.key?(field) && !attributes[field].is_a?(String)
+          raise ActionController::BadRequest, "#{field} must be a base-10 decimal string"
+        end
+      end
+      attributes
     end
   end
 end

@@ -162,6 +162,19 @@ describe('application routing', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
   })
 
+  it('deletes a favorite by its unambiguous resource identifier', async () => {
+    const id = '00000000-0000-4000-8000-000000000002'
+    const mutation = vi.fn(() => undefined)
+    await renderPath('/favorites', true, path => path === '/v1/favorites?page_size=100'
+      ? { next_cursor: null, items: [{ id, symbol: 'AAPL', instrument_type: 'equity', created_at: now }] }
+      : responseFor(path), mutation)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
+
+    await waitFor(() => expect(mutation).toHaveBeenCalled())
+    expect(mutation).toHaveBeenCalledWith(`/v1/favorites/${id}`, 'DELETE', undefined, expect.stringMatching(/^[0-9a-f-]{36}$/))
+  })
+
   it('redirects an authenticated user away from the sign-in page', async () => {
     const router = await renderPath('/auth', true)
 

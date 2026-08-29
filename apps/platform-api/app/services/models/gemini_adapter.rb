@@ -16,12 +16,14 @@ module Models
       @transport = transport
     end
 
-    def generate(prompt:, purpose:)
+    def generate(prompt:, purpose:, response_schema: nil)
       uri = URI("https://generativelanguage.googleapis.com/v1beta/models/#{@model}:generateContent")
       request = Net::HTTP::Post.new(uri, { "Content-Type" => "application/json", "x-goog-api-key" => @api_key })
+      generation_config = { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: "application/json" }
+      generation_config[:responseSchema] = response_schema if response_schema
       request.body = { system_instruction: { parts: [ { text: system_instruction(purpose) } ] },
         contents: [ { role: "user", parts: [ { text: prompt } ] } ],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: "application/json" } }.to_json
+        generationConfig: generation_config }.to_json
       response = @transport.start(uri.host, uri.port, use_ssl: true, open_timeout: 3, read_timeout: 30) { |http| http.request(request) }
       unless response.is_a?(Net::HTTPSuccess)
         category = response.code.to_i == 429 ? :rate_limited : :unavailable
