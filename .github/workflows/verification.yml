@@ -205,10 +205,9 @@ jobs:
         run: docker build --tag indus-rails-toolchain:8.1.3.1 tooling/rails
 
       - name: Verify Rails application
-        working-directory: apps/platform-api
         run: |
           docker run --rm --network host --entrypoint sh \
-            --volume "$PWD:/workspace" --workdir /workspace \
+            --volume "$GITHUB_WORKSPACE:/workspace" --workdir /workspace/apps/platform-api \
             --env DATABASE_URL --env REDIS_URL --env RAILS_ENV \
             indus-rails-toolchain:8.1.3.1 \
             -lc 'set -eu; bundle install; bin/rails db:prepare; bundle exec rspec; bin/rubocop; bin/brakeman --quiet --no-pager --exit-on-warn --exit-on-error; bin/bundler-audit check --update'
@@ -297,11 +296,35 @@ jobs:
           cargo clippy --locked --all-targets --all-features -- -D warnings
           cargo test --locked --all-targets
           cargo build --locked --release
+  aws-platform:
+    name: AWS platform definitions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.5
+          terraform_wrapper: false
+
+      - name: Install Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.2.3
+
+      - name: Install offline validators
+        run: sudo apt-get update && sudo apt-get install --yes jq ripgrep ruby shellcheck
+
+      - name: Validate infrastructure and GitOps definitions
+        run: scripts/validate-phase4.sh
 
   required:
     name: Required verification
     if: always()
-    needs: [core, database, integration, browser, authenticated, contracts, platform-api, replacement-web, market-data]
+    needs: [core, database, integration, browser, authenticated, contracts, platform-api, replacement-web, market-data, aws-platform]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -316,6 +339,7 @@ jobs:
           PLATFORM_API_RESULT: ${{ needs.platform-api.result }}
           REPLACEMENT_WEB_RESULT: ${{ needs.replacement-web.result }}
           MARKET_DATA_RESULT: ${{ needs.market-data.result }}
+          AWS_PLATFORM_RESULT: ${{ needs.aws-platform.result }}
         run: |
           test "$CORE_RESULT" = "success"
           test "$DATABASE_RESULT" = "success"
@@ -326,3 +350,4 @@ jobs:
           test "$PLATFORM_API_RESULT" = "success"
           test "$REPLACEMENT_WEB_RESULT" = "success"
           test "$MARKET_DATA_RESULT" = "success"
+          test "$AWS_PLATFORM_RESULT" = "success"

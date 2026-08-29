@@ -58,4 +58,4 @@ docker compose -f compose.yaml -f compose.workflows.yaml \
 
 `down` preserves named PostgreSQL, Redis, market-data, and artifact volumes. Add `--volumes` only when intentionally discarding the entire disposable local dataset.
 
-If a one-shot service failed, inspect `platform-migrate`, `workflow-topic-init`, or `minio-init` logs first. If workers continually restart, confirm that Redpanda reports healthy, Temporal responds on port 7233 inside the Compose network, and the Rails schema is current.
+If a one-shot service failed, inspect `platform-migrate`, `market-data-migrate`, `workflow-topic-init`, or `minio-init` logs first. If workers continually restart, confirm that Redpanda reports healthy, Temporal responds on port 7233 inside the Compose network, and both database schemas are current.

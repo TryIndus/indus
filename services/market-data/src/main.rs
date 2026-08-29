@@ -26,6 +26,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .json()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
         .init();
+    if std::env::args().nth(1).as_deref() == Some("migrate") {
+        let database_url = std::env::var("DATABASE_URL")?;
+        PostgresStore::migrate(&database_url).await?;
+        info!("market-data migrations completed");
+        return Ok(());
+    }
     let config = Config::from_env()?;
     let metrics = Metrics::new()?;
     let health = Arc::new(ServiceHealth::default());

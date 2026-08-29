@@ -19,7 +19,12 @@ The service fails closed when required identity, database, or model configuratio
 | Variable | Purpose |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection URL |
-| `REDIS_URL` | Sidekiq Redis URL |
+| `REDIS_AUTH_MODE` | `url` for local/static Redis credentials or `iam` for ElastiCache Serverless |
+| `REDIS_URL` | Redis URL used only in `url` mode; defaults to `redis://localhost:6379/0` |
+| `REDIS_ENDPOINT` | ElastiCache TLS endpoint hostname in `iam` mode |
+| `REDIS_PORT` | ElastiCache TLS port in `iam` mode; defaults to `6379` |
+| `REDIS_IAM_CACHE_NAME` | ElastiCache Serverless cache name signed into IAM auth tokens |
+| `REDIS_IAM_USER` | IAM-enabled ElastiCache user ID and username |
 | `KAFKA_BROKERS` | Comma-separated Kafka bootstrap brokers |
 | `KAFKA_AUTH_MODE` | `plaintext` locally or `msk_iam` with AWS workload identity |
 | `TEMPORAL_ADDRESS` | Temporal frontend address; defaults to `temporal:7233` |
@@ -37,6 +42,20 @@ The service fails closed when required identity, database, or model configuratio
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint when the exporter is explicitly enabled |
 
 Production also requires Rails' standard `SECRET_KEY_BASE`. No Rails master key or encrypted credential file is used.
+
+In AWS, Rails and Sidekiq obtain rotating workload credentials through IRSA
+and sign a new 15-minute ElastiCache token whenever a Redis socket is opened
+or reconnected. TLS certificate and hostname verification are mandatory. No
+Redis password is stored in Secrets Manager. Local Compose continues to use
+the static `REDIS_URL` path and does not require AWS credentials. Action Cable
+has no mounted endpoint or channels and its engine is intentionally not loaded
+by this API-only service. If it is introduced later, its long-lived Redis
+connections must use this same refreshable credential path.
+
+AWS runtime processes connect through RDS Proxy as the DML-only
+`indus_platform` role. They never receive schema-owner membership. The Argo
+migration hook alone reads the `indus_migrator` credential and assumes
+`indus_platform_owner` for the duration of each database connection.
 
 ## Boundaries
 

@@ -41,6 +41,7 @@ async fn transactional_publish_is_consumed_before_offsets_advance() {
         ssl_ca_location: None,
         aws_region: None,
     };
+    PostgresStore::migrate(&database_url).await.unwrap();
     let store = Arc::new(PostgresStore::connect(&database_url).await.unwrap());
     let mut events = parse_message(
         include_str!("fixtures/alpaca_equity.json"),

@@ -72,6 +72,7 @@ bunx supabase --version
 | Authenticated browser | `bun run test:authenticated` | Real local sign-in, protected product routes, tenant API access, and authenticated WCAG checks |
 | Performance | `bun run test:performance` | Production-mode navigation and JavaScript transfer budgets |
 | Market data | `bun run test:market-data` | Rust formatting, Clippy, fixtures, replay, SSE boundaries, PostgreSQL persistence, Kafka orchestration, and image build |
+| AWS platform | `bun run test:phase4` | Offline Terraform validation, Helm rendering, GitOps parsing, pinned workflows, and shell safety checks |
 
 ## Reliability-first development
 
