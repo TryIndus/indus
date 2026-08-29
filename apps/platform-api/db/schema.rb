@@ -133,7 +133,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_06_001000) do
     t.index ["report_id", "activity_key"], name: "report_activity_identity", unique: true
     t.index ["report_id"], name: "index_report_activity_executions_on_report_id"
     t.check_constraint "attempts >= 0", name: "report_activity_attempts_nonnegative"
-    t.check_constraint "status::text = ANY (ARRAY['running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text])", name: "report_activity_status"
+    t.check_constraint "status::text = ANY (ARRAY['running'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "report_activity_status"
   end
 
   create_table "report_sources", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

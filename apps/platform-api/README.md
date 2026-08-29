@@ -33,7 +33,6 @@ The service fails closed when required identity, database, or model configuratio
 | `SUPABASE_JWT_SECRET` | Optional legacy HS256 verifier secret during migration; prefer JWKS signing keys |
 | `GEMINI_API_KEY` | Server-side Gemini credential |
 | `GEMINI_MODEL` | Model selection; defaults to `gemini-2.5-flash` |
-| `AI_REQUESTS_PER_HOUR` | Per-user explanation quota; defaults to 30 |
 | `OTEL_TRACES_EXPORTER` | Trace exporter; defaults to `none` so local and test runs make no export attempts |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP collector endpoint when the exporter is explicitly enabled |
 
