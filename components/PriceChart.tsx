@@ -20,11 +20,11 @@ import {
 	getChartRange,
 	getRangeStartTimestamp,
 } from "@/lib/charts/ranges";
+import { getRealtimeStatus, type RealtimeStatus } from "@/lib/realtime/stream-status";
 import type { PageChartData } from "@/lib/types";
 
 type AssetType = "stock" | "crypto";
 type BarData = CandlestickData<Time> & { time: number; volume?: number };
-type RealtimeStatus = "connecting" | "connected" | "reconnecting" | "historical";
 
 interface HistoricalDataResponse {
 	data: BarData[];
@@ -380,16 +380,20 @@ export default function PriceChart({
 		clearReconnectTimer();
 
 		eventSource.onopen = () => {
-			clearReconnectTimer();
-			setRealtimeStatus("connected");
+			setRealtimeStatus(getRealtimeStatus("transport-open"));
 			setShowReconnecting(false);
 		};
 		eventSource.onerror = () => {
 			if (eventSource.readyState === EventSource.CLOSED) return;
-			setRealtimeStatus("reconnecting");
+			setRealtimeStatus(getRealtimeStatus("transport-error"));
 			if (!reconnectTimerRef.current) {
 				reconnectTimerRef.current = setTimeout(() => setShowReconnecting(true), 2500);
 			}
+		};
+		const handleReady = () => {
+			clearReconnectTimer();
+			setRealtimeStatus(getRealtimeStatus("upstream-ready"));
+			setShowReconnecting(false);
 		};
 		const handleBar = (event: MessageEvent<string>) => {
 			try {
@@ -430,16 +434,18 @@ export default function PriceChart({
 			}
 		};
 		const handleStreamError = () => {
-			setRealtimeStatus("historical");
+			setRealtimeStatus(getRealtimeStatus("provider-error"));
 			setShowReconnecting(false);
 			clearReconnectTimer();
 			eventSource.close();
 		};
+		eventSource.addEventListener("ready", handleReady);
 		eventSource.addEventListener("bar", handleBar as EventListener);
 		eventSource.addEventListener("stream-error", handleStreamError as EventListener);
 
 		return () => {
 			clearReconnectTimer();
+			eventSource.removeEventListener("ready", handleReady);
 			eventSource.removeEventListener("bar", handleBar as EventListener);
 			eventSource.removeEventListener("stream-error", handleStreamError as EventListener);
 			eventSource.close();
