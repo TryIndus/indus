@@ -2,7 +2,7 @@
 
 import { Send, Square } from "lucide-react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 interface ChatInputProps {
@@ -15,8 +15,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, sending, on
 	const [message, setMessage] = useState("");
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-	// Auto-resize textarea
-	useEffect(() => {
+	const resizeTextarea = useCallback(() => {
 		const textarea = textareaRef.current;
 		if (textarea) {
 			textarea.style.height = "auto";
@@ -24,13 +23,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, sending, on
 			const maxHeight = 6 * 24; // 6 lines * 24px line height
 			textarea.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
 		}
-	}, [message]);
+	}, []);
+
+	useLayoutEffect(resizeTextarea, [resizeTextarea]);
 
 	const handleSend = () => {
 		const trimmedMessage = message.trim();
 		if (trimmedMessage && !sending) {
 			onSendMessage(trimmedMessage);
 			setMessage("");
+			requestAnimationFrame(resizeTextarea);
 		}
 	};
 
@@ -56,7 +58,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, sending, on
 				<textarea
 					ref={textareaRef}
 					value={message}
-					onChange={(e) => setMessage(e.target.value)}
+					onChange={(e) => {
+						setMessage(e.target.value);
+						requestAnimationFrame(resizeTextarea);
+					}}
 					onKeyDown={handleKeyDown}
 					placeholder="Ask a question about this company…"
 					className="scrollbar-none max-h-40 min-h-11 flex-1 resize-none overflow-auto rounded-xl border border-border bg-background/70 px-3 py-3 text-sm leading-snug text-foreground outline-none placeholder:text-muted-foreground focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/15"

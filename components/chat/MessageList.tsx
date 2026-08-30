@@ -30,12 +30,15 @@ export function MessageList({
 	onClearError,
 	hasUserMessages,
 }: MessageListProps) {
-	const messagesEndRef = useRef<HTMLDivElement>(null);
+	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+	const latestContent = messages.at(-1)?.content;
 
 	useEffect(() => {
-		messagesEndRef.current?.scrollIntoView({ behavior: sending ? "auto" : "smooth" });
-	}, [messages, sending]);
+		if (latestContent === undefined && !sending) return;
+		const container = scrollContainerRef.current;
+		if (container) container.scrollTop = container.scrollHeight;
+	}, [latestContent, sending]);
 
 	const copyToClipboard = async (message: ChatMessage) => {
 		try {
@@ -51,6 +54,7 @@ export function MessageList({
 
 	return (
 		<div
+			ref={scrollContainerRef}
 			className="scrollbar-none flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-5"
 			aria-live="polite"
 		>
@@ -147,7 +151,6 @@ export function MessageList({
 					</div>
 				);
 			})}
-			<div ref={messagesEndRef} />
 		</div>
 	);
 }
