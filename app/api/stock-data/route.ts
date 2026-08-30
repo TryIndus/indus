@@ -76,7 +76,10 @@ export async function GET(request: Request) {
 	}
 
 	try {
-		const result = await stockDataService.load(symbol, { requestId: requestLog.requestId });
+		const result = await stockDataService.load(symbol, {
+			requestId: requestLog.requestId,
+			signal: request.signal,
+		});
 		const responseHeaders = {
 			...sharedHeaders,
 			"X-Indus-Cache": result.cacheStatus,

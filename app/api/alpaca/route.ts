@@ -206,6 +206,7 @@ export async function GET(request: NextRequest) {
 			startDate,
 			endDate,
 			requestId: requestLog.requestId,
+			signal: request.signal,
 		});
 		const sortedData = result.data;
 		const responseHeaders = {

@@ -14,6 +14,8 @@ Indus bounds upstream work, degrades to useful cached or secondary data where po
 
 Market-data responses are marked `private, no-store` so request IDs, rate-limit state, and degradation metadata cannot be replayed through a shared CDN cache. The bounded in-process caches remain intentionally opportunistic: warm serverless instances reuse them, while cold instances refill from providers.
 
+Incoming request cancellation propagates through retry and cache boundaries. Fetch-based provider calls are aborted when their final consumer disconnects; a deduplicated load remains active while another request still needs it. Alpaca SDK history calls retain the SDK's 5.5-second deadline because that helper does not expose caller cancellation, but disconnects stop local retries and Yahoo fallback work.
+
 ## Rate limits
 
 Database-backed per-user quotas remain authoritative for Gemini-backed routes. Public provider routes also use bounded per-instance fixed windows:

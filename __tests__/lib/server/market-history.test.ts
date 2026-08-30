@@ -155,4 +155,27 @@ describe("MarketHistoryService", () => {
 			cacheStatus: "stale",
 		});
 	});
+
+	it("stops provider work when the requesting client disconnects", async () => {
+		const caller = new AbortController();
+		const primaryLoad = vi.fn(
+			(_query, signal: AbortSignal) =>
+				new Promise<BarData[]>((_, reject) => {
+					signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+				}),
+		);
+		const fallbackLoad = vi.fn().mockResolvedValue(bars);
+		const service = new MarketHistoryService(
+			{ name: "alpaca", load: primaryLoad },
+			{ name: "yahoo", load: fallbackLoad },
+			{ attempts: 2 },
+		);
+
+		const pending = service.load({ ...query, signal: caller.signal });
+		caller.abort(new DOMException("Request cancelled", "AbortError"));
+
+		await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+		expect(primaryLoad).toHaveBeenCalledTimes(1);
+		expect(fallbackLoad).not.toHaveBeenCalled();
+	});
 });

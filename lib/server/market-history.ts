@@ -19,6 +19,7 @@ export interface MarketHistoryQuery {
 	startDate: Date;
 	endDate: Date;
 	requestId?: string;
+	signal?: AbortSignal;
 }
 
 export interface BarData {
@@ -102,73 +103,79 @@ export class MarketHistoryService {
 
 	async load(query: MarketHistoryQuery): Promise<MarketHistoryResult> {
 		try {
-			const result = await this.cache.getOrLoad(cacheKey(query), async () => {
-				const minimumBars = minimumBarCount(query);
-				let primaryData: BarData[] | null = null;
-				try {
-					primaryData = await this.loadFrom(this.primary, query);
-					if (primaryData.length >= minimumBars) {
-						return { data: primaryData, provider: this.primary.name, fallbackUsed: false };
-					}
-				} catch (primaryError) {
-					logger.warn("market_history.fallback_started", {
-						requestId: query.requestId,
-						symbol: query.symbol,
-						timeframe: query.timeframe,
-						primaryProvider: this.primary.name,
-						fallbackProvider: this.fallback.name,
-						errorName: primaryError instanceof Error ? primaryError.name : "UnknownError",
-						errorMessage:
-							primaryError instanceof Error ? primaryError.message : String(primaryError),
-					});
-				}
-
-				try {
-					const data = await this.loadFrom(this.fallback, query);
-					if (data.length < minimumBars) {
-						const bestPartial =
-							primaryData !== null && primaryData.length > data.length
-								? { data: primaryData, provider: this.primary.name }
-								: { data, provider: this.fallback.name };
-						logger.warn("market_history.insufficient_data", {
+			const result = await this.cache.getOrLoad(
+				cacheKey(query),
+				async (signal) => {
+					const minimumBars = minimumBarCount(query);
+					let primaryData: BarData[] | null = null;
+					try {
+						primaryData = await this.loadFrom(this.primary, query, signal);
+						if (primaryData.length >= minimumBars) {
+							return { data: primaryData, provider: this.primary.name, fallbackUsed: false };
+						}
+					} catch (primaryError) {
+						if (signal.aborted) throw primaryError;
+						logger.warn("market_history.fallback_started", {
 							requestId: query.requestId,
 							symbol: query.symbol,
 							timeframe: query.timeframe,
-							primaryBarCount: primaryData?.length ?? null,
-							fallbackBarCount: data.length,
-							selectedProvider: bestPartial.provider,
-						});
-						throw new InsufficientHistoryError({
-							...bestPartial,
-							fallbackUsed: true,
+							primaryProvider: this.primary.name,
+							fallbackProvider: this.fallback.name,
+							errorName: primaryError instanceof Error ? primaryError.name : "UnknownError",
+							errorMessage:
+								primaryError instanceof Error ? primaryError.message : String(primaryError),
 						});
 					}
 
-					return { data, provider: this.fallback.name, fallbackUsed: true };
-				} catch (fallbackError) {
-					if (fallbackError instanceof InsufficientHistoryError) {
+					try {
+						const data = await this.loadFrom(this.fallback, query, signal);
+						if (data.length < minimumBars) {
+							const bestPartial =
+								primaryData !== null && primaryData.length > data.length
+									? { data: primaryData, provider: this.primary.name }
+									: { data, provider: this.fallback.name };
+							logger.warn("market_history.insufficient_data", {
+								requestId: query.requestId,
+								symbol: query.symbol,
+								timeframe: query.timeframe,
+								primaryBarCount: primaryData?.length ?? null,
+								fallbackBarCount: data.length,
+								selectedProvider: bestPartial.provider,
+							});
+							throw new InsufficientHistoryError({
+								...bestPartial,
+								fallbackUsed: true,
+							});
+						}
+
+						return { data, provider: this.fallback.name, fallbackUsed: true };
+					} catch (fallbackError) {
+						if (signal.aborted) throw fallbackError;
+						if (fallbackError instanceof InsufficientHistoryError) {
+							throw fallbackError;
+						}
+						if (primaryData) {
+							logger.warn("market_history.primary_partial_used", {
+								requestId: query.requestId,
+								symbol: query.symbol,
+								timeframe: query.timeframe,
+								barCount: primaryData.length,
+								fallbackProvider: this.fallback.name,
+								errorName: fallbackError instanceof Error ? fallbackError.name : "UnknownError",
+								errorMessage:
+									fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+							});
+							throw new InsufficientHistoryError({
+								data: primaryData,
+								provider: this.primary.name,
+								fallbackUsed: true,
+							});
+						}
 						throw fallbackError;
 					}
-					if (primaryData) {
-						logger.warn("market_history.primary_partial_used", {
-							requestId: query.requestId,
-							symbol: query.symbol,
-							timeframe: query.timeframe,
-							barCount: primaryData.length,
-							fallbackProvider: this.fallback.name,
-							errorName: fallbackError instanceof Error ? fallbackError.name : "UnknownError",
-							errorMessage:
-								fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-						});
-						throw new InsufficientHistoryError({
-							data: primaryData,
-							provider: this.primary.name,
-							fallbackUsed: true,
-						});
-					}
-					throw fallbackError;
-				}
-			});
+				},
+				query.signal,
+			);
 
 			if (result.status === "stale") {
 				logger.warn("market_history.stale_cache_used", {
@@ -188,11 +195,16 @@ export class MarketHistoryService {
 		}
 	}
 
-	private loadFrom(provider: MarketHistoryProvider, query: MarketHistoryQuery): Promise<BarData[]> {
+	private loadFrom(
+		provider: MarketHistoryProvider,
+		query: MarketHistoryQuery,
+		externalSignal: AbortSignal,
+	): Promise<BarData[]> {
 		return executeWithRetry(({ signal }) => provider.load(query, signal), {
 			operation: `${provider.name}.history`,
 			attempts: this.attempts,
 			timeoutMs: this.timeoutMs,
+			signal: externalSignal,
 			onRetry: (error, nextAttempt) => {
 				logger.warn("provider.retry_scheduled", {
 					requestId: query.requestId,

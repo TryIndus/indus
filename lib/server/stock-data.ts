@@ -241,8 +241,9 @@ interface StockDataServiceOptions {
 	cache?: ResilientCache<StockDataCacheValue>;
 }
 
-interface StockDataRequestContext {
+export interface StockDataRequestContext {
 	requestId?: string;
+	signal?: AbortSignal;
 }
 
 class PartialStockDataError extends Error {
@@ -274,49 +275,55 @@ export class StockDataService {
 
 	async load(symbol: string, context: StockDataRequestContext = {}): Promise<StockDataResult> {
 		try {
-			const result = await this.cache.getOrLoad(symbol, async () => {
-				const [quoteResult, summaryResult] = await Promise.allSettled([
-					this.loadPart("quote", symbol, context, (signal) => this.provider.quote(symbol, signal)),
-					this.loadPart("quote_summary", symbol, context, (signal) =>
-						this.provider.quoteSummary(symbol, signal),
-					),
-				]);
-				const quote = quoteResult.status === "fulfilled" ? quoteResult.value : null;
-				const rawSummary = summaryResult.status === "fulfilled" ? summaryResult.value : null;
-				const summary =
-					rawSummary &&
-					Object.values(rawSummary).some((value) => value !== undefined && value !== null)
-						? rawSummary
-						: null;
+			const result = await this.cache.getOrLoad(
+				symbol,
+				async (signal) => {
+					const [quoteResult, summaryResult] = await Promise.allSettled([
+						this.loadPart("quote", symbol, context, signal, (attemptSignal) =>
+							this.provider.quote(symbol, attemptSignal),
+						),
+						this.loadPart("quote_summary", symbol, context, signal, (attemptSignal) =>
+							this.provider.quoteSummary(symbol, attemptSignal),
+						),
+					]);
+					const quote = quoteResult.status === "fulfilled" ? quoteResult.value : null;
+					const rawSummary = summaryResult.status === "fulfilled" ? summaryResult.value : null;
+					const summary =
+						rawSummary &&
+						Object.values(rawSummary).some((value) => value !== undefined && value !== null)
+							? rawSummary
+							: null;
 
-				if (!quote && !summary) {
-					throw new AggregateError(
-						[
-							quoteResult.status === "rejected" ? quoteResult.reason : null,
-							summaryResult.status === "rejected" ? summaryResult.reason : null,
-						].filter(Boolean),
-						`${this.provider.name} stock data unavailable`,
-					);
-				}
+					if (!quote && !summary) {
+						throw new AggregateError(
+							[
+								quoteResult.status === "rejected" ? quoteResult.reason : null,
+								summaryResult.status === "rejected" ? summaryResult.reason : null,
+							].filter(Boolean),
+							`${this.provider.name} stock data unavailable`,
+						);
+					}
 
-				const value = {
-					data: buildStockData(symbol, quote, summary),
-					provider: this.provider.name,
-					degraded: !quote || !summary,
-				};
-				if (value.degraded) {
-					logger.warn("stock_data.partial_provider_response", {
-						requestId: context.requestId,
-						symbol,
+					const value = {
+						data: buildStockData(symbol, quote, summary),
 						provider: this.provider.name,
-						quoteAvailable: Boolean(quote),
-						summaryAvailable: Boolean(summary),
-					});
-					throw new PartialStockDataError(value);
-				}
+						degraded: !quote || !summary,
+					};
+					if (value.degraded) {
+						logger.warn("stock_data.partial_provider_response", {
+							requestId: context.requestId,
+							symbol,
+							provider: this.provider.name,
+							quoteAvailable: Boolean(quote),
+							summaryAvailable: Boolean(summary),
+						});
+						throw new PartialStockDataError(value);
+					}
 
-				return value;
-			});
+					return value;
+				},
+				context.signal,
+			);
 
 			if (result.status === "stale") {
 				logger.warn("stock_data.stale_cache_used", {
@@ -339,12 +346,14 @@ export class StockDataService {
 		operation: string,
 		symbol: string,
 		context: StockDataRequestContext,
+		externalSignal: AbortSignal,
 		load: (signal: AbortSignal) => Promise<T>,
 	): Promise<T> {
 		return executeWithRetry(({ signal }) => load(signal), {
 			operation: `${this.provider.name}.${operation}`,
 			attempts: this.attempts,
 			timeoutMs: this.timeoutMs,
+			signal: externalSignal,
 			onRetry: (error, nextAttempt) => {
 				logger.warn("provider.retry_scheduled", {
 					requestId: context.requestId,

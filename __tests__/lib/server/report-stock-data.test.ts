@@ -142,4 +142,26 @@ describe("loadReportStockData", () => {
 			expect.stringContaining("report.stock_data_stale_cache_used"),
 		);
 	});
+
+	test("propagates caller cancellation instead of generating a report without evidence", async () => {
+		const caller = new AbortController();
+		const waitForAbort = (signal?: AbortSignal) =>
+			new Promise<never>((_, reject) => {
+				signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+			});
+		const provider = {
+			quote: vi.fn((_symbol: string, signal?: AbortSignal) => waitForAbort(signal)),
+			quoteSummary: vi.fn(
+				(_symbol: string, _options: { modules: string[] }, signal?: AbortSignal) =>
+					waitForAbort(signal),
+			),
+		};
+
+		const pending = loadReportStockData("AAPL", { provider, signal: caller.signal });
+		caller.abort(new DOMException("Request cancelled", "AbortError"));
+
+		await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+		expect(provider.quote).toHaveBeenCalledTimes(1);
+		expect(provider.quoteSummary).toHaveBeenCalledTimes(1);
+	});
 });

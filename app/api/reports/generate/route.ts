@@ -46,6 +46,7 @@ export async function POST(request: Request) {
 		reportUserId = access.userId;
 		const stockData = await loadReportStockData(symbol, {
 			requestId: requestLog.requestId,
+			signal: request.signal,
 		});
 		const { data: report, error: insertError } = await supabase
 			.from("reports")

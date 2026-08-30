@@ -79,4 +79,24 @@ describe("StockDataService", () => {
 			data: { peRatio: 20 },
 		});
 	});
+
+	it("stops all provider work when the requesting client disconnects", async () => {
+		const caller = new AbortController();
+		const waitForAbort = vi.fn(
+			(_symbol: string, signal: AbortSignal) =>
+				new Promise<never>((_, reject) => {
+					signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+				}),
+		);
+		const service = new StockDataService(
+			{ name: "yahoo", quote: waitForAbort, quoteSummary: waitForAbort },
+			{ attempts: 2 },
+		);
+
+		const pending = service.load("AAPL", { signal: caller.signal });
+		caller.abort(new DOMException("Request cancelled", "AbortError"));
+
+		await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+		expect(waitForAbort).toHaveBeenCalledTimes(2);
+	});
 });

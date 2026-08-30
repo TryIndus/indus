@@ -78,6 +78,7 @@ interface ReportStockDataOptions {
 	provider?: ReportStockDataProvider;
 	cache?: ResilientCache<ReportStockData>;
 	requestId?: string;
+	signal?: AbortSignal;
 }
 
 class PartialReportStockDataError extends Error {
@@ -91,12 +92,14 @@ async function fetchReportStockData(
 	symbol: string,
 	provider: ReportStockDataProvider,
 	requestId?: string,
+	externalSignal?: AbortSignal,
 ): Promise<ReportStockDataLoad> {
 	const [quoteResult, summaryResult] = await Promise.allSettled([
 		executeWithRetry(({ signal }) => provider.quote(symbol, signal), {
 			operation: "yahoo.report_quote",
 			attempts: 2,
 			timeoutMs: 6_000,
+			signal: externalSignal,
 			onRetry: (error, nextAttempt) => {
 				logger.warn("provider.retry_scheduled", {
 					requestId,
@@ -122,6 +125,7 @@ async function fetchReportStockData(
 				operation: "yahoo.report_quote_summary",
 				attempts: 2,
 				timeoutMs: 6_000,
+				signal: externalSignal,
 				onRetry: (error, nextAttempt) => {
 					logger.warn("provider.retry_scheduled", {
 						requestId,
@@ -195,16 +199,20 @@ export async function loadReportStockData(
 		const activeCache =
 			options.cache ?? (provider === defaultProvider ? reportStockDataCache : null);
 		if (!activeCache) {
-			return (await fetchReportStockData(symbol, provider, options.requestId)).data;
+			return (await fetchReportStockData(symbol, provider, options.requestId, options.signal)).data;
 		}
 
-		const result = await activeCache.getOrLoad(symbol, async () => {
-			const loaded = await fetchReportStockData(symbol, provider, options.requestId);
-			if (loaded.degraded) {
-				throw new PartialReportStockDataError(loaded.data);
-			}
-			return loaded.data;
-		});
+		const result = await activeCache.getOrLoad(
+			symbol,
+			async (signal) => {
+				const loaded = await fetchReportStockData(symbol, provider, options.requestId, signal);
+				if (loaded.degraded) {
+					throw new PartialReportStockDataError(loaded.data);
+				}
+				return loaded.data;
+			},
+			options.signal,
+		);
 		if (result.status === "stale") {
 			logger.warn("report.stock_data_stale_cache_used", {
 				requestId: options.requestId,
@@ -213,6 +221,9 @@ export async function loadReportStockData(
 		}
 		return result.value;
 	} catch (error) {
+		if (options.signal?.aborted) {
+			throw options.signal.reason ?? error;
+		}
 		if (error instanceof PartialReportStockDataError) {
 			return error.data;
 		}
