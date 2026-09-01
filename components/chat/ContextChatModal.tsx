@@ -10,7 +10,6 @@ interface ContextChatModalProps {
 	onSendMessage: (message: string) => void;
 	onRegenerateLast: () => void;
 	onClearError: () => void;
-	onStop: () => void;
 }
 
 export const ContextChatModal: React.FC<ContextChatModalProps> = (props) => {
