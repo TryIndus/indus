@@ -26,7 +26,7 @@ interface CryptoFinancialTableProps {
 
 const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onChatTrigger }) => {
 	const hasValidData = (value?: number) => {
-		return typeof value === "number" && Number.isFinite(value);
+		return value !== undefined && value !== null && value !== 0;
 	};
 
 	return (
@@ -50,7 +50,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 								<Hoverable
 									symbol={data.symbol}
 									metric="market_cap"
-									value={data.marketCap ?? Number.NaN}
+									value={data.marketCap || 0}
 									onChatTrigger={onChatTrigger}
 									metricLabel="Market Cap"
 								>
@@ -67,7 +67,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="market_rank"
-										value={data.rank ?? Number.NaN}
+										value={data.rank || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="Market Rank"
 									>
@@ -85,7 +85,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="market_dominance"
-										value={data.dominance ?? Number.NaN}
+										value={data.dominance || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="Market Dominance"
 									>
@@ -102,7 +102,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 								<Hoverable
 									symbol={data.symbol}
 									metric="volume_24h"
-									value={data.volume24h ?? data.volume ?? Number.NaN}
+									value={data.volume24h || data.volume || 0}
 									onChatTrigger={onChatTrigger}
 									metricLabel="24h Volume"
 								>
@@ -133,7 +133,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 								<Hoverable
 									symbol={data.symbol}
 									metric="circulating_supply"
-									value={data.circulatingSupply ?? Number.NaN}
+									value={data.circulatingSupply || 0}
 									onChatTrigger={onChatTrigger}
 									metricLabel="Circulating Supply"
 								>
@@ -150,7 +150,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="total_supply"
-										value={data.totalSupply ?? Number.NaN}
+										value={data.totalSupply || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="Total Supply"
 									>
@@ -168,7 +168,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="max_supply"
-										value={data.maxSupply ?? Number.NaN}
+										value={data.maxSupply || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="Max Supply"
 									>
@@ -198,7 +198,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 								<Hoverable
 									symbol={data.symbol}
 									metric="percent_change_24h"
-									value={data.percentChange24h ?? Number.NaN}
+									value={data.percentChange24h || 0}
 									onChatTrigger={onChatTrigger}
 									metricLabel="24h Change"
 								>
@@ -223,7 +223,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="percent_change_7d"
-										value={data.percentChange7d ?? Number.NaN}
+										value={data.percentChange7d || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="7d Change"
 									>
@@ -249,7 +249,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="percent_change_30d"
-										value={data.percentChange30d ?? Number.NaN}
+										value={data.percentChange30d || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="30d Change"
 									>
@@ -275,7 +275,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="all_time_high"
-										value={data.allTimeHigh ?? Number.NaN}
+										value={data.allTimeHigh || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="All-Time High"
 									>
@@ -293,7 +293,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="all_time_low"
-										value={data.allTimeLow ?? Number.NaN}
+										value={data.allTimeLow || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="All-Time Low"
 									>
@@ -311,7 +311,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="fifty_two_week_high"
-										value={data.fiftyTwoWeekHigh ?? Number.NaN}
+										value={data.fiftyTwoWeekHigh || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="52W High"
 									>
@@ -329,7 +329,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 									<Hoverable
 										symbol={data.symbol}
 										metric="fifty_two_week_low"
-										value={data.fiftyTwoWeekLow ?? Number.NaN}
+										value={data.fiftyTwoWeekLow || 0}
 										onChatTrigger={onChatTrigger}
 										metricLabel="52W Low"
 									>
@@ -370,7 +370,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										<Hoverable
 											symbol={data.symbol}
 											metric="github_activity"
-											value={data.githubActivity ?? Number.NaN}
+											value={data.githubActivity || 0}
 											onChatTrigger={onChatTrigger}
 											metricLabel="GitHub Activity"
 										>
@@ -388,7 +388,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										<Hoverable
 											symbol={data.symbol}
 											metric="community_score"
-											value={data.communityScore ?? Number.NaN}
+											value={data.communityScore || 0}
 											onChatTrigger={onChatTrigger}
 											metricLabel="Community Score"
 										>
@@ -406,7 +406,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										<Hoverable
 											symbol={data.symbol}
 											metric="developer_score"
-											value={data.developerScore ?? Number.NaN}
+											value={data.developerScore || 0}
 											onChatTrigger={onChatTrigger}
 											metricLabel="Developer Score"
 										>
@@ -442,7 +442,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										<Hoverable
 											symbol={data.symbol}
 											metric="volatility"
-											value={data.volatility ?? Number.NaN}
+											value={data.volatility || 0}
 											onChatTrigger={onChatTrigger}
 											metricLabel="Volatility"
 										>
@@ -460,7 +460,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										<Hoverable
 											symbol={data.symbol}
 											metric="beta"
-											value={data.beta ?? Number.NaN}
+											value={data.beta || 0}
 											onChatTrigger={onChatTrigger}
 											metricLabel="Beta"
 										>
@@ -478,7 +478,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										<Hoverable
 											symbol={data.symbol}
 											metric="sharpe_ratio"
-											value={data.sharpeRatio ?? Number.NaN}
+											value={data.sharpeRatio || 0}
 											onChatTrigger={onChatTrigger}
 											metricLabel="Sharpe Ratio"
 										>
@@ -496,7 +496,7 @@ const CryptoFinancialTable: React.FC<CryptoFinancialTableProps> = ({ data, onCha
 										<Hoverable
 											symbol={data.symbol}
 											metric="liquidity_score"
-											value={data.liquidityScore ?? Number.NaN}
+											value={data.liquidityScore || 0}
 											onChatTrigger={onChatTrigger}
 											metricLabel="Liquidity Score"
 										>
