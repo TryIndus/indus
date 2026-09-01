@@ -3,7 +3,9 @@ import {
 	CHART_RANGES,
 	filterRangeData,
 	getChartRange,
+	getPreviousHistoryEndTimestamp,
 	getRangeStartTimestamp,
+	prependOlderBars,
 } from "@/lib/charts/ranges";
 
 describe("chart ranges", () => {
@@ -24,5 +26,23 @@ describe("chart ranges", () => {
 		const data = [0, 1, 2, 3].map((offset) => ({ time: offset * day, close: offset }));
 		expect(filterRangeData(data, "1D").map(({ close }) => close)).toEqual([2, 3]);
 		expect(filterRangeData(data.slice(0, 1), "1D")).toEqual(data.slice(0, 1));
+	});
+
+	it("requests the next history page immediately before the earliest loaded bar", () => {
+		expect(getPreviousHistoryEndTimestamp(1_700_000_000)).toBe(1_699_999_999);
+		expect(getPreviousHistoryEndTimestamp(0)).toBe(0);
+	});
+
+	it("prepends only genuinely older bars in chronological order", () => {
+		const current = [{ time: 30 }, { time: 40 }];
+		const older = [{ time: 20 }, { time: 30 }, { time: 10 }];
+
+		expect(prependOlderBars(current, older)).toEqual([
+			{ time: 10 },
+			{ time: 20 },
+			{ time: 30 },
+			{ time: 40 },
+		]);
+		expect(prependOlderBars(current, [{ time: 30 }])).toEqual(current);
 	});
 });

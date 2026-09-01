@@ -3,6 +3,7 @@ import type { Item } from "@/lib/prompts";
 // localStorage key for persistent cache
 const STORAGE_KEY = "indus_explanations_cache_v3";
 const CACHE_TTL_MS = 15 * 60 * 1000;
+const MAX_BATCH_SIZE = 25;
 
 interface ExplanationCacheEntry {
 	value: number;
@@ -149,82 +150,80 @@ export async function fetchExplanation(
 }
 
 export async function batchPreload(items: Item[]) {
-	// If a batch request is already in progress, wait for it and return
-	// This prevents duplicate API calls from React Strict Mode or race conditions
-	if (pendingBatchRequest) {
-		await pendingBatchRequest;
-		return;
-	}
+	const previousRequest = pendingBatchRequest;
+	const request = (async () => {
+		if (previousRequest) await previousRequest;
 
-	// Only fetch if not already cached
-	const toFetch = items.filter(
-		(item) => !getCachedExplanation(item.symbol, item.metric, item.value),
-	);
+		const toFetch = items.filter(
+			(item) => !getCachedExplanation(item.symbol, item.metric, item.value),
+		);
+		if (toFetch.length === 0) return;
 
-	if (toFetch.length === 0) {
-		return;
-	}
+		for (const item of toFetch) {
+			const key = makeKey(item.symbol, item.metric);
+			errorState.delete(key);
+			loadingState.set(key, true);
+			notifyCacheUpdate(key);
+		}
 
-	for (const item of toFetch) {
-		const key = makeKey(item.symbol, item.metric);
-		errorState.delete(key);
-		loadingState.set(key, true);
-		notifyCacheUpdate(key);
-	}
-
-	// Create and store the promise BEFORE the async operation
-	// This ensures any concurrent calls will see the pending request
-	pendingBatchRequest = (async () => {
 		try {
-			const res = await fetch("/api/batch-explain", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(toFetch),
-			});
-			const data = await res.json();
+			for (let offset = 0; offset < toFetch.length; offset += MAX_BATCH_SIZE) {
+				const batch = toFetch.slice(offset, offset + MAX_BATCH_SIZE);
+				try {
+					const res = await fetch("/api/batch-explain", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(batch),
+					});
+					const data: unknown = await res.json().catch(() => null);
+					if (!res.ok) {
+						const message =
+							data && typeof data === "object" && "error" in data && typeof data.error === "string"
+								? data.error
+								: "This explanation is temporarily unavailable.";
+						throw new Error(message);
+					}
 
-			if (!res.ok) {
-				const message =
-					data && typeof data === "object" && typeof data.error === "string"
-						? data.error
-						: "This explanation is temporarily unavailable.";
-				throw new Error(message);
-			}
-
-			if (data && typeof data === "object" && data.explanations) {
-				const explanations = data.explanations as Record<string, unknown>;
-				for (const item of toFetch) {
-					const key = makeKey(item.symbol, item.metric);
-					const text = explanations[key];
-					if (typeof text === "string") {
-						explanationCache.set(key, {
-							value: item.value,
-							explanation: text,
-							savedAt: Date.now(),
-						});
+					const explanations =
+						data && typeof data === "object" && "explanations" in data
+							? (data.explanations as Record<string, unknown>)
+							: {};
+					for (const item of batch) {
+						const key = makeKey(item.symbol, item.metric);
+						const text = explanations[key];
+						if (typeof text === "string") {
+							explanationCache.set(key, {
+								value: item.value,
+								explanation: text,
+								savedAt: Date.now(),
+							});
+							notifyCacheUpdate(key);
+						}
+					}
+				} catch (error) {
+					const message =
+						error instanceof Error ? error.message : "This explanation is temporarily unavailable.";
+					for (const item of batch) {
+						const key = makeKey(item.symbol, item.metric);
+						errorState.set(key, message);
 						notifyCacheUpdate(key);
 					}
 				}
-				saveCacheToStorage(explanationCache);
 			}
-		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : "This explanation is temporarily unavailable.";
-			for (const item of toFetch) {
-				const key = makeKey(item.symbol, item.metric);
-				errorState.set(key, message);
-				notifyCacheUpdate(key);
-			}
+			saveCacheToStorage(explanationCache);
 		} finally {
 			for (const item of toFetch) {
 				const key = makeKey(item.symbol, item.metric);
 				loadingState.delete(key);
 				notifyCacheUpdate(key);
 			}
-			pendingBatchRequest = null;
 		}
 	})();
 
-	// Wait for the request to complete
-	await pendingBatchRequest;
+	pendingBatchRequest = request;
+	try {
+		await request;
+	} finally {
+		if (pendingBatchRequest === request) pendingBatchRequest = null;
+	}
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { prepareRegeneration } from "@/lib/chat/messages";
 import { buildPageContext, trimContextIfNeeded } from "@/lib/context/buildPageContext";
 import type { ChatMessage, ContextChatState, FinancialData, PageChartData } from "@/lib/types";
@@ -71,12 +71,14 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 	});
 
 	const abortControllerRef = useRef<AbortController | null>(null);
+	const conversationSymbolRef = useRef<string | null>(null);
+	const pendingQuestionRef = useRef<string | null>(null);
 
 	const requestCountRef = useRef(0);
 	const lastRequestWindowRef = useRef(Date.now());
 
 	const openWithMetric = useCallback(
-		(metricKey: string, metricLabel: string, value: number | string) => {
+		(metricKey: string, metricLabel: string, value: number | string, initialQuestion?: string) => {
 			try {
 				const financialData = getFinancialData();
 				const chartData = getChartData?.();
@@ -96,6 +98,9 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 				});
 
 				const trimmedContext = trimContextIfNeeded(initialContext);
+				const isSameCompany = conversationSymbolRef.current === trimmedContext.symbol;
+				conversationSymbolRef.current = trimmedContext.symbol;
+				pendingQuestionRef.current = initialQuestion?.trim() || null;
 
 				setState((prev) => ({
 					...prev,
@@ -103,7 +108,7 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 					initialContext: trimmedContext,
 					triggerMetric: { metricKey, label: metricLabel, value },
 					error: null,
-					messages: [], // Reset messages for new metric
+					messages: isSameCompany ? prev.messages : [],
 				}));
 			} catch {
 				setState((prev) => ({
@@ -127,6 +132,23 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 			sending: false,
 		}));
 	}, []);
+
+	const reset = useCallback(() => {
+		abortControllerRef.current?.abort();
+		abortControllerRef.current = null;
+		conversationSymbolRef.current = null;
+		pendingQuestionRef.current = null;
+		setState({ open: false, messages: [], sending: false, error: null });
+	}, []);
+
+	const toggle = useCallback(() => {
+		if (state.open) {
+			close();
+			return;
+		}
+
+		setState((prev) => (prev.initialContext ? { ...prev, open: true, error: null } : prev));
+	}, [close, state.open]);
 
 	const checkRateLimit = useCallback(() => {
 		const now = Date.now();
@@ -292,6 +314,14 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 		await sendMessage(regeneration.content, regeneration.history);
 	}, [state.messages, state.sending, sendMessage]);
 
+	useEffect(() => {
+		const question = pendingQuestionRef.current;
+		if (!question || !state.initialContext || state.sending) return;
+
+		pendingQuestionRef.current = null;
+		void sendMessage(question);
+	}, [sendMessage, state.initialContext, state.sending]);
+
 	const clearError = useCallback(() => {
 		setState((prev) => ({ ...prev, error: null }));
 	}, []);
@@ -312,6 +342,8 @@ export function useContextChat({ getFinancialData, getChartData }: UseContextCha
 		...state,
 		openWithMetric,
 		close,
+		reset,
+		toggle,
 		sendMessage,
 		regenerateLast,
 		clearError,

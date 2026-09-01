@@ -86,4 +86,65 @@ describe("explanation cache", () => {
 			savedAt: 10_000_000,
 		});
 	});
+
+	it("splits preloads at the API boundary without dropping metrics", async () => {
+		const storage = createStorage();
+		vi.stubGlobal("window", {});
+		vi.stubGlobal("localStorage", storage);
+		const requests: Array<Array<{ symbol: string; metric: string; value: number }>> = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (_url: string, init?: RequestInit) => {
+				const batch = JSON.parse(String(init?.body));
+				requests.push(batch);
+				return Response.json({
+					explanations: Object.fromEntries(
+						batch.map((item: { symbol: string; metric: string }) => [
+							`${item.symbol}_${item.metric}`,
+							`review-${item.metric}`,
+						]),
+					),
+				});
+			}),
+		);
+
+		const { batchPreload, getCachedExplanation } = await import("@/hooks/useExplanation");
+		const items = Array.from({ length: 26 }, (_, index) => ({
+			symbol: "AAPL",
+			metric: `metric_${index}`,
+			value: index,
+		}));
+		await batchPreload(items);
+
+		expect(requests.map((batch) => batch.length)).toEqual([25, 1]);
+		expect(getCachedExplanation("AAPL", "metric_25", 25)).toBe("review-metric_25");
+	});
+
+	it("serializes concurrent preloads and still fetches each uncached metric", async () => {
+		const storage = createStorage();
+		vi.stubGlobal("window", {});
+		vi.stubGlobal("localStorage", storage);
+		const requestedMetrics: string[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (_url: string, init?: RequestInit) => {
+				const [item] = JSON.parse(String(init?.body));
+				requestedMetrics.push(item.metric);
+				await Promise.resolve();
+				return Response.json({
+					explanations: { [`${item.symbol}_${item.metric}`]: `review-${item.metric}` },
+				});
+			}),
+		);
+
+		const { batchPreload, getCachedExplanation } = await import("@/hooks/useExplanation");
+		await Promise.all([
+			batchPreload([{ symbol: "AAPL", metric: "pe_ratio", value: 30 }]),
+			batchPreload([{ symbol: "AAPL", metric: "beta", value: 1.2 }]),
+		]);
+
+		expect(requestedMetrics).toEqual(["pe_ratio", "beta"]);
+		expect(getCachedExplanation("AAPL", "pe_ratio", 30)).toBe("review-pe_ratio");
+		expect(getCachedExplanation("AAPL", "beta", 1.2)).toBe("review-beta");
+	});
 });

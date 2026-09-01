@@ -22,6 +22,8 @@ import { FavoriteButtonCompact } from "@/components/FavoriteButton";
 import FinancialTable from "@/components/FinancialTable";
 import StockChart from "@/components/StockChart";
 import { Button } from "@/components/ui/button";
+import { batchPreload } from "@/hooks/useExplanation";
+import { buildExplanationItems } from "@/lib/explanation-items";
 import type { FinancialData, PageChartData } from "@/lib/types";
 import {
 	formatCurrency,
@@ -122,7 +124,9 @@ export default function CompanyPage() {
 						: "Financial data is temporarily unavailable.";
 				throw new Error(message);
 			}
-			setFinancialData(result.data as FinancialData);
+			const data = result.data as FinancialData;
+			setFinancialData(data);
+			void batchPreload(buildExplanationItems(data));
 		} catch (stockError) {
 			setError(
 				stockError instanceof Error
@@ -135,8 +139,9 @@ export default function CompanyPage() {
 	}, []);
 
 	useEffect(() => {
+		contextChat.reset();
 		if (symbol) void fetchStockData(symbol);
-	}, [fetchStockData, symbol]);
+	}, [contextChat.reset, fetchStockData, symbol]);
 
 	const researchLenses = useMemo(
 		() => (financialData ? buildResearchLenses(financialData) : []),
@@ -363,7 +368,9 @@ export default function CompanyPage() {
 									<button
 										key={lens.metric}
 										type="button"
-										onClick={() => contextChat.openWithMetric(lens.metric, lens.label, lens.value)}
+										onClick={() =>
+											contextChat.openWithMetric(lens.metric, lens.label, lens.value, lens.question)
+										}
 										className="group rounded-xl border border-primary/15 bg-background/55 p-3.5 text-left transition-colors hover:border-primary/40 hover:bg-background/80"
 									>
 										<div className="flex items-center justify-between gap-3">
@@ -460,6 +467,34 @@ export default function CompanyPage() {
 				onClearError={contextChat.clearError}
 				onStop={contextChat.stop}
 			/>
+
+			{financialData && !isLoading && (
+				<Button
+					type="button"
+					onClick={() => {
+						if (contextChat.initialContext) {
+							contextChat.toggle();
+							return;
+						}
+						const lens = researchLenses[0];
+						contextChat.openWithMetric(
+							lens?.metric ?? "company_overview",
+							lens?.label ?? "Company overview",
+							lens?.value ?? financialData.symbol,
+						);
+					}}
+					aria-expanded={contextChat.open}
+					aria-label={contextChat.open ? "Hide Indus Analyst" : "Show Indus Analyst"}
+					className={`fixed z-[60] rounded-full px-4 shadow-xl transition-[right,bottom] ${
+						contextChat.open
+							? "bottom-[calc(92dvh+0.75rem)] right-4 md:bottom-4 md:right-[500px]"
+							: "bottom-4 right-4"
+					}`}
+				>
+					<BrainCircuit className="size-4" />
+					{contextChat.open ? "Hide analyst" : "Indus Analyst"}
+				</Button>
+			)}
 		</div>
 	);
 }

@@ -31,3 +31,19 @@ export function filterRangeData<T extends { time: number }>(
 	const filtered = data.filter((bar) => bar.time >= cutoff);
 	return filtered.length >= 2 ? filtered : data;
 }
+
+export function getPreviousHistoryEndTimestamp(earliestTimestamp: number): number {
+	return Math.max(0, Math.floor(earliestTimestamp) - 1);
+}
+
+export function prependOlderBars<T extends { time: number }>(current: T[], older: T[]): T[] {
+	const firstTimestamp = current[0]?.time;
+	if (firstTimestamp === undefined) {
+		return [...older].sort((left, right) => left.time - right.time);
+	}
+
+	const unseenOlderBars = older
+		.filter((bar) => bar.time < firstTimestamp)
+		.sort((left, right) => left.time - right.time);
+	return [...unseenOlderBars, ...current];
+}

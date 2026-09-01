@@ -30,8 +30,8 @@ const evaluationConfig = {
 	},
 	neutral: {
 		color: "bg-gray-400",
-		label: "Context needed",
-		description: "More context needed",
+		label: "Neutral",
+		description: "Neutral directional read",
 	},
 };
 

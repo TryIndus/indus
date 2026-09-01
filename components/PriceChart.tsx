@@ -9,6 +9,7 @@ import {
 	HistogramSeries,
 	type IChartApi,
 	type ISeriesApi,
+	type LogicalRange,
 } from "lightweight-charts";
 import { AlertCircle, Radio, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,7 +19,9 @@ import {
 	type ChartRangeValue,
 	filterRangeData,
 	getChartRange,
+	getPreviousHistoryEndTimestamp,
 	getRangeStartTimestamp,
+	prependOlderBars,
 } from "@/lib/charts/ranges";
 import { getRealtimeStatus, type RealtimeStatus } from "@/lib/realtime/stream-status";
 import type { PageChartData } from "@/lib/types";
@@ -79,14 +82,20 @@ function parseHistoricalResponse(value: unknown): HistoricalDataResponse | null 
 	};
 }
 
-function buildHistoricalUrl(symbol: string, rangeValue: ChartRangeValue, type: AssetType): string {
+function buildHistoricalUrl(
+	symbol: string,
+	rangeValue: ChartRangeValue,
+	type: AssetType,
+	end?: number,
+): string {
 	const range = getChartRange(rangeValue);
 	const params = new URLSearchParams({
 		symbol,
 		timeframe: range.timeframe,
-		start: String(getRangeStartTimestamp(rangeValue)),
 		limit: "5000",
 	});
+	if (end === undefined) params.set("start", String(getRangeStartTimestamp(rangeValue)));
+	else params.set("end", String(end));
 	if (type === "crypto") params.set("type", "crypto");
 	return `/api/alpaca?${params.toString()}`;
 }
@@ -151,6 +160,12 @@ export default function PriceChart({
 	const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const requestIdRef = useRef(0);
 	const historicalDataRef = useRef<BarData[]>([]);
+	const earliestLoadedTimestampRef = useRef<number | null>(null);
+	const isLoadingOlderRef = useRef(false);
+	const hasReachedHistoryLimitRef = useRef(false);
+	const selectedRangeRef = useRef<ChartRangeValue>("1D");
+	const symbolRef = useRef(symbol);
+	const snapshotBaselineRef = useRef<number | null>(null);
 	const latestSnapshotRef = useRef<ChartSnapshot | null>(null);
 	const onDataChangeRef = useRef(onDataChange);
 	onDataChangeRef.current = onDataChange;
@@ -162,6 +177,9 @@ export default function PriceChart({
 	const [showReconnecting, setShowReconnecting] = useState(false);
 	const [latestSnapshot, setLatestSnapshot] = useState<ChartSnapshot | null>(null);
 	const [hoverSnapshot, setHoverSnapshot] = useState<ChartSnapshot | null>(null);
+	const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+	selectedRangeRef.current = selectedRange;
+	symbolRef.current = symbol;
 
 	const clearReconnectTimer = useCallback(() => {
 		if (reconnectTimerRef.current) {
@@ -186,6 +204,11 @@ export default function PriceChart({
 		const requestId = ++requestIdRef.current;
 		setIsLoading(true);
 		setError(null);
+		earliestLoadedTimestampRef.current = null;
+		snapshotBaselineRef.current = null;
+		hasReachedHistoryLimitRef.current = false;
+		isLoadingOlderRef.current = false;
+		setIsLoadingOlder(false);
 		onDataChangeRef.current?.(undefined);
 
 		try {
@@ -206,12 +229,14 @@ export default function PriceChart({
 
 			const rangeData = filterRangeData(result.data, selectedRange);
 			historicalDataRef.current = rangeData;
+			earliestLoadedTimestampRef.current = rangeData[0]?.time ?? null;
 			applySeriesData(rangeData);
 			chartRef.current?.timeScale().fitContent();
 
 			const first = rangeData[0];
 			const latest = rangeData.at(-1);
 			if (first && latest) {
+				snapshotBaselineRef.current = first.close;
 				const snapshot = snapshotFromBar(latest, first.close);
 				latestSnapshotRef.current = snapshot;
 				setLatestSnapshot(snapshot);
@@ -239,6 +264,65 @@ export default function PriceChart({
 			if (requestId === requestIdRef.current) setIsLoading(false);
 		}
 	}, [applySeriesData, selectedRange, symbol, type]);
+
+	const loadOlderHistory = useCallback(
+		async (visibleRange: LogicalRange) => {
+			const earliestTimestamp = earliestLoadedTimestampRef.current;
+			const requestId = requestIdRef.current;
+			if (
+				earliestTimestamp === null ||
+				isLoadingOlderRef.current ||
+				hasReachedHistoryLimitRef.current
+			) {
+				return;
+			}
+
+			isLoadingOlderRef.current = true;
+			setIsLoadingOlder(true);
+			try {
+				const response = await fetch(
+					buildHistoricalUrl(
+						symbolRef.current,
+						selectedRangeRef.current,
+						type,
+						getPreviousHistoryEndTimestamp(earliestTimestamp),
+					),
+				);
+				const payload: unknown = await response.json().catch(() => null);
+				const result = parseHistoricalResponse(payload);
+				if (requestId !== requestIdRef.current) return;
+				if (!response.ok || !result) return;
+				if (result.isEmpty) {
+					hasReachedHistoryLimitRef.current = true;
+					return;
+				}
+
+				const current = historicalDataRef.current;
+				const combined = prependOlderBars(current, result.data);
+				const prependedCount = combined.length - current.length;
+				if (prependedCount === 0) {
+					hasReachedHistoryLimitRef.current = true;
+					return;
+				}
+
+				historicalDataRef.current = combined;
+				earliestLoadedTimestampRef.current = combined[0]?.time ?? earliestTimestamp;
+				applySeriesData(combined);
+				chartRef.current?.timeScale().setVisibleLogicalRange({
+					from: visibleRange.from + prependedCount,
+					to: visibleRange.to + prependedCount,
+				});
+			} catch {
+				// Keep the current chart usable; another left pan can retry the history request.
+			} finally {
+				if (requestId === requestIdRef.current) {
+					isLoadingOlderRef.current = false;
+					setIsLoadingOlder(false);
+				}
+			}
+		},
+		[applySeriesData, type],
+	);
 
 	useEffect(() => {
 		if (!chartContainerRef.current) return;
@@ -318,12 +402,20 @@ export default function PriceChart({
 		chart.subscribeCrosshairMove((param) => {
 			const value = param.seriesData.get(candlestickSeries);
 			if (isBarData(value)) {
-				const firstClose = historicalDataRef.current[0]?.close ?? value.close;
+				const firstClose = snapshotBaselineRef.current ?? value.close;
 				setHoverSnapshot(snapshotFromBar(value, firstClose));
 			} else {
 				setHoverSnapshot(latestSnapshotRef.current);
 			}
 		});
+
+		let historyTimer: ReturnType<typeof setTimeout> | null = null;
+		const handleVisibleRangeChange = (range: LogicalRange | null) => {
+			if (historyTimer) clearTimeout(historyTimer);
+			if (!range || range.from > 3 || historicalDataRef.current.length < 2) return;
+			historyTimer = setTimeout(() => void loadOlderHistory(range), 250);
+		};
+		chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
 
 		const resizeObserver = new ResizeObserver(([entry]) => {
 			if (!entry) return;
@@ -353,6 +445,8 @@ export default function PriceChart({
 		});
 
 		return () => {
+			if (historyTimer) clearTimeout(historyTimer);
+			chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
 			resizeObserver.disconnect();
 			themeObserver.disconnect();
 			chart.remove();
@@ -360,7 +454,7 @@ export default function PriceChart({
 			candlestickSeriesRef.current = null;
 			volumeSeriesRef.current = null;
 		};
-	}, [applySeriesData]);
+	}, [applySeriesData, loadOlderHistory]);
 
 	useEffect(() => {
 		void loadHistoricalData();
@@ -410,7 +504,7 @@ export default function PriceChart({
 				const last = existing.at(-1);
 				historicalDataRef.current =
 					last?.time === data.time ? [...existing.slice(0, -1), data] : [...existing, data];
-				const firstClose = historicalDataRef.current[0]?.close ?? data.close;
+				const firstClose = snapshotBaselineRef.current ?? data.close;
 				const snapshot = snapshotFromBar(data, firstClose);
 				latestSnapshotRef.current = snapshot;
 				setLatestSnapshot(snapshot);
@@ -591,6 +685,15 @@ export default function PriceChart({
 						<div className="flex items-center gap-2 text-[10px] text-muted-foreground">
 							<Radio className="size-3 animate-pulse text-primary" />
 							Reconnecting live feed
+						</div>
+					</div>
+				)}
+
+				{isLoadingOlder && (
+					<div className="absolute left-5 top-5 z-20 rounded-full border border-border bg-card/95 px-3 py-1.5 shadow-lg backdrop-blur">
+						<div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+							<RefreshCw className="size-3 animate-spin text-primary" />
+							Loading older history
 						</div>
 					</div>
 				)}

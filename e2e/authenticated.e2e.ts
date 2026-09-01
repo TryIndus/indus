@@ -65,6 +65,8 @@ const cachedExplanationFixture = JSON.stringify({
 
 async function mockCompanyResearch(page: Page) {
 	const requestedTimeframes: string[] = [];
+	const historyRequests: string[] = [];
+	const analystQuestions: string[] = [];
 	await page.route("**/api/stock-data?**", async (route) => {
 		await route.fulfill({
 			status: 200,
@@ -74,8 +76,9 @@ async function mockCompanyResearch(page: Page) {
 	});
 	await page.route("**/api/alpaca?**", async (route) => {
 		const url = new URL(route.request().url());
+		historyRequests.push(url.toString());
 		requestedTimeframes.push(url.searchParams.get("timeframe") ?? "");
-		const now = Math.floor(Date.now() / 1000);
+		const now = Number(url.searchParams.get("end")) || Math.floor(Date.now() / 1000);
 		const data = Array.from({ length: 80 }, (_, index) => {
 			const open = 192 + index * 0.25;
 			return {
@@ -98,6 +101,38 @@ async function mockCompanyResearch(page: Page) {
 			}),
 		});
 	});
+	await page.route("**/api/batch-explain", async (route) => {
+		const items = route.request().postDataJSON() as Array<{
+			symbol: string;
+			metric: string;
+			value: number;
+		}>;
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				explanations: Object.fromEntries(
+					items.map((item) => [
+						`${item.symbol}_${item.metric}`,
+						JSON.stringify({
+							metric_display: `**${item.metric}: ${item.value}**`,
+							insight: `AI review for ${item.metric}.`,
+							evaluation: "neutral",
+						}),
+					]),
+				),
+			}),
+		});
+	});
+	await page.route("**/api/context-chat", async (route) => {
+		const body = route.request().postDataJSON() as { newMessage: string };
+		analystQuestions.push(body.newMessage);
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({ response: `Analyst answer ${analystQuestions.length}.` }),
+		});
+	});
 	await page.route("**/api/stream/**", async (route) => {
 		await route.fulfill({
 			status: 200,
@@ -105,7 +140,7 @@ async function mockCompanyResearch(page: Page) {
 			body: "event: stream-error\ndata: {}\n\n",
 		});
 	});
-	return requestedTimeframes;
+	return { analystQuestions, historyRequests, requestedTimeframes };
 }
 
 test.beforeEach(async ({ page }) => {
@@ -122,14 +157,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("@authenticated dashboard loads with a verified session", async ({ page }) => {
-	await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Your research desk." })).toBeVisible();
 	await expect(page.getByRole("heading", { name: "Your Favorites" })).toBeVisible();
 });
 
 test("@authenticated auth page redirects an existing session", async ({ page }) => {
 	await page.goto("/auth");
 	await expect(page).toHaveURL(/\/dashboard$/);
-	await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Your research desk." })).toBeVisible();
 });
 
 test("@authenticated queryless crypto route renders its empty state", async ({ page }) => {
@@ -159,28 +194,50 @@ test("@authenticated settings route renders for the current tenant", async ({ pa
 });
 
 test("@authenticated company research connects chart ranges to the analyst", async ({ page }) => {
-	const requestedTimeframes = await mockCompanyResearch(page);
+	const { analystQuestions, historyRequests, requestedTimeframes } =
+		await mockCompanyResearch(page);
 	await page.addInitScript((cachedExplanation) => {
 		window.localStorage.setItem("indus_explanations_cache_v3", cachedExplanation);
 	}, cachedExplanationFixture);
 	await page.goto("/company/AAPL");
 
-	await expect(page.getByText("Apple Inc.", { exact: true })).toBeVisible();
-	await expect(page.getByRole("heading", { name: "Price Chart" })).toBeVisible();
-	await expect(page.getByText("Financial Metrics", { exact: true })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Apple Inc." })).toBeVisible();
+	await expect(page.getByRole("region", { name: "AAPL price chart" })).toBeVisible();
+	await expect(page.getByText("Interrogate the numbers.", { exact: true })).toBeVisible();
 
 	await page.getByRole("button", { name: "1Y" }).click();
 	await expect.poll(() => requestedTimeframes).toContain("1Day");
 
 	await page.getByText("33.1", { exact: true }).last().hover();
 	await expect(page.getByText(/Read it with growth and margins/)).toBeVisible();
+	await expect(page.getByText("Neutral", { exact: true })).toBeVisible();
+	await expect(page.getByText("Context needed", { exact: true })).toHaveCount(0);
 
-	await page.getByRole("button", { name: "Ask more" }).click();
-	const analyst = page.getByRole("dialog");
+	await page.getByRole("button", { name: /Valuation/ }).click();
+	await expect
+		.poll(() => analystQuestions)
+		.toContain("What expectations are embedded in this valuation?");
+	const analyst = page.getByRole("dialog", { name: /Valuation/ });
 	await expect(analyst).toBeVisible();
-	await expect(analyst.getByText("AAPL", { exact: true })).toBeVisible();
-	await analyst.getByRole("button", { name: "Close chat" }).click();
+	await expect(analyst.getByText("Analyst answer 1.", { exact: true })).toBeVisible();
+
+	await page.getByRole("button", { name: "Hide Indus Analyst" }).click();
 	await expect(analyst).toBeHidden();
+	await page.getByRole("button", { name: "Show Indus Analyst" }).click();
+	await expect(analyst).toBeVisible();
+	await expect(analyst.getByText("Analyst answer 1.", { exact: true })).toBeVisible();
+
+	await page.getByRole("button", { name: "Hide Indus Analyst" }).click();
+	await page.getByRole("button", { name: /Profitability/ }).click();
+	await expect
+		.poll(() => analystQuestions)
+		.toContain("What does this margin say about earnings quality?");
+	await expect(page.getByRole("dialog")).toHaveCount(1);
+	await expect(page.getByText("Analyst answer 1.", { exact: true })).toBeVisible();
+	await expect(page.getByText("Analyst answer 2.", { exact: true })).toBeVisible();
+	await expect
+		.poll(() => historyRequests.some((requestUrl) => new URL(requestUrl).searchParams.has("end")))
+		.toBe(true);
 });
 
 test("@authenticated critical product routes have no serious accessibility violations", async ({
