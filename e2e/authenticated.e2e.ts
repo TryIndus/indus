@@ -122,14 +122,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("@authenticated dashboard loads with a verified session", async ({ page }) => {
-	await expect(page.getByRole("heading", { name: "Your research desk." })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 	await expect(page.getByRole("heading", { name: "Your Favorites" })).toBeVisible();
 });
 
 test("@authenticated auth page redirects an existing session", async ({ page }) => {
 	await page.goto("/auth");
 	await expect(page).toHaveURL(/\/dashboard$/);
-	await expect(page.getByRole("heading", { name: "Your research desk." })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 });
 
 test("@authenticated queryless crypto route renders its empty state", async ({ page }) => {
@@ -158,18 +158,16 @@ test("@authenticated settings route renders for the current tenant", async ({ pa
 	await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
 });
 
-test("@authenticated company research connects chart ranges to the grounded analyst", async ({
-	page,
-}) => {
+test("@authenticated company research connects chart ranges to the analyst", async ({ page }) => {
 	const requestedTimeframes = await mockCompanyResearch(page);
 	await page.addInitScript((cachedExplanation) => {
 		window.localStorage.setItem("indus_explanations_cache_v3", cachedExplanation);
 	}, cachedExplanationFixture);
 	await page.goto("/company/AAPL");
 
-	await expect(page.getByRole("heading", { name: "Apple Inc." })).toBeVisible();
-	await expect(page.getByRole("region", { name: "AAPL price chart" })).toBeVisible();
-	await expect(page.getByText("Interrogate the numbers.", { exact: true })).toBeVisible();
+	await expect(page.getByText("Apple Inc.", { exact: true })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Price Chart" })).toBeVisible();
+	await expect(page.getByText("Financial Metrics", { exact: true })).toBeVisible();
 
 	await page.getByRole("button", { name: "1Y" }).click();
 	await expect.poll(() => requestedTimeframes).toContain("1Day");
@@ -177,12 +175,11 @@ test("@authenticated company research connects chart ranges to the grounded anal
 	await page.getByText("33.1", { exact: true }).last().hover();
 	await expect(page.getByText(/Read it with growth and margins/)).toBeVisible();
 
-	const companySnapshot = page.getByRole("region", { name: "AAPL company snapshot" });
-	await companySnapshot.getByRole("button", { name: "Ask Indus" }).click();
-	const analyst = page.getByRole("dialog", { name: /Valuation|Company overview/ });
+	await page.getByRole("button", { name: "Ask more" }).click();
+	const analyst = page.getByRole("dialog");
 	await expect(analyst).toBeVisible();
-	await expect(analyst.getByText(/Grounded in the company fundamentals/)).toBeVisible();
-	await analyst.getByRole("button", { name: "Close analyst" }).click();
+	await expect(analyst.getByText("AAPL", { exact: true })).toBeVisible();
+	await analyst.getByRole("button", { name: "Close chat" }).click();
 	await expect(analyst).toBeHidden();
 });
 
