@@ -120,7 +120,7 @@ const Hoverable: React.FC<HoverableProps> = ({
 		if (!explanation) {
 			return (
 				<div className="text-sm text-muted-foreground">
-					Preparing a grounded interpretation of this value.
+					Preparing a data-based interpretation of this value.
 				</div>
 			);
 		}

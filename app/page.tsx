@@ -129,7 +129,7 @@ function ProductPreview() {
 								Indus analyst
 							</div>
 							<span className="rounded-full bg-primary/15 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-primary">
-								Grounded
+								Evidence-led
 							</span>
 						</div>
 						<div className="my-5 h-px bg-primary/15" />
@@ -207,7 +207,10 @@ export default function LandingPage() {
 							<span className="block italic text-primary">in context.</span>
 						</h1>
 						<p className="animate-rise-in mx-auto mt-7 max-w-2xl text-balance text-base leading-7 text-muted-foreground [animation-delay:120ms] md:text-lg">
-							Live price action, durable company fundamentals, and a grounded AI analyst—one
+							Live price action, durable company fundamentals, and AI analytics all in{" "}
+							<span className="underline decoration-primary decoration-2 underline-offset-4">
+								one
+							</span>{" "}
 							workspace for moving from signal to understanding.
 						</p>
 						<div className="animate-rise-in mt-9 flex flex-col justify-center gap-3 [animation-delay:160ms] sm:flex-row">
@@ -310,7 +313,7 @@ export default function LandingPage() {
 							},
 							{
 								icon: LockKeyhole,
-								title: "Grounded model context",
+								title: "Evidence-based model context",
 								copy: "The analyst is constrained to the company evidence supplied in the current research view.",
 							},
 						].map((principle) => (

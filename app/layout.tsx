@@ -24,16 +24,16 @@ const newsreader = Newsreader({
 export const metadata: Metadata = {
 	metadataBase: new URL("https://indus-trade.vercel.app"),
 	title: {
-		default: "Indus — Financial intelligence, in context",
-		template: "%s — Indus",
+		default: "Indus | Financial intelligence, in context",
+		template: "%s | Indus",
 	},
 	description:
-		"Research public companies with live market charts, grounded financial context, and an AI analyst that works from the data in view.",
+		"Research public companies with live market charts, durable financial context, and AI analytics that work from the data in view.",
 	icons: {
 		icon: "/favicon.ico",
 	},
 	openGraph: {
-		title: "Indus — Financial intelligence, in context",
+		title: "Indus | Financial intelligence, in context",
 		description: "Move from market signal to financial context without leaving your research.",
 		url: "/",
 		siteName: "Indus",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
 	},
 	twitter: {
 		card: "summary_large_image",
-		title: "Indus — Financial intelligence, in context",
+		title: "Indus | Financial intelligence, in context",
 		description: "Move from market signal to financial context without leaving your research.",
 		images: ["/og-image.png"],
 	},

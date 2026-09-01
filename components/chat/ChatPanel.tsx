@@ -115,7 +115,7 @@ export function ChatPanel({
 						className="mt-3 flex items-center gap-2 text-[10px] leading-4 text-muted-foreground"
 					>
 						<ShieldCheck className="size-3.5 shrink-0 text-primary" />
-						Grounded in the company fundamentals and chart points supplied by this page.
+						Based on the company fundamentals and chart points supplied by this page.
 					</div>
 					<ContextSummary context={state.initialContext} />
 				</div>

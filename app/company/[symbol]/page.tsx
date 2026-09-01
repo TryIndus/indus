@@ -356,7 +356,7 @@ export default function CompanyPage() {
 							</div>
 							<p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
 								The analyst receives this company’s visible fundamentals and the latest chart
-								points—not an open-ended mandate to invent context.
+								points, not an open-ended mandate to invent context.
 							</p>
 							<div className="mt-6 grid gap-2 sm:grid-cols-2">
 								{researchLenses.map((lens) => (
@@ -443,8 +443,8 @@ export default function CompanyPage() {
 								</h2>
 							</div>
 							<p className="max-w-lg text-xs leading-5 text-muted-foreground">
-								Select a label for its definition. Select a value for a grounded interpretation and
-								a direct path into the analyst.
+								Select a label for its definition. Select a value for a data-based interpretation
+								and a direct path into the analyst.
 							</p>
 						</div>
 						<FinancialTable data={financialData} onChatTrigger={contextChat.openWithMetric} />
