@@ -398,7 +398,10 @@ export default function PriceChart({
 	}, [clearReconnectTimer, selectedSymbol]);
 
 	return (
-		<div className={`bg-card rounded-lg border border-border ${className}`}>
+		<section
+			className={`bg-card rounded-lg border border-border ${className}`}
+			aria-label={`${selectedSymbol} price chart`}
+		>
 			{showControls && (
 				<div className="p-4 border-b border-border">
 					<div className="flex flex-wrap items-center justify-between gap-3">
@@ -484,6 +487,6 @@ export default function PriceChart({
 					style={{ height: `${height}px` }}
 				/>
 			</div>
-		</div>
+		</section>
 	);
 }

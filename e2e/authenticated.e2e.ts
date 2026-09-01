@@ -166,7 +166,7 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 	await page.goto("/company/AAPL");
 
 	await expect(page.getByText("Apple Inc.", { exact: true })).toBeVisible();
-	await expect(page.getByRole("heading", { name: "Price Chart" })).toBeVisible();
+	await expect(page.getByRole("region", { name: "AAPL price chart" })).toBeVisible();
 	await expect(page.getByText("Financial Metrics", { exact: true })).toBeVisible();
 
 	await page.getByRole("button", { name: "1Y" }).click();
