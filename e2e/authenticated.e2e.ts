@@ -309,10 +309,12 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 	expect(chartBounds).not.toBeNull();
 	if (chartBounds) {
 		const y = chartBounds.y + chartBounds.height / 2;
-		await page.mouse.move(chartBounds.x + chartBounds.width * 0.3, y);
-		await page.mouse.down();
-		await page.mouse.move(chartBounds.x + chartBounds.width * 0.85, y, { steps: 8 });
-		await page.mouse.up();
+		for (let attempt = 0; attempt < 3; attempt += 1) {
+			await page.mouse.move(chartBounds.x + chartBounds.width * 0.2, y);
+			await page.mouse.down();
+			await page.mouse.move(chartBounds.x + chartBounds.width * 0.9, y, { steps: 8 });
+			await page.mouse.up();
+		}
 	}
 
 	await page.getByText("33.1", { exact: true }).last().hover();

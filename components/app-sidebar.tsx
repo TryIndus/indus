@@ -167,10 +167,10 @@ export function AppSidebar() {
 						<DropdownMenuLabel>My Account</DropdownMenuLabel>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem asChild>
-							<Link href="/settings#profile">
+							<a href="/settings#profile">
 								<User className="mr-2 h-4 w-4" />
 								<span>Account</span>
-							</Link>
+							</a>
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem onClick={signOut} className="text-red-600 focus:text-red-600">
@@ -196,10 +196,10 @@ export function AppSidebar() {
 						<DropdownMenuLabel>My Account</DropdownMenuLabel>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem asChild>
-							<Link href="/settings#profile">
+							<a href="/settings#profile">
 								<User className="mr-2 h-4 w-4" />
 								<span>Account</span>
-							</Link>
+							</a>
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem onClick={signOut} className="text-red-600 focus:text-red-600">

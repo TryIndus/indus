@@ -35,11 +35,12 @@ test("@browser landing navigation scrolls between sections and returns to the to
 		["Workflow", "#workflow"],
 		["Principles", "#principles"],
 	] as const) {
-		await expect(page.locator(`nav a[href="${hash}"]`)).toHaveText(name);
+		await expect(page.locator(`nav a[href="${hash}"]`).first()).toHaveText(name);
 	}
 
 	await page
 		.locator('nav a[href="#principles"]')
+		.first()
 		.evaluate((link: HTMLAnchorElement) => link.click());
 	await expect(page).toHaveURL(/#principles$/);
 	await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(480);

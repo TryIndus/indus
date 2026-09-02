@@ -420,9 +420,15 @@ export default function PriceChart({
 			hasUserNavigatedHistoryRef.current = true;
 		};
 		const chartContainer = chartContainerRef.current;
-		chartContainer.addEventListener("pointerdown", markUserNavigation);
-		chartContainer.addEventListener("touchstart", markUserNavigation, { passive: true });
-		chartContainer.addEventListener("wheel", markUserNavigation, { passive: true });
+		chartContainer.addEventListener("pointerdown", markUserNavigation, { capture: true });
+		chartContainer.addEventListener("touchstart", markUserNavigation, {
+			capture: true,
+			passive: true,
+		});
+		chartContainer.addEventListener("wheel", markUserNavigation, {
+			capture: true,
+			passive: true,
+		});
 		const handleVisibleRangeChange = (range: LogicalRange | null) => {
 			if (historyTimer) clearTimeout(historyTimer);
 			if (!hasUserNavigatedHistoryRef.current) return;
@@ -461,9 +467,9 @@ export default function PriceChart({
 
 		return () => {
 			if (historyTimer) clearTimeout(historyTimer);
-			chartContainer.removeEventListener("pointerdown", markUserNavigation);
-			chartContainer.removeEventListener("touchstart", markUserNavigation);
-			chartContainer.removeEventListener("wheel", markUserNavigation);
+			chartContainer.removeEventListener("pointerdown", markUserNavigation, { capture: true });
+			chartContainer.removeEventListener("touchstart", markUserNavigation, { capture: true });
+			chartContainer.removeEventListener("wheel", markUserNavigation, { capture: true });
 			chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
 			resizeObserver.disconnect();
 			themeObserver.disconnect();
