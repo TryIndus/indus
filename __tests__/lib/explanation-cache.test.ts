@@ -48,6 +48,39 @@ describe("explanation cache", () => {
 		expect(getCachedExplanation("MSFT", "pe_ratio", 40)).toBeUndefined();
 	});
 
+	it("repairs previously cached numbered JSON wrappers", async () => {
+		const now = 10_000_000;
+		vi.spyOn(Date, "now").mockReturnValue(now);
+		const storage = createStorage({
+			[STORAGE_KEY]: JSON.stringify({
+				entries: {
+					AAPL_market_cap: {
+						value: 4_750_000_000_000,
+						explanation: JSON.stringify({
+							1: {
+								metric_display: "Market capitalization: $4.75T",
+								insight: "This measures the value of outstanding shares.",
+								evaluation: "neutral",
+							},
+						}),
+						savedAt: now - 1_000,
+					},
+				},
+			}),
+		});
+		vi.stubGlobal("window", {});
+		vi.stubGlobal("localStorage", storage);
+
+		const { getCachedExplanation } = await import("@/hooks/useExplanation");
+		const explanation = getCachedExplanation("AAPL", "market_cap", 4_750_000_000_000);
+
+		expect(JSON.parse(explanation ?? "{}")).toMatchObject({
+			metric_display: "Market capitalization: $4.75T",
+			insight: "This measures the value of outstanding shares.",
+		});
+		expect(explanation).not.toContain('"1"');
+	});
+
 	it("does not refresh existing entries when another explanation is saved", async () => {
 		const firstSavedAt = 9_500_000;
 		vi.spyOn(Date, "now").mockReturnValue(10_000_000);

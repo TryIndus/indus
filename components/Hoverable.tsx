@@ -14,7 +14,7 @@ import {
 	isLoading,
 	subscribeToCacheUpdates,
 } from "@/hooks/useExplanation";
-import type { ValueAnalysis } from "@/lib/types";
+import { parseValueAnalysis } from "@/lib/metric-explanations";
 
 type HoverableProps = {
 	symbol: string;
@@ -69,15 +69,6 @@ const Hoverable: React.FC<HoverableProps> = ({
 		}
 	}, [symbol, metric, value]);
 
-	const parseExplanation = useCallback((rawExplanation: string) => {
-		try {
-			const parsed: ValueAnalysis = JSON.parse(rawExplanation);
-			return parsed;
-		} catch {
-			return null;
-		}
-	}, []);
-
 	const renderContent = () => {
 		if (loading) {
 			return (
@@ -125,7 +116,7 @@ const Hoverable: React.FC<HoverableProps> = ({
 			);
 		}
 
-		const valueAnalysis = parseExplanation(explanation);
+		const valueAnalysis = parseValueAnalysis(explanation);
 
 		if (valueAnalysis) {
 			return (
@@ -184,16 +175,7 @@ const Hoverable: React.FC<HoverableProps> = ({
 	};
 
 	// Extract evaluation for display next to the number
-	const currentEvaluation = explanation
-		? (() => {
-				try {
-					const parsed: ValueAnalysis = JSON.parse(explanation);
-					return parsed.evaluation;
-				} catch {
-					return null;
-				}
-			})()
-		: null;
+	const currentEvaluation = explanation ? parseValueAnalysis(explanation)?.evaluation : null;
 
 	if (!Number.isFinite(value)) {
 		return <span className="inline-flex items-center gap-1.5">{children}</span>;

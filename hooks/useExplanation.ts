@@ -1,3 +1,4 @@
+import { normalizeMetricExplanation } from "@/lib/metric-explanations";
 import type { Item } from "@/lib/prompts";
 
 // localStorage key for persistent cache
@@ -26,23 +27,26 @@ function loadCacheFromStorage(): Map<string, ExplanationCacheEntry> {
 				typeof parsed.entries === "object"
 			) {
 				return new Map(
-					Object.entries(parsed.entries).filter(
-						(entry): entry is [string, ExplanationCacheEntry] => {
-							const value = entry[1];
-							return (
-								value !== null &&
-								typeof value === "object" &&
-								"value" in value &&
-								typeof value.value === "number" &&
-								Number.isFinite(value.value) &&
-								"explanation" in value &&
-								typeof value.explanation === "string" &&
-								"savedAt" in value &&
-								typeof value.savedAt === "number" &&
-								Date.now() - value.savedAt < CACHE_TTL_MS
-							);
-						},
-					),
+					Object.entries(parsed.entries).flatMap((entry) => {
+						const value = entry[1];
+						if (
+							value === null ||
+							typeof value !== "object" ||
+							!("value" in value) ||
+							typeof value.value !== "number" ||
+							!Number.isFinite(value.value) ||
+							!("explanation" in value) ||
+							!("savedAt" in value) ||
+							typeof value.savedAt !== "number" ||
+							Date.now() - value.savedAt >= CACHE_TTL_MS
+						) {
+							return [];
+						}
+						const explanation = normalizeMetricExplanation(value.explanation);
+						return explanation
+							? [[entry[0], { value: value.value, explanation, savedAt: value.savedAt }]]
+							: [];
+					}),
 				);
 			}
 			localStorage.removeItem(STORAGE_KEY);
@@ -190,8 +194,8 @@ export async function batchPreload(items: Item[]) {
 							: {};
 					for (const item of batch) {
 						const key = makeKey(item.symbol, item.metric);
-						const text = explanations[key];
-						if (typeof text === "string") {
+						const text = normalizeMetricExplanation(explanations[key]);
+						if (text) {
 							explanationCache.set(key, {
 								value: item.value,
 								explanation: text,

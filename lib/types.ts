@@ -222,4 +222,8 @@ export interface ContextChatState {
 	};
 }
 
-export type ValueAnalysis = StructuredExplanation;
+export interface ValueAnalysis {
+	metric_display: string;
+	insight: string;
+	evaluation: "green" | "red" | "neutral" | "amber";
+}
