@@ -197,6 +197,36 @@
   }
 }
 
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  [data-report-document],
+  [data-report-document] * {
+    visibility: visible;
+  }
+
+  [data-report-document] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: 0;
+    box-shadow: none;
+  }
+
+  [data-print-hidden] {
+    display: none !important;
+  }
+
+  [data-report-document] h1,
+  [data-report-document] h2,
+  [data-report-document] h3,
+  [data-report-document] li {
+    break-inside: avoid;
+  }
+}
+
 /* Financial Number Formatting */
 .financial-number {
   font-family: var(--font-mono);

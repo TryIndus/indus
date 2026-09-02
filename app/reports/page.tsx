@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { parseReportContent } from "@/lib/report-content";
 import { useAuth } from "@/lib/stores/auth-store";
 
 interface Report {
@@ -74,39 +75,42 @@ const renderInline = (text: string): ReactNode[] => {
 const formatText = (text: string) => {
 	if (!text) return null;
 
-	const paragraphs = text.split("\n\n");
-
-	return paragraphs.map((paragraph, pIndex) => {
-		if (!paragraph.trim()) return null;
-
-		if (paragraph.startsWith("#")) {
-			const level = paragraph.match(/^#+/)?.[0].length || 1;
-			const headingText = paragraph.replace(/^#+\s*/, "");
-
-			if (level === 1) {
+	return parseReportContent(text).map((block, index) => {
+		if (block.kind === "heading") {
+			if (block.level === 1) {
 				return (
-					<h1 key={pIndex} className="text-2xl font-bold mb-4 text-foreground border-b pb-2">
-						{headingText}
+					<h1 key={index} className="mb-4 border-b pb-2 text-2xl font-bold text-foreground">
+						{renderInline(block.text)}
 					</h1>
 				);
-			} else if (level === 2) {
+			}
+			if (block.level === 2) {
 				return (
-					<h2 key={pIndex} className="text-xl font-semibold mb-3 mt-6 text-foreground">
-						{headingText}
+					<h2 key={index} className="mb-3 mt-6 text-xl font-semibold text-foreground">
+						{renderInline(block.text)}
 					</h2>
 				);
-			} else if (level === 3) {
-				return (
-					<h3 key={pIndex} className="text-lg font-semibold mb-2 mt-4 text-foreground">
-						{headingText}
-					</h3>
-				);
 			}
+			return (
+				<h3 key={index} className="mb-2 mt-4 text-lg font-semibold text-foreground">
+					{renderInline(block.text)}
+				</h3>
+			);
+		}
+
+		if (block.kind === "list") {
+			return (
+				<ul key={index} className="mb-4 list-disc space-y-2 pl-5 text-muted-foreground">
+					{block.items.map((item, itemIndex) => (
+						<li key={`${index}-${itemIndex}`}>{renderInline(item)}</li>
+					))}
+				</ul>
+			);
 		}
 
 		return (
-			<p key={pIndex} className="mb-4 text-muted-foreground leading-relaxed">
-				{renderInline(paragraph)}
+			<p key={index} className="mb-4 leading-relaxed text-muted-foreground">
+				{renderInline(block.text)}
 			</p>
 		);
 	});
@@ -276,9 +280,12 @@ export default function ReportsPage() {
 	if (viewMode === "view" && selectedReport) {
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-				<div className="container mx-auto max-w-4xl p-6">
+				<div className="container mx-auto min-w-0 max-w-4xl px-4 py-6 sm:px-6">
 					{/* Header */}
-					<div className="flex items-center justify-between mb-8">
+					<div
+						className="mb-6 flex flex-wrap items-center justify-between gap-3 sm:mb-8"
+						data-print-hidden
+					>
 						<Button
 							variant="ghost"
 							onClick={handleBackToList}
@@ -304,7 +311,12 @@ export default function ReportsPage() {
 								{selectedReport.status}
 							</Badge>
 							{selectedReport.status === "completed" && (
-								<Button variant="outline" size="sm">
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => window.print()}
+									title="Open the print dialog to save this report as a PDF"
+								>
 									<Download className="h-4 w-4 mr-2" />
 									Export PDF
 								</Button>
@@ -313,16 +325,19 @@ export default function ReportsPage() {
 					</div>
 
 					{/* Report Card */}
-					<Card className="overflow-hidden shadow-lg border-0 bg-card/95 backdrop-blur">
+					<Card
+						className="min-w-0 overflow-visible border-0 bg-card/95 shadow-lg backdrop-blur"
+						data-report-document
+					>
 						<CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 border-b">
-							<div className="flex items-start justify-between">
-								<div className="space-y-2">
-									<div className="flex items-center gap-3">
+							<div className="flex min-w-0 items-start justify-between">
+								<div className="min-w-0 space-y-2">
+									<div className="flex min-w-0 items-center gap-3">
 										<div className="p-2 bg-primary/10 rounded-lg">
 											<Building2 className="h-6 w-6 text-primary" />
 										</div>
-										<div>
-											<CardTitle className="text-2xl font-bold">
+										<div className="min-w-0">
+											<CardTitle className="break-words text-2xl font-bold">
 												{selectedReport.symbol} Research Report
 											</CardTitle>
 											<CardDescription className="text-base">
@@ -330,7 +345,7 @@ export default function ReportsPage() {
 											</CardDescription>
 										</div>
 									</div>
-									<div className="flex items-center gap-6 text-sm text-muted-foreground">
+									<div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
 										<span className="flex items-center gap-2">
 											<Calendar className="h-4 w-4" />
 											Generated on {format(new Date(selectedReport.created_at), "MMMM d, yyyy")}
@@ -344,7 +359,7 @@ export default function ReportsPage() {
 							</div>
 						</CardHeader>
 
-						<CardContent className="p-8">
+						<CardContent className="min-w-0 p-5 sm:p-8">
 							{selectedReport.status === "generating" ? (
 								<div className="text-center py-16 space-y-6">
 									<div className="relative mx-auto w-24 h-24">
@@ -381,7 +396,7 @@ export default function ReportsPage() {
 									</Button>
 								</div>
 							) : (
-								<div className="prose prose-gray max-w-none">
+								<div className="max-w-none break-words [overflow-wrap:anywhere]">
 									<div className="space-y-1">{formatText(selectedReport.report_content)}</div>
 								</div>
 							)}
@@ -530,7 +545,7 @@ export default function ReportsPage() {
 
 									<CardContent>
 										<div className="space-y-4">
-											<p className="text-sm text-muted-foreground leading-relaxed h-12 overflow-hidden">
+											<p className="break-words text-sm leading-relaxed text-muted-foreground">
 												{report.summary || report.company_name}
 											</p>
 
