@@ -305,6 +305,7 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 		false,
 	);
 	const chart = page.getByRole("img", { name: /AAPL 1Y chart/ });
+	await chart.scrollIntoViewIfNeeded();
 	const chartBounds = await chart.boundingBox();
 	expect(chartBounds).not.toBeNull();
 	if (chartBounds) {
