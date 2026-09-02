@@ -15,7 +15,7 @@ import {
 	Sparkles,
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { useContextChat } from "@/components/chat/useContextChat";
 import { FavoriteButtonCompact } from "@/components/FavoriteButton";
@@ -104,6 +104,11 @@ export default function CompanyPage() {
 		getFinancialData: () => financialDataRef.current,
 		getChartData: () => chartDataRef.current,
 	});
+
+	useLayoutEffect(() => {
+		if (!symbol) return;
+		window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+	}, [symbol]);
 
 	const fetchStockData = useCallback(async (stockSymbol: string) => {
 		setIsLoading(true);

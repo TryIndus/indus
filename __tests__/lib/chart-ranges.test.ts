@@ -6,6 +6,7 @@ import {
 	getPreviousHistoryEndTimestamp,
 	getRangeStartTimestamp,
 	prependOlderBars,
+	shiftLogicalRange,
 } from "@/lib/charts/ranges";
 
 describe("chart ranges", () => {
@@ -44,5 +45,13 @@ describe("chart ranges", () => {
 			{ time: 40 },
 		]);
 		expect(prependOlderBars(current, [{ time: 30 }])).toEqual(current);
+	});
+
+	it("keeps the current viewport anchored after older bars are prepended", () => {
+		expect(shiftLogicalRange({ from: -4.5, to: 35.5 }, 80)).toEqual({
+			from: 75.5,
+			to: 115.5,
+		});
+		expect(shiftLogicalRange(null, 80)).toBeNull();
 	});
 });

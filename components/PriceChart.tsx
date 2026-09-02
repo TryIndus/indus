@@ -22,6 +22,7 @@ import {
 	getPreviousHistoryEndTimestamp,
 	getRangeStartTimestamp,
 	prependOlderBars,
+	shiftLogicalRange,
 } from "@/lib/charts/ranges";
 import { getRealtimeStatus, type RealtimeStatus } from "@/lib/realtime/stream-status";
 import type { PageChartData } from "@/lib/types";
@@ -159,6 +160,7 @@ export default function PriceChart({
 	const eventSourceRef = useRef<EventSource | null>(null);
 	const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const requestIdRef = useRef(0);
+	const isInitialHistoryLoadingRef = useRef(true);
 	const historicalDataRef = useRef<BarData[]>([]);
 	const earliestLoadedTimestampRef = useRef<number | null>(null);
 	const isLoadingOlderRef = useRef(false);
@@ -203,6 +205,7 @@ export default function PriceChart({
 
 	const loadHistoricalData = useCallback(async () => {
 		const requestId = ++requestIdRef.current;
+		isInitialHistoryLoadingRef.current = true;
 		setIsLoading(true);
 		setError(null);
 		earliestLoadedTimestampRef.current = null;
@@ -263,70 +266,69 @@ export default function PriceChart({
 				setError("Market history is temporarily unavailable. Try again in a moment.");
 			}
 		} finally {
-			if (requestId === requestIdRef.current) setIsLoading(false);
+			if (requestId === requestIdRef.current) {
+				isInitialHistoryLoadingRef.current = false;
+				setIsLoading(false);
+			}
 		}
 	}, [applySeriesData, selectedRange, symbol, type]);
 
-	const loadOlderHistory = useCallback(
-		async (visibleRange: LogicalRange) => {
-			const earliestTimestamp = earliestLoadedTimestampRef.current;
-			const requestId = requestIdRef.current;
-			if (
-				earliestTimestamp === null ||
-				isLoadingOlderRef.current ||
-				hasReachedHistoryLimitRef.current
-			) {
+	const loadOlderHistory = useCallback(async () => {
+		const earliestTimestamp = earliestLoadedTimestampRef.current;
+		const requestId = requestIdRef.current;
+		if (
+			earliestTimestamp === null ||
+			isLoadingOlderRef.current ||
+			hasReachedHistoryLimitRef.current
+		) {
+			return;
+		}
+
+		isLoadingOlderRef.current = true;
+		setIsLoadingOlder(true);
+		try {
+			const response = await fetch(
+				buildHistoricalUrl(
+					symbolRef.current,
+					selectedRangeRef.current,
+					type,
+					getPreviousHistoryEndTimestamp(earliestTimestamp),
+				),
+			);
+			const payload: unknown = await response.json().catch(() => null);
+			const result = parseHistoricalResponse(payload);
+			if (requestId !== requestIdRef.current) return;
+			if (!response.ok || !result) return;
+			if (result.isEmpty) {
+				hasReachedHistoryLimitRef.current = true;
+				setHistoryLimitReached(true);
 				return;
 			}
 
-			isLoadingOlderRef.current = true;
-			setIsLoadingOlder(true);
-			try {
-				const response = await fetch(
-					buildHistoricalUrl(
-						symbolRef.current,
-						selectedRangeRef.current,
-						type,
-						getPreviousHistoryEndTimestamp(earliestTimestamp),
-					),
-				);
-				const payload: unknown = await response.json().catch(() => null);
-				const result = parseHistoricalResponse(payload);
-				if (requestId !== requestIdRef.current) return;
-				if (!response.ok || !result) return;
-				if (result.isEmpty) {
-					hasReachedHistoryLimitRef.current = true;
-					setHistoryLimitReached(true);
-					return;
-				}
-
-				const current = historicalDataRef.current;
-				const combined = prependOlderBars(current, result.data);
-				const prependedCount = combined.length - current.length;
-				if (prependedCount === 0) {
-					hasReachedHistoryLimitRef.current = true;
-					setHistoryLimitReached(true);
-					return;
-				}
-
-				historicalDataRef.current = combined;
-				earliestLoadedTimestampRef.current = combined[0]?.time ?? earliestTimestamp;
-				applySeriesData(combined);
-				chartRef.current?.timeScale().setVisibleLogicalRange({
-					from: visibleRange.from + prependedCount,
-					to: visibleRange.to + prependedCount,
-				});
-			} catch {
-				// Keep the current chart usable; another left pan can retry the history request.
-			} finally {
-				if (requestId === requestIdRef.current) {
-					isLoadingOlderRef.current = false;
-					setIsLoadingOlder(false);
-				}
+			const current = historicalDataRef.current;
+			const combined = prependOlderBars(current, result.data);
+			const prependedCount = combined.length - current.length;
+			if (prependedCount === 0) {
+				hasReachedHistoryLimitRef.current = true;
+				setHistoryLimitReached(true);
+				return;
 			}
-		},
-		[applySeriesData, type],
-	);
+
+			const currentVisibleRange = chartRef.current?.timeScale().getVisibleLogicalRange() ?? null;
+			historicalDataRef.current = combined;
+			earliestLoadedTimestampRef.current = combined[0]?.time ?? earliestTimestamp;
+			applySeriesData(combined);
+			const restoredRange = shiftLogicalRange(currentVisibleRange, prependedCount);
+			if (restoredRange) chartRef.current?.timeScale().setVisibleLogicalRange(restoredRange);
+		} catch {
+			// Keep the current chart usable; another left pan can retry the history request.
+		} finally {
+			if (requestId === requestIdRef.current) {
+				isLoadingOlderRef.current = false;
+				setIsLoadingOlder(false);
+			}
+		}
+	}, [applySeriesData, type]);
 
 	useEffect(() => {
 		if (!chartContainerRef.current) return;
@@ -416,8 +418,10 @@ export default function PriceChart({
 		let historyTimer: ReturnType<typeof setTimeout> | null = null;
 		const handleVisibleRangeChange = (range: LogicalRange | null) => {
 			if (historyTimer) clearTimeout(historyTimer);
-			if (!range || range.from > 3 || historicalDataRef.current.length < 2) return;
-			historyTimer = setTimeout(() => void loadOlderHistory(range), 250);
+			if (isInitialHistoryLoadingRef.current) return;
+			const bars = range ? candlestickSeries.barsInLogicalRange(range) : null;
+			if (!bars || bars.barsBefore > 10 || historicalDataRef.current.length < 2) return;
+			historyTimer = setTimeout(() => void loadOlderHistory(), 250);
 		};
 		chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
 

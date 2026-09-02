@@ -47,3 +47,14 @@ export function prependOlderBars<T extends { time: number }>(current: T[], older
 		.sort((left, right) => left.time - right.time);
 	return [...unseenOlderBars, ...current];
 }
+
+export function shiftLogicalRange(
+	range: { from: number; to: number } | null,
+	prependedCount: number,
+): { from: number; to: number } | null {
+	if (!range || prependedCount <= 0) return range;
+	return {
+		from: range.from + prependedCount,
+		to: range.to + prependedCount,
+	};
+}
