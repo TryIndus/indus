@@ -269,7 +269,7 @@ test("@authenticated stock search keeps its form and tips compact", async ({ pag
 
 test("@authenticated account menu opens Profile & Account settings", async ({ page }) => {
 	await page.goto("/settings");
-	await page.getByRole("button", { name: "Notifications", exact: true }).click();
+	await page.getByRole("button", { name: /^Notifications/ }).click();
 	await expect(page).toHaveURL(/\/settings#notifications$/);
 	await page.getByRole("button", { name: "Open account menu" }).click();
 	const accountLink = page.getByRole("menuitem", { name: "Account", exact: true });

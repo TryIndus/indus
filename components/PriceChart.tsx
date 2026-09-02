@@ -160,7 +160,7 @@ export default function PriceChart({
 	const eventSourceRef = useRef<EventSource | null>(null);
 	const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const requestIdRef = useRef(0);
-	const isInitialHistoryLoadingRef = useRef(true);
+	const hasUserNavigatedHistoryRef = useRef(false);
 	const historicalDataRef = useRef<BarData[]>([]);
 	const earliestLoadedTimestampRef = useRef<number | null>(null);
 	const isLoadingOlderRef = useRef(false);
@@ -205,7 +205,7 @@ export default function PriceChart({
 
 	const loadHistoricalData = useCallback(async () => {
 		const requestId = ++requestIdRef.current;
-		isInitialHistoryLoadingRef.current = true;
+		hasUserNavigatedHistoryRef.current = false;
 		setIsLoading(true);
 		setError(null);
 		earliestLoadedTimestampRef.current = null;
@@ -267,7 +267,6 @@ export default function PriceChart({
 			}
 		} finally {
 			if (requestId === requestIdRef.current) {
-				isInitialHistoryLoadingRef.current = false;
 				setIsLoading(false);
 			}
 		}
@@ -285,6 +284,7 @@ export default function PriceChart({
 		}
 
 		isLoadingOlderRef.current = true;
+		hasUserNavigatedHistoryRef.current = false;
 		setIsLoadingOlder(true);
 		try {
 			const response = await fetch(
@@ -416,9 +416,16 @@ export default function PriceChart({
 		});
 
 		let historyTimer: ReturnType<typeof setTimeout> | null = null;
+		const markUserNavigation = () => {
+			hasUserNavigatedHistoryRef.current = true;
+		};
+		const chartContainer = chartContainerRef.current;
+		chartContainer.addEventListener("pointerdown", markUserNavigation);
+		chartContainer.addEventListener("touchstart", markUserNavigation, { passive: true });
+		chartContainer.addEventListener("wheel", markUserNavigation, { passive: true });
 		const handleVisibleRangeChange = (range: LogicalRange | null) => {
 			if (historyTimer) clearTimeout(historyTimer);
-			if (isInitialHistoryLoadingRef.current) return;
+			if (!hasUserNavigatedHistoryRef.current) return;
 			const bars = range ? candlestickSeries.barsInLogicalRange(range) : null;
 			if (!bars || bars.barsBefore > 10 || historicalDataRef.current.length < 2) return;
 			historyTimer = setTimeout(() => void loadOlderHistory(), 250);
@@ -454,6 +461,9 @@ export default function PriceChart({
 
 		return () => {
 			if (historyTimer) clearTimeout(historyTimer);
+			chartContainer.removeEventListener("pointerdown", markUserNavigation);
+			chartContainer.removeEventListener("touchstart", markUserNavigation);
+			chartContainer.removeEventListener("wheel", markUserNavigation);
 			chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
 			resizeObserver.disconnect();
 			themeObserver.disconnect();
