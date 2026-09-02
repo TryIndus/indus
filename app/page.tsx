@@ -12,6 +12,7 @@ import {
 	Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import { BackToTopButton } from "@/components/landing/BackToTopButton";
 import { Button } from "@/components/ui/button";
 
 const researchSteps = [
@@ -155,7 +156,7 @@ function ProductPreview() {
 
 export default function LandingPage() {
 	return (
-		<div className="relative min-h-screen overflow-hidden bg-background">
+		<div id="top" className="relative min-h-screen overflow-hidden bg-background">
 			<div className="landing-grid pointer-events-none absolute inset-x-0 top-0 -z-0 h-[900px] opacity-70" />
 			<div className="pointer-events-none absolute left-1/2 top-[-360px] h-[720px] w-[900px] -translate-x-1/2 rounded-full bg-primary/[0.08] blur-[140px]" />
 
@@ -357,6 +358,7 @@ export default function LandingPage() {
 					<p className="font-mono text-xs">© {new Date().getFullYear()} Indus</p>
 				</div>
 			</footer>
+			<BackToTopButton />
 		</div>
 	);
 }

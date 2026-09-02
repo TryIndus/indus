@@ -22,6 +22,37 @@ test("@browser landing page exposes the primary product path", async ({ page }) 
 	).toBeVisible();
 });
 
+test("@browser landing navigation scrolls between sections and returns to the top", async ({
+	page,
+}) => {
+	await page.goto("/");
+	await expect
+		.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior))
+		.toBe("smooth");
+
+	for (const [name, hash] of [
+		["Product", "#product"],
+		["Workflow", "#workflow"],
+		["Principles", "#principles"],
+	] as const) {
+		await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute("href", hash);
+	}
+
+	await page.getByRole("link", { name: "Principles", exact: true }).click();
+	await expect(page).toHaveURL(/#principles$/);
+	await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(480);
+
+	const backToTop = page.getByRole("link", { name: "Back to top" });
+	await expect(backToTop).toHaveAttribute("data-visible", "true");
+	await backToTop.click();
+	await expect(page).toHaveURL(/#top$/);
+	await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
+	await expect(page.locator('a[aria-label="Back to top"]')).toHaveAttribute(
+		"data-visible",
+		"false",
+	);
+});
+
 test("@browser public pages do not overflow the viewport", async ({ page }) => {
 	for (const path of ["/", "/auth", "/help"]) {
 		await page.goto(path);

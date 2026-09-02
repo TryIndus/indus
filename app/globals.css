@@ -124,6 +124,7 @@
   }
   html {
     overflow-x: hidden; /* Prevent horizontal scrolling at document level */
+    scroll-behavior: smooth;
   }
   
   /* Ensure main content containers don't overflow */
