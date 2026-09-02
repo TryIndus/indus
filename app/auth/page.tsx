@@ -113,16 +113,16 @@ export default function AuthPage() {
 				<div className="relative z-10 max-w-xl">
 					<div className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.07] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
 						<Sparkles className="size-3" />
-						Your research workspace
+						Charts, fundamentals, and AI analysis
 					</div>
 					<h1 className="font-display mt-7 text-balance text-6xl font-medium leading-[0.96] tracking-[-0.045em] xl:text-7xl">
-						Read the market.
+						Research companies.
 						<br />
-						<span className="italic text-primary">Question the signal.</span>
+						<span className="italic text-primary">Keep the data together.</span>
 					</h1>
 					<p className="mt-6 max-w-md text-sm leading-6 text-muted-foreground">
-						One place for market charts, company fundamentals, and an analyst constrained to the
-						evidence in view.
+						Review market charts and company fundamentals, then ask questions using the data on that
+						page.
 					</p>
 					<div className="mt-9 flex items-center gap-2 text-xs text-muted-foreground">
 						<ShieldCheck className="size-4 text-primary" />

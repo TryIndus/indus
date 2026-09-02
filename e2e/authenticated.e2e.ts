@@ -18,6 +18,7 @@ const companyFixture = {
 	sector: "Technology",
 	industry: "Consumer Electronics",
 	city: "Cupertino",
+	state: "California",
 	country: "United States",
 	marketCap: 3_190_000_000_000,
 	enterpriseValue: 3_240_000_000_000,
@@ -78,6 +79,14 @@ async function mockCompanyResearch(page: Page) {
 		const url = new URL(route.request().url());
 		historyRequests.push(url.toString());
 		requestedTimeframes.push(url.searchParams.get("timeframe") ?? "");
+		if (url.searchParams.has("end")) {
+			await route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ data: [], isEmpty: true, totalBars: 0 }),
+			});
+			return;
+		}
 		const now = Number(url.searchParams.get("end")) || Math.floor(Date.now() / 1000);
 		const data = Array.from({ length: 80 }, (_, index) => {
 			const open = 192 + index * 0.25;
@@ -157,14 +166,14 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("@authenticated dashboard loads with a verified session", async ({ page }) => {
-	await expect(page.getByRole("heading", { name: "Your research desk." })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Company research" })).toBeVisible();
 	await expect(page.getByRole("heading", { name: "Your Favorites" })).toBeVisible();
 });
 
 test("@authenticated auth page redirects an existing session", async ({ page }) => {
 	await page.goto("/auth");
 	await expect(page).toHaveURL(/\/dashboard$/);
-	await expect(page.getByRole("heading", { name: "Your research desk." })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Company research" })).toBeVisible();
 });
 
 test("@authenticated queryless crypto route renders its empty state", async ({ page }) => {
@@ -203,7 +212,10 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 
 	await expect(page.getByRole("heading", { name: "Apple Inc." })).toBeVisible();
 	await expect(page.getByRole("region", { name: "AAPL price chart" })).toBeVisible();
-	await expect(page.getByText("Interrogate the numbers.", { exact: true })).toBeVisible();
+	await expect(page.getByText("Ask about the company.", { exact: true })).toBeVisible();
+	await expect(
+		page.getByText("Cupertino, California, United States", { exact: true }),
+	).toBeVisible();
 
 	await page.getByRole("button", { name: "1Y" }).click();
 	await expect.poll(() => requestedTimeframes).toContain("1Day");
@@ -238,6 +250,7 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 	await expect
 		.poll(() => historyRequests.some((requestUrl) => new URL(requestUrl).searchParams.has("end")))
 		.toBe(true);
+	await expect(page.getByText("Oldest available data reached", { exact: true })).toBeVisible();
 });
 
 test("@authenticated critical product routes have no serious accessibility violations", async ({

@@ -18,20 +18,20 @@ const researchSteps = [
 	{
 		number: "01",
 		icon: Search,
-		title: "Find the signal",
-		description: "Move from a company search to live price action without opening another tab.",
+		title: "Search a company",
+		description: "Open live and historical price data from a company search.",
 	},
 	{
 		number: "02",
 		icon: Layers3,
-		title: "Read the business",
-		description: "Put valuation, margins, growth, and balance-sheet data into one coherent view.",
+		title: "Review the fundamentals",
+		description: "See valuation, margins, growth, and balance-sheet data in the same view.",
 	},
 	{
 		number: "03",
 		icon: BrainCircuit,
-		title: "Interrogate the evidence",
-		description: "Ask focused questions and receive answers constrained to the financials in view.",
+		title: "Ask about the data",
+		description: "Ask focused questions using the company financials and chart data on the page.",
 	},
 ];
 
@@ -54,7 +54,7 @@ function ProductPreview() {
 				<div className="flex items-center justify-between border-b border-border/70 px-5 py-3">
 					<div className="flex items-center gap-2 text-xs text-muted-foreground">
 						<span className="size-2 rounded-full bg-primary shadow-[0_0_0_4px_color-mix(in_oklab,var(--primary)_15%,transparent)]" />
-						Illustrative research workspace
+						Company research preview
 					</div>
 					<div className="flex gap-1.5" aria-hidden="true">
 						<span className="size-1 rounded-full bg-muted-foreground/40" />
@@ -129,12 +129,12 @@ function ProductPreview() {
 								Indus analyst
 							</div>
 							<span className="rounded-full bg-primary/15 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-primary">
-								Evidence-led
+								Current data
 							</span>
 						</div>
 						<div className="my-5 h-px bg-primary/15" />
 						<p className="font-display text-xl leading-snug">
-							“Where is the tension in these numbers?”
+							“How does this margin compare with the valuation?”
 						</p>
 						<p className="mt-4 text-xs leading-relaxed text-muted-foreground">
 							A 24.3% net margin and 33.1× P/E connect profitability to the price paid for earnings.
@@ -143,7 +143,7 @@ function ProductPreview() {
 						<div className="mt-auto pt-6">
 							<div className="flex items-center gap-2 border-t border-primary/15 pt-3 text-[10px] text-muted-foreground">
 								<Check className="size-3 text-primary" />
-								Uses only the metrics supplied
+								Based on the metrics shown
 							</div>
 						</div>
 					</div>
@@ -200,7 +200,7 @@ export default function LandingPage() {
 					<div className="mx-auto max-w-4xl text-center">
 						<div className="animate-rise-in inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/[0.07] px-3 py-1.5 text-xs font-semibold text-primary">
 							<Sparkles className="size-3.5" />
-							Research at the speed of a question
+							Charts, fundamentals, and AI analysis
 						</div>
 						<h1 className="font-display animate-rise-in mt-7 text-balance text-6xl font-medium leading-[0.92] tracking-[-0.045em] [animation-delay:60ms] md:text-8xl lg:text-[7.2rem]">
 							Financial intelligence,
@@ -244,14 +244,14 @@ export default function LandingPage() {
 						<div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
 							<div>
 								<p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-									One research loop
+									Company research in one view
 								</p>
 								<h2 className="font-display mt-4 max-w-lg text-balance text-4xl font-medium leading-[1.02] tracking-[-0.035em] md:text-6xl">
-									Less tab switching. More signal.
+									Research a company without switching tools.
 								</h2>
 								<p className="mt-5 max-w-md text-sm leading-6 text-muted-foreground">
-									Indus keeps market data, company fundamentals, and explanation in the same
-									information hierarchy so your reasoning stays intact.
+									Indus keeps market data, company fundamentals, and AI analysis together so you can
+									compare them directly.
 								</p>
 							</div>
 
@@ -287,15 +287,14 @@ export default function LandingPage() {
 					<div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
 						<div>
 							<p className="font-mono text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-								Designed for trust
+								Clear data boundaries
 							</p>
 							<h2 className="font-display mt-4 text-4xl font-medium tracking-[-0.035em] md:text-6xl">
-								Clarity over theatre.
+								Know what the product is showing.
 							</h2>
 						</div>
 						<p className="max-w-md text-sm leading-6 text-muted-foreground">
-							Every layer is designed to show what is known, what is delayed, and what the model can
-							actually support.
+							Market status, source data, and model context remain visible while you research.
 						</p>
 					</div>
 
@@ -303,18 +302,18 @@ export default function LandingPage() {
 						{[
 							{
 								icon: DatabaseZap,
-								title: "Market data with state",
+								title: "Clear market status",
 								copy: "Live, reconnecting, and historical states are explicit instead of hidden behind a spinner.",
 							},
 							{
 								icon: CircleGauge,
-								title: "Dense, not noisy",
-								copy: "The numbers stay scannable while definitions and deeper interpretation remain one gesture away.",
+								title: "Financial data in one view",
+								copy: "Financial metrics stay scannable, with definitions and analysis available from each value.",
 							},
 							{
 								icon: LockKeyhole,
-								title: "Evidence-based model context",
-								copy: "The analyst is constrained to the company evidence supplied in the current research view.",
+								title: "Answers tied to current data",
+								copy: "The analyst receives the company fundamentals and chart data supplied by the current page.",
 							},
 						].map((principle) => (
 							<div
@@ -333,10 +332,10 @@ export default function LandingPage() {
 					<div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-primary/25 bg-primary/[0.075] px-6 py-14 text-center md:px-12 md:py-20">
 						<ChartNoAxesCombined className="mx-auto size-7 text-primary" />
 						<h2 className="font-display mx-auto mt-5 max-w-3xl text-balance text-4xl font-medium leading-[1.03] tracking-[-0.035em] md:text-6xl">
-							Turn a ticker into a research thesis.
+							Review a company in one place.
 						</h2>
 						<p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-muted-foreground">
-							Start with a company. Leave with the questions that matter next.
+							Open the chart, compare the fundamentals, and ask follow-up questions.
 						</p>
 						<Button size="lg" asChild className="mt-8 h-12 rounded-full px-7">
 							<Link href="/auth">
@@ -354,7 +353,7 @@ export default function LandingPage() {
 						<BrandMark />
 						<span className="font-semibold">Indus</span>
 					</div>
-					<p>Independent research infrastructure for the curious investor.</p>
+					<p>Market data, company fundamentals, and AI analysis in one workspace.</p>
 					<p className="font-mono text-xs">© {new Date().getFullYear()} Indus</p>
 				</div>
 			</footer>

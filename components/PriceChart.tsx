@@ -178,6 +178,7 @@ export default function PriceChart({
 	const [latestSnapshot, setLatestSnapshot] = useState<ChartSnapshot | null>(null);
 	const [hoverSnapshot, setHoverSnapshot] = useState<ChartSnapshot | null>(null);
 	const [isLoadingOlder, setIsLoadingOlder] = useState(false);
+	const [historyLimitReached, setHistoryLimitReached] = useState(false);
 	selectedRangeRef.current = selectedRange;
 	symbolRef.current = symbol;
 
@@ -207,6 +208,7 @@ export default function PriceChart({
 		earliestLoadedTimestampRef.current = null;
 		snapshotBaselineRef.current = null;
 		hasReachedHistoryLimitRef.current = false;
+		setHistoryLimitReached(false);
 		isLoadingOlderRef.current = false;
 		setIsLoadingOlder(false);
 		onDataChangeRef.current?.(undefined);
@@ -294,6 +296,7 @@ export default function PriceChart({
 				if (!response.ok || !result) return;
 				if (result.isEmpty) {
 					hasReachedHistoryLimitRef.current = true;
+					setHistoryLimitReached(true);
 					return;
 				}
 
@@ -302,6 +305,7 @@ export default function PriceChart({
 				const prependedCount = combined.length - current.length;
 				if (prependedCount === 0) {
 					hasReachedHistoryLimitRef.current = true;
+					setHistoryLimitReached(true);
 					return;
 				}
 
@@ -695,6 +699,15 @@ export default function PriceChart({
 							<RefreshCw className="size-3 animate-spin text-primary" />
 							Loading older history
 						</div>
+					</div>
+				)}
+
+				{historyLimitReached && !isLoadingOlder && (
+					<div
+						className="absolute right-5 top-5 z-20 rounded-full border border-border bg-card/95 px-3 py-1.5 text-[10px] text-muted-foreground shadow-lg backdrop-blur"
+						role="status"
+					>
+						Oldest available data reached
 					</div>
 				)}
 			</div>

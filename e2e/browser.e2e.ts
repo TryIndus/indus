@@ -15,9 +15,11 @@ test("@browser landing page exposes the primary product path", async ({ page }) 
 		await expect(page.getByRole("link", { name })).toHaveAttribute("href", "/auth");
 	}
 	await expect(
-		page.getByText("Less tab switching. More signal.", { exact: true }).first(),
+		page.getByText("Research a company without switching tools.", { exact: true }).first(),
 	).toBeVisible();
-	await expect(page.getByText("Clarity over theatre.", { exact: true }).first()).toBeVisible();
+	await expect(
+		page.getByText("Know what the product is showing.", { exact: true }).first(),
+	).toBeVisible();
 });
 
 test("@browser public pages do not overflow the viewport", async ({ page }) => {

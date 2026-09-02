@@ -247,10 +247,12 @@ export default function CompanyPage() {
 								</div>
 								<div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
 									{financialData.industry && <span>{financialData.industry}</span>}
-									{(financialData.city || financialData.country) && (
+									{(financialData.city || financialData.state || financialData.country) && (
 										<span className="inline-flex items-center gap-1.5">
 											<MapPin className="size-3" />
-											{[financialData.city, financialData.country].filter(Boolean).join(", ")}
+											{[financialData.city, financialData.state, financialData.country]
+												.filter(Boolean)
+												.join(", ")}
 										</span>
 									)}
 									{financialData.website && (
@@ -351,17 +353,17 @@ export default function CompanyPage() {
 										id="analyst-heading"
 										className="font-display mt-3 text-3xl font-medium tracking-[-0.03em]"
 									>
-										Interrogate the numbers.
+										Ask about the company.
 									</h2>
 								</div>
 								<span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
 									<ShieldCheck className="size-3" />
-									In-view data
+									Current data
 								</span>
 							</div>
 							<p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-								The analyst receives this company’s visible fundamentals and the latest chart
-								points, not an open-ended mandate to invent context.
+								Ask about valuation, profitability, growth, or balance-sheet risk using the
+								fundamentals and chart data shown on this page.
 							</p>
 							<div className="mt-6 grid gap-2 sm:grid-cols-2">
 								{researchLenses.map((lens) => (

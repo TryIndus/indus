@@ -54,11 +54,11 @@ export default function Dashboard() {
 							Dashboard
 						</p>
 						<h1 className="font-display mt-3 text-balance text-4xl font-medium leading-none tracking-[-0.035em] sm:text-5xl">
-							Your research desk.
+							Company research
 						</h1>
 						<p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-							Begin with a company, pressure-test the fundamentals, and use the analyst to find the
-							next useful question.
+							Search a company, review its chart and fundamentals, then ask questions about the data
+							on the page.
 						</p>
 					</div>
 					<div className="flex flex-col gap-2 sm:flex-row">
@@ -84,11 +84,11 @@ export default function Dashboard() {
 						<div className="flex items-center gap-2 text-primary">
 							<Binoculars className="size-4" />
 							<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]">
-								Research loop
+								How it works
 							</p>
 						</div>
 						<h2 id="workflow-heading" className="mt-1 text-xl font-semibold tracking-[-0.025em]">
-							Move from discovery to a defensible read
+							Review a company from price to fundamentals
 						</h2>
 					</div>
 				</div>
@@ -98,19 +98,19 @@ export default function Dashboard() {
 							step: "01",
 							icon: Search,
 							title: "Discover",
-							copy: "Search any listed company and open a complete research view.",
+							copy: "Search a listed company and open its chart, profile, and financial metrics.",
 						},
 						{
 							step: "02",
 							icon: BookOpenText,
-							title: "Read",
-							copy: "Connect the chart to valuation, profitability, growth, and financial health.",
+							title: "Review",
+							copy: "Compare valuation, profitability, growth, and balance-sheet metrics.",
 						},
 						{
 							step: "03",
 							icon: Cpu,
-							title: "Interrogate",
-							copy: "Ask the analyst about a metric while keeping the visible evidence attached.",
+							title: "Ask",
+							copy: "Ask the analyst about a metric using the company data already in view.",
 						},
 					].map((item) => (
 						<div
