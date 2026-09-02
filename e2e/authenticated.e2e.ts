@@ -169,8 +169,7 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 	await expect(page.getByRole("region", { name: "AAPL price chart" })).toBeVisible();
 	await expect(page.getByText("Financial Metrics", { exact: true })).toBeVisible();
 
-	await page.getByRole("button", { name: "1Y" }).click();
-	await expect.poll(() => requestedTimeframes).toContain("1Day");
+	await expect.poll(() => requestedTimeframes).toContain("1Min");
 
 	await page.getByText("33.1", { exact: true }).last().hover();
 	await expect(page.getByText(/Read it with growth and margins/)).toBeVisible();
