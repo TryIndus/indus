@@ -167,9 +167,9 @@ export function AppSidebar() {
 						<DropdownMenuLabel>My Account</DropdownMenuLabel>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem asChild>
-							<Link href="/settings">
+							<Link href="/settings#profile">
 								<User className="mr-2 h-4 w-4" />
-								<span>Account settings</span>
+								<span>Account</span>
 							</Link>
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />
@@ -196,9 +196,9 @@ export function AppSidebar() {
 						<DropdownMenuLabel>My Account</DropdownMenuLabel>
 						<DropdownMenuSeparator />
 						<DropdownMenuItem asChild>
-							<Link href="/settings">
+							<Link href="/settings#profile">
 								<User className="mr-2 h-4 w-4" />
-								<span>Account settings</span>
+								<span>Account</span>
 							</Link>
 						</DropdownMenuItem>
 						<DropdownMenuSeparator />

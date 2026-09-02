@@ -121,16 +121,16 @@ export default function SearchPage() {
 			</div>
 
 			{/* Main Search Card */}
-			<Card>
-				<CardHeader>
+			<Card className="gap-4 py-4">
+				<CardHeader className="gap-1 px-4 sm:px-5">
 					<CardTitle className="flex items-center gap-2">
 						<Search className="h-5 w-5" />
 						Stock Symbol Search
 					</CardTitle>
 					<CardDescription>Enter a ticker symbol like AAPL, TSLA, or MSFT</CardDescription>
 				</CardHeader>
-				<CardContent className="space-y-4">
-					<form onSubmit={handleSearchSubmit} className="flex gap-4">
+				<CardContent className="space-y-3 px-4 sm:px-5">
+					<form onSubmit={handleSearchSubmit} className="flex flex-col gap-2 sm:flex-row">
 						<div className="flex-1">
 							<Input
 								id="stock-search"
@@ -142,7 +142,7 @@ export default function SearchPage() {
 								disabled={isSearching}
 							/>
 						</div>
-						<Button type="submit" disabled={isSearching || !searchTerm.trim()} className="px-8">
+						<Button type="submit" disabled={isSearching || !searchTerm.trim()} className="px-5">
 							{isSearching ? "Searching..." : "Search"}
 						</Button>
 					</form>
@@ -171,17 +171,15 @@ export default function SearchPage() {
 					)}
 
 					{/* Search Tips */}
-					<Card className="border-primary/20 bg-primary/5">
-						<CardContent className="pt-4">
-							<h4 className="font-medium text-primary mb-2">Search Tips:</h4>
-							<ul className="text-sm text-muted-foreground space-y-1">
-								<li>• Enter ticker symbols like AAPL, GOOGL, TSLA</li>
-								<li>• Works with most NYSE and NASDAQ stocks</li>
-								<li>• International stocks may be available with proper suffixes</li>
-								<li>• ETFs and mutual funds are also supported</li>
-							</ul>
-						</CardContent>
-					</Card>
+					<aside className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+						<h4 className="mb-1.5 text-sm font-medium text-primary">Search Tips:</h4>
+						<ul className="space-y-0.5 text-sm text-muted-foreground">
+							<li>• Enter ticker symbols like AAPL, GOOGL, TSLA</li>
+							<li>• Works with most NYSE and NASDAQ stocks</li>
+							<li>• International stocks may be available with proper suffixes</li>
+							<li>• ETFs and mutual funds are also supported</li>
+						</ul>
+					</aside>
 				</CardContent>
 			</Card>
 

@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -79,6 +79,21 @@ export default function Settings() {
 	const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
 	const { theme, setTheme } = useTheme();
 	const [currency, setCurrency] = useState("USD");
+
+	useEffect(() => {
+		const syncSection = () => {
+			const section = window.location.hash.slice(1);
+			if (settingSections.some(({ id }) => id === section)) setActiveSection(section);
+		};
+		syncSection();
+		window.addEventListener("hashchange", syncSection);
+		return () => window.removeEventListener("hashchange", syncSection);
+	}, []);
+
+	const selectSection = (section: string) => {
+		setActiveSection(section);
+		window.history.replaceState(null, "", `#${section}`);
+	};
 
 	const renderSectionContent = () => {
 		switch (activeSection) {
@@ -443,7 +458,7 @@ export default function Settings() {
 								<button
 									key={section.id}
 									type="button"
-									onClick={() => setActiveSection(section.id)}
+									onClick={() => selectSection(section.id)}
 									className={`w-full text-left p-3 rounded-md transition-colors ${
 										activeSection === section.id
 											? "bg-muted text-foreground"
@@ -464,7 +479,7 @@ export default function Settings() {
 				</Card>
 
 				{/* Settings Content */}
-				<Card className="lg:col-span-3">
+				<Card id={activeSection} className="scroll-mt-20 lg:col-span-3">
 					<CardHeader>
 						<CardTitle>{settingSections.find((s) => s.id === activeSection)?.title}</CardTitle>
 						<CardDescription>
