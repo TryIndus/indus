@@ -54,10 +54,12 @@ const cachedExplanationFixture = JSON.stringify({
 		AAPL_pe_ratio: {
 			value: 33.1,
 			explanation: JSON.stringify({
-				metric_display: "**P/E Ratio: 33.1**",
-				insight:
-					"This multiple shows how much investors pay for current earnings. Read it with growth and margins before forming a directional view.",
-				evaluation: "neutral",
+				1: {
+					metric_display: "**P/E Ratio: 33.1**",
+					insight:
+						"This multiple shows how much investors pay for current earnings. Read it with growth and margins before forming a directional view.",
+					evaluation: "neutral",
+				},
 			}),
 			savedAt: Date.now(),
 		},
@@ -196,10 +198,85 @@ test("@authenticated reports API returns only the current tenant collection", as
 	expect(await response.json()).toEqual({ reports: [] });
 });
 
+test("@authenticated completed reports render fully and open PDF export", async ({ page }) => {
+	const reportContent =
+		"# AAPL Research Report\n## Overview\nApple produces consumer devices.\nRevenue remains durable.\n- Strong margins\n- Large cash balance\n## Risks\nDemand may slow. This final paragraph must remain visible.";
+	await page.route(/\/api\/reports$/, async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				reports: [
+					{
+						id: "4d606955-c4bc-4b20-9ea9-a3715060212a",
+						symbol: "AAPL",
+						company_name: "Apple Inc.",
+						report_content: reportContent,
+						created_at: "2026-09-02T12:00:00.000Z",
+						status: "completed",
+						summary:
+							"A complete report summary that remains readable without fixed-height clipping.",
+					},
+				],
+			}),
+		});
+	});
+	await page.addInitScript(() => {
+		window.print = () => window.localStorage.setItem("indus-print-called", "true");
+	});
+
+	await page.goto("/reports");
+	await expect(page.getByText(/complete report summary/)).toBeVisible();
+	await page.getByRole("button", { name: "View Report" }).click();
+	await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+	await expect(page.getByText(/final paragraph must remain visible/)).toBeVisible();
+	await expect
+		.poll(() =>
+			page
+				.locator("[data-report-document]")
+				.evaluate((report) => report.scrollWidth <= report.clientWidth),
+		)
+		.toBe(true);
+
+	await page.getByRole("button", { name: "Export PDF" }).click();
+	await expect
+		.poll(() => page.evaluate(() => window.localStorage.getItem("indus-print-called")))
+		.toBe("true");
+});
+
 test("@authenticated settings route renders for the current tenant", async ({ page }) => {
 	await page.goto("/settings");
 	await expect(page).toHaveURL(/\/settings$/);
 	await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+});
+
+test("@authenticated stock search keeps its form and tips compact", async ({ page }) => {
+	await page.goto("/search");
+	const form = page
+		.locator("form")
+		.filter({ has: page.getByPlaceholder("Type any stock symbol...") });
+	const tips = page.locator("aside").filter({ hasText: "Search Tips:" });
+	await expect(form).toBeVisible();
+	await expect(tips).toBeVisible();
+	const formBounds = await form.boundingBox();
+	const tipsBounds = await tips.boundingBox();
+	expect(formBounds).not.toBeNull();
+	expect(tipsBounds).not.toBeNull();
+	if (formBounds && tipsBounds) {
+		expect(tipsBounds.y - (formBounds.y + formBounds.height)).toBeLessThanOrEqual(16);
+	}
+});
+
+test("@authenticated account menu opens Profile & Account settings", async ({ page }) => {
+	await page.goto("/settings");
+	await page.getByRole("button", { name: "Notifications", exact: true }).click();
+	await expect(page).toHaveURL(/\/settings#notifications$/);
+	await page.getByRole("button", { name: "Open account menu" }).click();
+	const accountLink = page.getByRole("menuitem", { name: "Account", exact: true });
+	await expect(accountLink).toHaveAttribute("href", "/settings#profile");
+	await accountLink.click();
+	await expect(page).toHaveURL(/\/settings#profile$/);
+	await expect(page.locator("#profile")).toContainText("Profile & Account");
 });
 
 test("@authenticated company research connects chart ranges to the analyst", async ({ page }) => {
@@ -208,9 +285,13 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 	await page.addInitScript((cachedExplanation) => {
 		window.localStorage.setItem("indus_explanations_cache_v3", cachedExplanation);
 	}, cachedExplanationFixture);
-	await page.goto("/company/AAPL");
+	await page.goto("/dashboard");
+	await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+	await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+	await page.getByRole("link", { name: /AAPL Apple/ }).click();
 
 	await expect(page.getByRole("heading", { name: "Apple Inc." })).toBeVisible();
+	await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
 	await expect(page.getByRole("region", { name: "AAPL price chart" })).toBeVisible();
 	await expect(page.getByText("Ask about the company.", { exact: true })).toBeVisible();
 	await expect(
@@ -219,10 +300,25 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 
 	await page.getByRole("button", { name: "1Y" }).click();
 	await expect.poll(() => requestedTimeframes).toContain("1Day");
+	await page.waitForTimeout(400);
+	expect(historyRequests.some((requestUrl) => new URL(requestUrl).searchParams.has("end"))).toBe(
+		false,
+	);
+	const chart = page.getByRole("img", { name: /AAPL 1Y chart/ });
+	const chartBounds = await chart.boundingBox();
+	expect(chartBounds).not.toBeNull();
+	if (chartBounds) {
+		const y = chartBounds.y + chartBounds.height / 2;
+		await page.mouse.move(chartBounds.x + chartBounds.width * 0.3, y);
+		await page.mouse.down();
+		await page.mouse.move(chartBounds.x + chartBounds.width * 0.85, y, { steps: 8 });
+		await page.mouse.up();
+	}
 
 	await page.getByText("33.1", { exact: true }).last().hover();
 	await expect(page.getByText(/Read it with growth and margins/)).toBeVisible();
 	await expect(page.getByText("Neutral", { exact: true })).toBeVisible();
+	await expect(page.getByText(/^\{\s*"1"/)).toHaveCount(0);
 	await expect(page.getByText("Context needed", { exact: true })).toHaveCount(0);
 
 	await page.getByRole("button", { name: /Valuation/ }).click();
@@ -256,7 +352,7 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 test("@authenticated critical product routes have no serious accessibility violations", async ({
 	page,
 }) => {
-	for (const path of ["/dashboard", "/crypto", "/reports", "/settings"]) {
+	for (const path of ["/dashboard", "/crypto", "/reports", "/search", "/settings"]) {
 		await page.goto(path);
 		await expect(page).toHaveTitle(/Indus/);
 		const results = await new AxeBuilder({ page })
