@@ -31,7 +31,7 @@ const guides = [
 		icon: FileText,
 		steps: [
 			"Open Reports, enter a ticker, and select Generate Report.",
-			"Open a completed report and use Export PDF to print or save it.",
+			"Open a completed report and use Export PDF to download it.",
 		],
 	},
 ];

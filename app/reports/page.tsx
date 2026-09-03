@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isCompleteReportContent, parseReportContent } from "@/lib/report-content";
+import { parseReportDocumentContent, type ReportDocument } from "@/lib/report-document";
 import { useAuth } from "@/lib/stores/auth-store";
 
 interface Report {
@@ -116,10 +117,64 @@ const formatText = (text: string) => {
 	});
 };
 
+const StructuredReport = ({ document }: { document: ReportDocument }) => (
+	<div className="space-y-10">
+		<section aria-labelledby="executive-summary">
+			<h2
+				id="executive-summary"
+				className="border-b border-border pb-3 text-xl font-semibold text-foreground"
+			>
+				Executive Summary
+			</h2>
+			<p className="mt-5 leading-7 text-foreground/85">{document.executiveSummary}</p>
+		</section>
+
+		<section aria-labelledby="financial-snapshot">
+			<h2
+				id="financial-snapshot"
+				className="border-b border-border pb-3 text-xl font-semibold text-foreground"
+			>
+				Financial Snapshot
+			</h2>
+			<dl className="mt-5 divide-y divide-border rounded-xl border border-border bg-background/45">
+				{document.financialSnapshot.map((metric) => (
+					<div key={`${metric.label}-${metric.value}`} className="px-4 py-5 sm:px-5">
+						<div className="flex flex-wrap items-baseline justify-between gap-2">
+							<dt className="font-semibold text-foreground">{metric.label}</dt>
+							<dd className="font-mono text-sm font-semibold text-primary">{metric.value}</dd>
+						</div>
+						<dd className="mt-2 text-sm leading-6 text-muted-foreground">{metric.analysis}</dd>
+					</div>
+				))}
+			</dl>
+		</section>
+
+		<section aria-labelledby="data-limitations">
+			<h2
+				id="data-limitations"
+				className="border-b border-border pb-3 text-xl font-semibold text-foreground"
+			>
+				Data Limitations
+			</h2>
+			<ul className="mt-5 list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+				{document.dataLimitations.map((limitation) => (
+					<li key={limitation}>{limitation}</li>
+				))}
+			</ul>
+		</section>
+
+		<p className="border-t border-border pt-5 text-xs text-muted-foreground">
+			This report is educational and is not investment advice.
+		</p>
+	</div>
+);
+
 export default function ReportsPage() {
 	const [newReportSymbol, setNewReportSymbol] = useState("");
 	const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 	const [viewMode, setViewMode] = useState<"list" | "view">("list");
+	const [exportingPdf, setExportingPdf] = useState(false);
+	const [pdfError, setPdfError] = useState<string | null>(null);
 	const { user } = useAuth();
 	const queryClient = useQueryClient();
 	const reportsQueryKey = useMemo(() => ["reports", user?.id ?? "anonymous"], [user?.id]);
@@ -248,6 +303,36 @@ export default function ReportsPage() {
 	const handleBackToList = () => {
 		setViewMode("list");
 		setSelectedReport(null);
+		setPdfError(null);
+	};
+
+	const exportPdf = async (report: Report) => {
+		setExportingPdf(true);
+		setPdfError(null);
+		try {
+			const response = await fetch(`/api/reports/${report.id}/pdf`);
+			if (!response.ok || !response.headers.get("Content-Type")?.startsWith("application/pdf")) {
+				throw new Error("PDF export failed");
+			}
+			const blob = await response.blob();
+			if (blob.size === 0) throw new Error("PDF export was empty");
+
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = `${report.symbol
+				.toUpperCase()
+				.replace(/[^A-Z0-9_-]/g, "-")}-research-report-${format(
+				new Date(report.created_at),
+				"yyyy-MM-dd",
+			)}.pdf`;
+			link.click();
+			setTimeout(() => URL.revokeObjectURL(url), 0);
+		} catch {
+			setPdfError("PDF export failed. Please try again.");
+		} finally {
+			setExportingPdf(false);
+		}
 	};
 
 	if (loading) {
@@ -281,6 +366,7 @@ export default function ReportsPage() {
 		const reportIsIncomplete =
 			selectedReport.status === "completed" &&
 			!isCompleteReportContent(selectedReport.report_content);
+		const structuredDocument = parseReportDocumentContent(selectedReport.report_content);
 
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
@@ -320,15 +406,20 @@ export default function ReportsPage() {
 								<Button
 									variant="outline"
 									size="sm"
-									onClick={() => window.print()}
-									title="Open the print dialog to save this report as a PDF"
+									disabled={exportingPdf}
+									onClick={() => void exportPdf(selectedReport)}
 								>
 									<Download className="h-4 w-4 mr-2" />
-									Export PDF
+									{exportingPdf ? "Exporting..." : "Export PDF"}
 								</Button>
 							)}
 						</div>
 					</div>
+					{pdfError && (
+						<p role="alert" className="mb-4 text-right text-sm text-destructive" data-print-hidden>
+							{pdfError}
+						</p>
+					)}
 
 					{/* Report Card */}
 					<Card
@@ -408,7 +499,11 @@ export default function ReportsPage() {
 								</div>
 							) : (
 								<div className="max-w-none break-words [overflow-wrap:anywhere]">
-									<div className="space-y-1">{formatText(selectedReport.report_content)}</div>
+									{structuredDocument ? (
+										<StructuredReport document={structuredDocument} />
+									) : (
+										<div className="space-y-1">{formatText(selectedReport.report_content)}</div>
+									)}
 								</div>
 							)}
 						</CardContent>

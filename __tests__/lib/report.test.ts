@@ -1,9 +1,12 @@
 import { describe, expect, test } from "vitest";
 import {
+	createFallbackReport,
 	createReportMessages,
 	extractReportSummary,
+	parseGeneratedReport,
 	REPORT_GENERATION_CONFIG,
 } from "@/lib/ai/report";
+import { REPORT_DOCUMENT_JSON_SCHEMA } from "@/lib/report-document";
 
 describe("createReportMessages", () => {
 	test("prohibits unsupported research claims", () => {
@@ -28,15 +31,51 @@ describe("createReportMessages", () => {
 	test("allocates enough output for a complete report with bounded thinking", () => {
 		expect(REPORT_GENERATION_CONFIG).toEqual({
 			maxOutputTokens: 8192,
+			responseMimeType: "application/json",
+			responseJsonSchema: REPORT_DOCUMENT_JSON_SCHEMA,
 			thinkingConfig: { thinkingLevel: "low" },
 		});
+	});
+
+	test("forbids presentation markup in generated fields", () => {
+		const systemInstruction = createReportMessages("AAPL", null)[0].parts[0].text;
+		expect(systemInstruction).toContain("Do not use Markdown, HTML, LaTeX");
+		expect(createReportMessages("AAPL", null)[1].parts[0].text).not.toContain("##");
+	});
+
+	test("builds a complete structured fallback from provider data", () => {
+		const document = createFallbackReport("AAPL", {
+			longName: "Apple Inc.",
+			regularMarketPrice: 200,
+			marketCap: 3_000_000_000_000,
+			debtToEquity: 147,
+		});
+		expect(document.executiveSummary).toContain("Apple Inc. (AAPL)");
+		expect(document.financialSnapshot).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ label: "Market capitalization", value: "$3.00T" }),
+				expect.objectContaining({ label: "Debt-to-equity", value: "147.0%" }),
+			]),
+		);
+	});
+
+	test("builds a valid fallback when market data is unavailable", () => {
+		const document = createFallbackReport("AAPL", null);
+		expect(document.financialSnapshot).toEqual([
+			expect.objectContaining({ label: "Data availability", value: "Unavailable" }),
+		]);
 	});
 });
 
 describe("extractReportSummary", () => {
 	test("extracts and bounds the executive summary", () => {
 		const summary = extractReportSummary(
-			`## Executive Summary\n${"A".repeat(180)}\n## Available Financial Snapshot\nDetails`,
+			{
+				version: 1,
+				executiveSummary: "A".repeat(180),
+				financialSnapshot: [{ label: "Price", value: "$200", analysis: "Current price." }],
+				dataLimitations: ["The snapshot is limited."],
+			},
 			"AAPL",
 		);
 
@@ -44,12 +83,16 @@ describe("extractReportSummary", () => {
 		expect(summary.endsWith("...")).toBe(true);
 	});
 
-	test("keeps short summaries and supplies a fallback for an empty section", () => {
-		expect(extractReportSummary("## Executive Summary\nShort summary", "AAPL")).toBe(
-			"Short summary",
+	test("parses a complete structured report", () => {
+		const document = parseGeneratedReport(
+			JSON.stringify({
+				version: 1,
+				executiveSummary:
+					"A concise summary with enough detail to satisfy the minimum document length for a report.",
+				financialSnapshot: [{ label: "Price", value: "$200", analysis: "Current supplied price." }],
+				dataLimitations: ["The snapshot has no comparison period."],
+			}),
 		);
-		expect(extractReportSummary("## Executive Summary\n## Data Limitations", "AAPL")).toBe(
-			"Financial snapshot for AAPL",
-		);
+		expect(document.financialSnapshot[0].value).toBe("$200");
 	});
 });

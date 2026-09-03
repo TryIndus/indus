@@ -25,6 +25,7 @@ const GENERATION_CONFIG = {
 export interface GeminiGenerationConfig {
 	maxOutputTokens?: number;
 	responseMimeType?: "application/json" | "text/plain";
+	responseJsonSchema?: Record<string, unknown>;
 	thinkingConfig?: { thinkingLevel: "low" | "medium" | "high" };
 }
 

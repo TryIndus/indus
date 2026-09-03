@@ -1,9 +1,12 @@
+import { parseReportDocumentContent } from "@/lib/report-document";
+
 export type ReportBlock =
 	| { kind: "heading"; level: 1 | 2 | 3; text: string }
 	| { kind: "paragraph"; text: string }
 	| { kind: "list"; items: string[] };
 
 export const REPORT_DISCLAIMER = "This report is educational and is not investment advice.";
+export const MAX_REPORT_CONTENT_LENGTH = 100_000;
 
 const REQUIRED_REPORT_HEADINGS = [
 	"Executive Summary",
@@ -12,6 +15,9 @@ const REQUIRED_REPORT_HEADINGS = [
 ] as const;
 
 export function isCompleteReportContent(reportContent: string): boolean {
+	if (reportContent.length > MAX_REPORT_CONTENT_LENGTH) return false;
+	if (parseReportDocumentContent(reportContent)) return true;
+
 	let previousHeadingIndex = -1;
 	for (const heading of REQUIRED_REPORT_HEADINGS) {
 		const headingIndex = reportContent.search(new RegExp(`^##\\s+${heading}\\s*$`, "im"));

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isCompleteReportContent, parseReportContent } from "@/lib/report-content";
+import {
+	isCompleteReportContent,
+	MAX_REPORT_CONTENT_LENGTH,
+	parseReportContent,
+} from "@/lib/report-content";
 
 describe("report content", () => {
 	it("keeps adjacent headings, paragraphs, and lists as complete blocks", () => {
@@ -36,5 +40,10 @@ This report is educational and is not investment advice.`;
 		["missing disclaimer", completeReport.replace(/This report.*$/, "")],
 	])("rejects %s", (_case, content) => {
 		expect(isCompleteReportContent(content)).toBe(false);
+	});
+
+	it("rejects oversized legacy content before PDF rendering", () => {
+		const oversized = completeReport.replace("Summary.", "A".repeat(MAX_REPORT_CONTENT_LENGTH));
+		expect(isCompleteReportContent(oversized)).toBe(false);
 	});
 });

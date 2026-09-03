@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
-import { GeminiClient, getGeminiResponseStatus } from "@/lib/ai/geminiClient";
+import { GeminiApiError, GeminiClient, getGeminiResponseStatus } from "@/lib/ai/geminiClient";
 import {
+	createFallbackReport,
 	createReportMessages,
 	extractReportSummary,
+	parseGeneratedReport,
 	REPORT_GENERATION_CONFIG,
 } from "@/lib/ai/report";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/observability/logger";
 import { finishRequestLog, getRequestHeaders, startRequestLog } from "@/lib/observability/request";
-import { isCompleteReportContent } from "@/lib/report-content";
+import { serializeReportDocument } from "@/lib/report-document";
 import { generateReportSchema } from "@/lib/schemas/api";
 import { type AiAccessClient, checkAiAccess, getAiQuotaHeaders } from "@/lib/security/ai-access";
 import { loadReportStockData } from "@/lib/server/report-stock-data";
@@ -81,15 +83,26 @@ export async function POST(request: Request) {
 
 		reportId = report.id;
 		const geminiClient = new GeminiClient(env.GEMINI_API_KEY);
-		const reportContent = await geminiClient.generateContent(
-			createReportMessages(symbol, stockData),
-			REPORT_GENERATION_CONFIG,
-			{ signal: request.signal, requestId: requestLog.requestId },
-		);
-		if (!isCompleteReportContent(reportContent)) {
-			throw new Error("Gemini returned an incomplete report");
+		let reportDocument: ReturnType<typeof createFallbackReport>;
+		try {
+			const generatedContent = await geminiClient.generateContent(
+				createReportMessages(symbol, stockData),
+				REPORT_GENERATION_CONFIG,
+				{ signal: request.signal, requestId: requestLog.requestId },
+			);
+			reportDocument = parseGeneratedReport(generatedContent);
+		} catch (error) {
+			if (request.signal.aborted) throw error;
+			logger.warn("report.provider_fallback", {
+				reportId,
+				requestId: requestLog.requestId,
+				errorName: error instanceof Error ? error.name : "UnknownError",
+				providerStatus: error instanceof GeminiApiError ? error.status : undefined,
+			});
+			reportDocument = createFallbackReport(symbol, stockData);
 		}
-		const summary = extractReportSummary(reportContent, symbol);
+		const reportContent = serializeReportDocument(reportDocument);
+		const summary = extractReportSummary(reportDocument, symbol);
 
 		const { data: completedReport, error: updateError } = await supabase
 			.from("reports")
