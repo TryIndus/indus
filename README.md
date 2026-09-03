@@ -91,6 +91,7 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 | Document | Purpose |
 |---|---|
 | [Quality and Security Verification](./docs/QUALITY.md) | Security boundaries, local verification layers, budgets, and troubleshooting |
+| [Runtime Reliability](./docs/RELIABILITY.md) | Provider deadlines, retries, caching, fallbacks, rate limits, health checks, and diagnostics |
 | [Revamp Plan](./docs/REVAMP_PLAN.md) | In-progress application modernization plan retained during the revamp |
 
 ## Features
@@ -104,7 +105,7 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 
 ### AI-Powered Intelligence
 
-- **Context-Aware Explanations** - Hover over any metric to get intelligent explanations powered by Google's Gemini AI
+- **Metric Explanations** - Review definitions and value-specific context for financial metrics
 - **Interactive Chat** - Click on any metric to open an AI chat panel for deeper analysis
 - **Educational Content** - Built-in definitions and explanations for all financial terms
 - **Streaming Responses** - Real-time AI responses with proper context understanding
@@ -131,7 +132,7 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 | Styling | Tailwind CSS v4 + shadcn/ui (Radix) + Lucide icons + next-themes |
 | Auth & DB | Supabase (PostgreSQL + Auth with Google OAuth) |
 | State | Zustand + TanStack Query |
-| AI | Google Gemini 2.5 Flash via the REST API |
+| AI | Google Gemini 3.8 Flash via the REST API |
 | Real-time | SSE via Next.js Route Handlers (streams Alpaca WebSocket bars to clients) |
 | Charts | TradingView Lightweight Charts v5 |
 | Financial Data | Alpaca Trade API + Yahoo Finance 2 |

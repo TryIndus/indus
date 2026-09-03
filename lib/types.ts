@@ -133,10 +133,11 @@ export interface ChartPoint {
 }
 
 export interface PageChartData {
+	range?: string;
 	interval?: string;
 	points?: ChartPoint[];
 	latestPrice?: number;
-	dayChangePct?: number;
+	rangeChangePct?: number;
 }
 
 export interface MetricGroups {
@@ -187,12 +188,12 @@ export interface PageContext {
 	asOf: string;
 	metricGroups: MetricGroups;
 	chart?: {
+		range: string;
 		interval: string;
 		points: ChartPoint[];
 		latestPrice: number;
-		dayChangePct: number;
+		rangeChangePct: number;
 	};
-	cachedExplanations: Record<string, string>;
 	trigger: {
 		metricKey: string;
 		metricLabel: string;
@@ -221,4 +222,9 @@ export interface ContextChatState {
 	};
 }
 
-export type ValueAnalysis = StructuredExplanation;
+export interface ValueAnalysis {
+	metric_display: string;
+	insight: string;
+	evaluation: "green" | "red" | "neutral" | "amber";
+	source?: "model" | "fallback";
+}
