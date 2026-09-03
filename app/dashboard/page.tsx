@@ -1,12 +1,4 @@
-import {
-	ArrowRight,
-	ArrowUpRight,
-	Binoculars,
-	BookOpenText,
-	Cpu,
-	Search,
-	Sparkles,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight, Search, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { FavoritesSection } from "@/components/FavoritesSection";
 import { Button } from "@/components/ui/button";
@@ -23,24 +15,6 @@ const RESEARCH_STARTERS = [
 	{ symbol: "AMZN", name: "Amazon", lens: "Operating leverage", group: "Commerce" },
 	{ symbol: "GOOGL", name: "Alphabet", lens: "Cash generation & AI spend", group: "Platforms" },
 	{ symbol: "TSLA", name: "Tesla", lens: "Margins & volatility", group: "Mobility" },
-];
-
-const THEMES = [
-	{
-		title: "Durable compounders",
-		description: "Businesses where margins, returns, and reinvestment deserve to be read together.",
-		symbols: ["MSFT", "V", "COST"],
-	},
-	{
-		title: "AI infrastructure",
-		description: "A starting set for comparing scale, valuation, and growth expectations.",
-		symbols: ["NVDA", "AMD", "AVGO"],
-	},
-	{
-		title: "Platform economics",
-		description: "Study network effects through margins, growth, and capital intensity.",
-		symbols: ["META", "GOOGL", "SHOP"],
-	},
 ];
 
 export default function Dashboard() {
@@ -75,58 +49,6 @@ export default function Dashboard() {
 							</Link>
 						</Button>
 					</div>
-				</div>
-			</section>
-
-			<section aria-labelledby="workflow-heading">
-				<div className="mb-4 flex items-center justify-between gap-4">
-					<div>
-						<div className="flex items-center gap-2 text-primary">
-							<Binoculars className="size-4" />
-							<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]">
-								How it works
-							</p>
-						</div>
-						<h2 id="workflow-heading" className="mt-1 text-xl font-semibold tracking-[-0.025em]">
-							Review a company from price to fundamentals
-						</h2>
-					</div>
-				</div>
-				<div className="grid gap-3 md:grid-cols-3">
-					{[
-						{
-							step: "01",
-							icon: Search,
-							title: "Discover",
-							copy: "Search a listed company and open its chart, profile, and financial metrics.",
-						},
-						{
-							step: "02",
-							icon: BookOpenText,
-							title: "Review",
-							copy: "Compare valuation, profitability, growth, and balance-sheet metrics.",
-						},
-						{
-							step: "03",
-							icon: Cpu,
-							title: "Ask",
-							copy: "Ask the analyst about a metric using the company data already in view.",
-						},
-					].map((item) => (
-						<div
-							key={item.step}
-							className="surface-hairline rounded-2xl border border-border/70 bg-card p-5"
-						>
-							<div className="flex items-center justify-between">
-								<span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-									<item.icon className="size-4" />
-								</span>
-								<span className="font-mono text-[10px] text-muted-foreground">{item.step}</span>
-							</div>
-							<h3 className="mt-6 font-semibold">{item.title}</h3>
-							<p className="mt-2 text-sm leading-6 text-muted-foreground">{item.copy}</p>
-						</div>
-					))}
 				</div>
 			</section>
 
@@ -174,38 +96,6 @@ export default function Dashboard() {
 								<ArrowUpRight className="size-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
 							</div>
 						</Link>
-					))}
-				</div>
-			</section>
-
-			<section aria-labelledby="themes-heading">
-				<div className="mb-4">
-					<p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-						Compare a theme
-					</p>
-					<h2 id="themes-heading" className="mt-1 text-xl font-semibold tracking-[-0.025em]">
-						Build context across companies
-					</h2>
-				</div>
-				<div className="grid gap-3 lg:grid-cols-3">
-					{THEMES.map((theme) => (
-						<div key={theme.title} className="rounded-2xl border border-border/70 bg-card p-5">
-							<h3 className="font-semibold">{theme.title}</h3>
-							<p className="mt-2 min-h-12 text-sm leading-6 text-muted-foreground">
-								{theme.description}
-							</p>
-							<div className="mt-6 flex flex-wrap gap-2">
-								{theme.symbols.map((symbol) => (
-									<Link
-										key={symbol}
-										href={`/company/${symbol}`}
-										className="rounded-full border border-border bg-background px-3 py-1.5 font-mono text-xs font-semibold transition-colors hover:border-primary/40 hover:text-primary"
-									>
-										{symbol}
-									</Link>
-								))}
-							</div>
-						</div>
 					))}
 				</div>
 			</section>

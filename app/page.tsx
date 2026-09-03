@@ -20,19 +20,19 @@ const researchSteps = [
 		number: "01",
 		icon: Search,
 		title: "Search a company",
-		description: "Open live and historical price data from a company search.",
+		description: "Open live and historical prices.",
 	},
 	{
 		number: "02",
 		icon: Layers3,
 		title: "Review the fundamentals",
-		description: "See valuation, margins, growth, and balance-sheet data in the same view.",
+		description: "Compare valuation, margins, growth, and debt.",
 	},
 	{
 		number: "03",
 		icon: BrainCircuit,
 		title: "Ask about the data",
-		description: "Ask focused questions using the company financials and chart data on the page.",
+		description: "Ask questions about the data shown.",
 	},
 ];
 
@@ -250,10 +250,6 @@ export default function LandingPage() {
 								<h2 className="font-display mt-4 max-w-lg text-balance text-4xl font-medium leading-[1.02] tracking-[-0.035em] md:text-6xl">
 									Research a company without switching tools.
 								</h2>
-								<p className="mt-5 max-w-md text-sm leading-6 text-muted-foreground">
-									Indus keeps market data, company fundamentals, and AI analysis together so you can
-									compare them directly.
-								</p>
 							</div>
 
 							<div className="divide-y divide-border/70 border-y border-border/70">
@@ -294,9 +290,6 @@ export default function LandingPage() {
 								Know what the product is showing.
 							</h2>
 						</div>
-						<p className="max-w-md text-sm leading-6 text-muted-foreground">
-							Market status, source data, and model context remain visible while you research.
-						</p>
 					</div>
 
 					<div className="grid gap-4 md:grid-cols-3">
@@ -304,17 +297,17 @@ export default function LandingPage() {
 							{
 								icon: DatabaseZap,
 								title: "Clear market status",
-								copy: "Live, reconnecting, and historical states are explicit instead of hidden behind a spinner.",
+								copy: "See whether chart data is live, reconnecting, or historical.",
 							},
 							{
 								icon: CircleGauge,
 								title: "Financial data in one view",
-								copy: "Financial metrics stay scannable, with definitions and analysis available from each value.",
+								copy: "Open definitions and analysis from each metric.",
 							},
 							{
 								icon: LockKeyhole,
 								title: "Answers tied to current data",
-								copy: "The analyst receives the company fundamentals and chart data supplied by the current page.",
+								copy: "The analyst uses the fundamentals and chart data on the page.",
 							},
 						].map((principle) => (
 							<div

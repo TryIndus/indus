@@ -340,10 +340,7 @@ const CryptoPage: React.FC = () => {
 					<Card>
 						<CardHeader>
 							<CardTitle>Crypto Metrics</CardTitle>
-							<CardDescription>
-								Comprehensive cryptocurrency analysis with AI-powered explanations. Hover over any
-								metric for detailed insights.
-							</CardDescription>
+							<CardDescription>Hover over a metric for an explanation.</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<CryptoFinancialTable data={cryptoData} />

@@ -367,8 +367,7 @@ export default function CompanyPage() {
 								</span>
 							</div>
 							<p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-								Ask about valuation, profitability, growth, or balance-sheet risk using the
-								fundamentals and chart data shown on this page.
+								Ask about valuation, profitability, growth, or debt.
 							</p>
 							<div className="mt-6 grid gap-2 sm:grid-cols-2">
 								{researchLenses.map((lens) => (
@@ -457,8 +456,7 @@ export default function CompanyPage() {
 								</h2>
 							</div>
 							<p className="max-w-lg text-xs leading-5 text-muted-foreground">
-								Select a label for its definition. Select a value for a data-based interpretation
-								and a direct path into the analyst.
+								Select a label for its definition or a value for analysis.
 							</p>
 						</div>
 						<FinancialTable data={financialData} onChatTrigger={contextChat.openWithMetric} />

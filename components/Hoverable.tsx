@@ -77,10 +77,8 @@ const Hoverable: React.FC<HoverableProps> = ({
 						<BrainCircuit className="size-4 animate-pulse" />
 					</span>
 					<div>
-						<p className="text-sm font-medium">Reading this metric</p>
-						<p className="text-xs text-muted-foreground">
-							Grounding the answer in {symbol}’s value.
-						</p>
+						<p className="text-sm font-medium">Fetching explanation</p>
+						<p className="text-xs text-muted-foreground">Using {symbol}’s current value.</p>
 					</div>
 				</div>
 			);
@@ -109,11 +107,7 @@ const Hoverable: React.FC<HoverableProps> = ({
 		}
 
 		if (!explanation) {
-			return (
-				<div className="text-sm text-muted-foreground">
-					Preparing a data-based interpretation of this value.
-				</div>
-			);
+			return <div className="text-sm text-muted-foreground">No explanation loaded.</div>;
 		}
 
 		const valueAnalysis = parseValueAnalysis(explanation);

@@ -17,8 +17,7 @@ interface MessageListProps {
 const SEED_MESSAGE: ChatMessage = {
 	id: "seed",
 	role: "assistant",
-	content:
-		"I’m attached to the company data in this research view. Ask me to connect valuation, profitability, growth, balance-sheet strength, or the visible chart.",
+	content: "Ask about the company’s valuation, profitability, growth, debt, or price history.",
 	createdAt: 0,
 };
 

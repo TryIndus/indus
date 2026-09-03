@@ -111,14 +111,7 @@ export default function SearchPage() {
 
 	return (
 		<div className="flex-1 space-y-6 p-6 overflow-x-hidden max-w-full">
-			{/* Header */}
-			<div className="space-y-2">
-				<h1 className="text-3xl font-bold tracking-tight">Discover</h1>
-				<p className="text-muted-foreground">
-					Search for any publicly traded stock on Yahoo Finance. Enter a ticker symbol to get
-					comprehensive financial analysis.
-				</p>
-			</div>
+			<h1 className="text-3xl font-bold tracking-tight">Discover</h1>
 
 			{/* Main Search Card */}
 			<Card className="gap-4 py-4">
@@ -147,39 +140,19 @@ export default function SearchPage() {
 						</Button>
 					</form>
 
-					{/* Error Display */}
 					{error && (
 						<Card className="border-destructive bg-destructive/10">
 							<CardContent className="pt-6">
 								<div className="flex items-start gap-3">
 									<AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-									<div className="space-y-2">
+									<div>
 										<p className="font-medium text-destructive">Search Error</p>
 										<p className="text-sm text-destructive/80">{error}</p>
-										<div className="space-y-1">
-											<p className="text-sm font-medium text-destructive">Tips:</p>
-											<ul className="text-sm text-destructive/80 space-y-1 ml-4">
-												<li>• Make sure you&apos;re using the correct ticker symbol</li>
-												<li>• Try searching for major exchanges (NYSE, NASDAQ)</li>
-												<li>• Some international stocks may not be available</li>
-											</ul>
-										</div>
 									</div>
 								</div>
 							</CardContent>
 						</Card>
 					)}
-
-					{/* Search Tips */}
-					<aside className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-						<h4 className="mb-1.5 text-sm font-medium text-primary">Search Tips:</h4>
-						<ul className="space-y-0.5 text-sm text-muted-foreground">
-							<li>• Enter ticker symbols like AAPL, GOOGL, TSLA</li>
-							<li>• Works with most NYSE and NASDAQ stocks</li>
-							<li>• International stocks may be available with proper suffixes</li>
-							<li>• ETFs and mutual funds are also supported</li>
-						</ul>
-					</aside>
 				</CardContent>
 			</Card>
 
@@ -218,31 +191,6 @@ export default function SearchPage() {
 					))}
 				</div>
 			</div>
-
-			{/* Example Searches */}
-			<Card>
-				<CardHeader>
-					<CardTitle>Popular Examples</CardTitle>
-					<CardDescription>Quick access to commonly searched stocks</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<div className="flex flex-wrap gap-2">
-						{["AAPL", "TSLA", "GOOGL", "AMZN", "MSFT", "NVDA", "META", "NFLX", "UBER", "SPOT"].map(
-							(symbol) => (
-								<Button
-									key={symbol}
-									variant="secondary"
-									size="sm"
-									onClick={() => handleQuickSearch(symbol)}
-									className="font-mono"
-								>
-									{symbol}
-								</Button>
-							),
-						)}
-					</div>
-				</CardContent>
-			</Card>
 		</div>
 	);
 }

@@ -86,7 +86,7 @@ export function ChatPanel({
 				className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92dvh] min-h-[68dvh] flex-col overflow-hidden rounded-t-[1.6rem] border border-border/80 bg-card shadow-[0_-28px_90px_-35px_rgba(0,0,0,0.85)] md:inset-x-auto md:bottom-4 md:right-4 md:h-[min(780px,calc(100dvh-2rem))] md:min-h-0 md:w-[480px] md:rounded-[1.6rem]"
 				role="dialog"
 				aria-labelledby="chat-title"
-				aria-describedby="chat-grounding"
+				aria-describedby="chat-source-note"
 				aria-modal="true"
 			>
 				<div className="border-b border-border/70 bg-primary/[0.045] px-4 pb-4 pt-4 sm:px-5">
@@ -111,7 +111,7 @@ export function ChatPanel({
 						</Button>
 					</div>
 					<div
-						id="chat-grounding"
+						id="chat-source-note"
 						className="mt-3 flex items-center gap-2 text-[10px] leading-4 text-muted-foreground"
 					>
 						<ShieldCheck className="size-3.5 shrink-0 text-primary" />

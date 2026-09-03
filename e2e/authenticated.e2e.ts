@@ -200,7 +200,7 @@ test("@authenticated reports API returns only the current tenant collection", as
 
 test("@authenticated completed reports render fully and open PDF export", async ({ page }) => {
 	const reportContent =
-		"# AAPL Research Report\n## Overview\nApple produces consumer devices.\nRevenue remains durable.\n- Strong margins\n- Large cash balance\n## Risks\nDemand may slow. This final paragraph must remain visible.";
+		"## Executive Summary\nApple produces consumer devices.\n## Available Financial Snapshot\nRevenue remains durable.\n- Strong margins\n- Large cash balance\n## Data Limitations\nDemand may slow. This final paragraph must remain visible.\nThis report is educational and is not investment advice.";
 	await page.route(/\/api\/reports$/, async (route) => {
 		await route.fulfill({
 			status: 200,
@@ -228,7 +228,7 @@ test("@authenticated completed reports render fully and open PDF export", async 
 	await page.goto("/reports");
 	await expect(page.getByText(/complete report summary/)).toBeVisible();
 	await page.getByRole("button", { name: "View Report" }).click();
-	await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+	await expect(page.getByRole("heading", { name: "Executive Summary" })).toBeVisible();
 	await expect(page.getByText(/final paragraph must remain visible/)).toBeVisible();
 	await expect
 		.poll(() =>
@@ -244,39 +244,68 @@ test("@authenticated completed reports render fully and open PDF export", async 
 		.toBe("true");
 });
 
+test("@authenticated incomplete legacy reports are not presented as complete", async ({ page }) => {
+	await page.route(/\/api\/reports$/, async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				reports: [
+					{
+						id: "4d606955-c4bc-4b20-9ea9-a3715060212b",
+						symbol: "AAPL",
+						company_name: "Apple Inc.",
+						report_content: "## Executive Summary\nApple has a market capitalization of 4,",
+						created_at: "2026-09-03T08:59:16.000Z",
+						status: "completed",
+						summary: "An incomplete provider response",
+					},
+				],
+			}),
+		});
+	});
+
+	await page.goto("/reports");
+	await page.getByRole("button", { name: "View Report" }).click();
+	await expect(
+		page.getByRole("heading", { name: "Report Generation Was Incomplete" }),
+	).toBeVisible();
+	await expect(page.getByRole("button", { name: "Export PDF" })).toHaveCount(0);
+});
+
 test("@authenticated settings route renders for the current tenant", async ({ page }) => {
 	await page.goto("/settings");
 	await expect(page).toHaveURL(/\/settings$/);
 	await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
 });
 
-test("@authenticated stock search keeps its form and tips compact", async ({ page }) => {
+test("@authenticated stock search stays focused on search and results", async ({ page }) => {
 	await page.goto("/search");
 	const form = page
 		.locator("form")
 		.filter({ has: page.getByPlaceholder("Type any stock symbol...") });
-	const tips = page.locator("aside").filter({ hasText: "Search Tips:" });
 	await expect(form).toBeVisible();
-	await expect(tips).toBeVisible();
-	const formBounds = await form.boundingBox();
-	const tipsBounds = await tips.boundingBox();
-	expect(formBounds).not.toBeNull();
-	expect(tipsBounds).not.toBeNull();
-	if (formBounds && tipsBounds) {
-		expect(tipsBounds.y - (formBounds.y + formBounds.height)).toBeLessThanOrEqual(16);
-	}
+	await expect(page.getByText("Search Tips:")).toHaveCount(0);
+	await expect(page.getByRole("heading", { name: "Browse by Category" })).toBeVisible();
 });
 
 test("@authenticated account menu opens Profile & Account settings", async ({ page }) => {
 	await page.goto("/settings");
-	await page.getByRole("button", { name: /^Notifications/ }).click();
-	await expect(page).toHaveURL(/\/settings#notifications$/);
+	await page.getByRole("button", { name: "Appearance" }).click();
+	await expect(page).toHaveURL(/\/settings#appearance$/);
 	await page.getByRole("button", { name: "Open account menu" }).click();
 	const accountLink = page.getByRole("menuitem", { name: "Account", exact: true });
 	await expect(accountLink).toHaveAttribute("href", "/settings#profile");
 	await accountLink.click();
 	await expect(page).toHaveURL(/\/settings#profile$/);
 	await expect(page.locator("#profile")).toContainText("Profile & Account");
+});
+
+test("@authenticated account settings provide a working log out button", async ({ page }) => {
+	await page.goto("/settings#profile");
+	await page.getByRole("button", { name: "Log out" }).click();
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 });
 
 test("@authenticated company research connects chart ranges to the analyst", async ({ page }) => {
