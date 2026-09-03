@@ -17,7 +17,7 @@ export function makeBatchPrompt(items: Item[]): string {
 	return prompt;
 }
 
-function getMetricLabel(symbol: string, metric: string, value: number): string {
+export function getMetricLabel(symbol: string, metric: string, value: number): string {
 	const formatCurrency = (val: number) => {
 		const absolute = Math.abs(val);
 		const prefix = val < 0 ? "-$" : "$";

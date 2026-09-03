@@ -1,15 +1,22 @@
-import { normalizeMetricExplanation } from "@/lib/metric-explanations";
+import { normalizeMetricExplanation, parseValueAnalysis } from "@/lib/metric-explanations";
 import type { Item } from "@/lib/prompts";
 
 // localStorage key for persistent cache
-const STORAGE_KEY = "indus_explanations_cache_v3";
+const STORAGE_KEY = "indus_explanations_cache_v4";
 const CACHE_TTL_MS = 15 * 60 * 1000;
+const FALLBACK_CACHE_TTL_MS = 60 * 1000;
 const MAX_BATCH_SIZE = 25;
 
 interface ExplanationCacheEntry {
 	value: number;
 	explanation: string;
 	savedAt: number;
+}
+
+function cacheTtl(explanation: string): number {
+	return parseValueAnalysis(explanation)?.source === "fallback"
+		? FALLBACK_CACHE_TTL_MS
+		: CACHE_TTL_MS;
 }
 
 // Load cache from localStorage on initialization
@@ -37,13 +44,14 @@ function loadCacheFromStorage(): Map<string, ExplanationCacheEntry> {
 							!Number.isFinite(value.value) ||
 							!("explanation" in value) ||
 							!("savedAt" in value) ||
-							typeof value.savedAt !== "number" ||
-							Date.now() - value.savedAt >= CACHE_TTL_MS
+							typeof value.savedAt !== "number"
 						) {
 							return [];
 						}
 						const explanation = normalizeMetricExplanation(value.explanation);
-						return explanation
+						return explanation &&
+							Date.now() - value.savedAt >= 0 &&
+							Date.now() - value.savedAt < cacheTtl(explanation)
 							? [[entry[0], { value: value.value, explanation, savedAt: value.savedAt }]]
 							: [];
 					}),
@@ -93,7 +101,7 @@ export function getCachedExplanation(symbol: string, metric: string, value: numb
 		!entry ||
 		entry.value !== value ||
 		Date.now() - entry.savedAt < 0 ||
-		Date.now() - entry.savedAt >= CACHE_TTL_MS
+		Date.now() - entry.savedAt >= cacheTtl(entry.explanation)
 	) {
 		if (entry) {
 			explanationCache.delete(key);

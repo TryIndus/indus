@@ -49,27 +49,11 @@ const companyFixture = {
 	beta: 1.18,
 };
 
-const cachedExplanationFixture = JSON.stringify({
-	entries: {
-		AAPL_pe_ratio: {
-			value: 33.1,
-			explanation: JSON.stringify({
-				1: {
-					metric_display: "**P/E Ratio: 33.1**",
-					insight:
-						"This multiple shows how much investors pay for current earnings. Read it with growth and margins before forming a directional view.",
-					evaluation: "neutral",
-				},
-			}),
-			savedAt: Date.now(),
-		},
-	},
-});
-
 async function mockCompanyResearch(page: Page) {
 	const requestedTimeframes: string[] = [];
 	const historyRequests: string[] = [];
 	const analystQuestions: string[] = [];
+	const explanationRequests: Array<Array<{ symbol: string; metric: string; value: number }>> = [];
 	await page.route("**/api/stock-data?**", async (route) => {
 		await route.fulfill({
 			status: 200,
@@ -118,6 +102,7 @@ async function mockCompanyResearch(page: Page) {
 			metric: string;
 			value: number;
 		}>;
+		explanationRequests.push(items);
 		await route.fulfill({
 			status: 200,
 			contentType: "application/json",
@@ -129,6 +114,7 @@ async function mockCompanyResearch(page: Page) {
 							metric_display: `**${item.metric}: ${item.value}**`,
 							insight: `AI review for ${item.metric}.`,
 							evaluation: "neutral",
+							source: "model",
 						}),
 					]),
 				),
@@ -151,7 +137,7 @@ async function mockCompanyResearch(page: Page) {
 			body: "event: stream-error\ndata: {}\n\n",
 		});
 	});
-	return { analystQuestions, historyRequests, requestedTimeframes };
+	return { analystQuestions, explanationRequests, historyRequests, requestedTimeframes };
 }
 
 test.beforeEach(async ({ page }) => {
@@ -198,9 +184,20 @@ test("@authenticated reports API returns only the current tenant collection", as
 	expect(await response.json()).toEqual({ reports: [] });
 });
 
-test("@authenticated completed reports render fully and open PDF export", async ({ page }) => {
-	const reportContent =
-		"## Executive Summary\nApple produces consumer devices.\n## Available Financial Snapshot\nRevenue remains durable.\n- Strong margins\n- Large cash balance\n## Data Limitations\nDemand may slow. This final paragraph must remain visible.\nThis report is educational and is not investment advice.";
+test("@authenticated structured reports render fully and download PDF export", async ({ page }) => {
+	const reportContent = JSON.stringify({
+		version: 1,
+		executiveSummary:
+			"Apple produces consumer devices. The supplied snapshot provides current market and financial figures without a peer comparison.",
+		financialSnapshot: [
+			{
+				label: "Market capitalization",
+				value: "$4.75T",
+				analysis: "This final metric explanation must remain visible.",
+			},
+		],
+		dataLimitations: ["No historical comparison was supplied."],
+	});
 	await page.route(/\/api\/reports$/, async (route) => {
 		await route.fulfill({
 			status: 200,
@@ -221,15 +218,24 @@ test("@authenticated completed reports render fully and open PDF export", async 
 			}),
 		});
 	});
-	await page.addInitScript(() => {
-		window.print = () => window.localStorage.setItem("indus-print-called", "true");
+	const pdfRoute = /\/api\/reports\/[^/]+\/pdf$/;
+	await page.route(pdfRoute, async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/pdf; charset=binary",
+			headers: {
+				"Content-Disposition": 'attachment; filename="AAPL-research-report-2026-09-02.pdf"',
+			},
+			body: "%PDF-1.4 test",
+		});
 	});
 
 	await page.goto("/reports");
 	await expect(page.getByText(/complete report summary/)).toBeVisible();
 	await page.getByRole("button", { name: "View Report" }).click();
 	await expect(page.getByRole("heading", { name: "Executive Summary" })).toBeVisible();
-	await expect(page.getByText(/final paragraph must remain visible/)).toBeVisible();
+	await expect(page.getByText("$4.75T")).toBeVisible();
+	await expect(page.getByText(/final metric explanation must remain visible/)).toBeVisible();
 	await expect
 		.poll(() =>
 			page
@@ -238,10 +244,23 @@ test("@authenticated completed reports render fully and open PDF export", async 
 		)
 		.toBe(true);
 
+	const downloadPromise = page.waitForEvent("download");
 	await page.getByRole("button", { name: "Export PDF" }).click();
-	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("indus-print-called")))
-		.toBe("true");
+	const download = await downloadPromise;
+	expect(download.suggestedFilename()).toBe("AAPL-research-report-2026-09-02.pdf");
+
+	await page.unroute(pdfRoute);
+	await page.route(pdfRoute, async (route) => {
+		await route.fulfill({
+			status: 500,
+			contentType: "application/json",
+			body: JSON.stringify({ error: "Unable to export report" }),
+		});
+	});
+	await page.getByRole("button", { name: "Export PDF" }).click();
+	await expect(
+		page.getByText("PDF export failed. Please try again.", { exact: true }),
+	).toBeVisible();
 });
 
 test("@authenticated incomplete legacy reports are not presented as complete", async ({ page }) => {
@@ -309,11 +328,8 @@ test("@authenticated account settings provide a working log out button", async (
 });
 
 test("@authenticated company research connects chart ranges to the analyst", async ({ page }) => {
-	const { analystQuestions, historyRequests, requestedTimeframes } =
+	const { analystQuestions, explanationRequests, historyRequests, requestedTimeframes } =
 		await mockCompanyResearch(page);
-	await page.addInitScript((cachedExplanation) => {
-		window.localStorage.setItem("indus_explanations_cache_v3", cachedExplanation);
-	}, cachedExplanationFixture);
 	await page.goto("/dashboard");
 	await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
 	await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
@@ -326,6 +342,7 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 	await expect(
 		page.getByText("Cupertino, California, United States", { exact: true }),
 	).toBeVisible();
+	expect(explanationRequests).toHaveLength(0);
 
 	await page.getByRole("button", { name: "1Y" }).click();
 	await expect.poll(() => requestedTimeframes).toContain("1Day");
@@ -348,7 +365,8 @@ test("@authenticated company research connects chart ranges to the analyst", asy
 	}
 
 	await page.getByText("33.1", { exact: true }).last().hover();
-	await expect(page.getByText(/Read it with growth and margins/)).toBeVisible();
+	await expect(page.getByText("AI review for pe_ratio.", { exact: true })).toBeVisible();
+	expect(explanationRequests).toEqual([[{ symbol: "AAPL", metric: "pe_ratio", value: 33.1 }]]);
 	await expect(page.getByText("Neutral", { exact: true })).toBeVisible();
 	await expect(page.getByText(/^\{\s*"1"/)).toHaveCount(0);
 	await expect(page.getByText("Context needed", { exact: true })).toHaveCount(0);

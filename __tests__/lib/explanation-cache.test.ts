@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const STORAGE_KEY = "indus_explanations_cache_v3";
+const STORAGE_KEY = "indus_explanations_cache_v4";
 
 function createStorage(initial: Record<string, string> = {}) {
 	const values = new Map(Object.entries(initial));
@@ -46,6 +46,39 @@ describe("explanation cache", () => {
 		expect(getCachedExplanation("AAPL", "pe_ratio", 33.1)).toBe("fresh");
 		expect(getCachedExplanation("AAPL", "pe_ratio", 34)).toBeUndefined();
 		expect(getCachedExplanation("MSFT", "pe_ratio", 40)).toBeUndefined();
+	});
+
+	it("expires provider fallbacks quickly while retaining model explanations", async () => {
+		const now = 10_000_000;
+		vi.spyOn(Date, "now").mockReturnValue(now);
+		const structured = {
+			metric_display: "AAPL P/E: 33.1",
+			insight: "Compare this value with peers and history.",
+			evaluation: "neutral",
+		};
+		const storage = createStorage({
+			[STORAGE_KEY]: JSON.stringify({
+				entries: {
+					AAPL_pe_ratio: {
+						value: 33.1,
+						explanation: JSON.stringify({ ...structured, source: "fallback" }),
+						savedAt: now - 61_000,
+					},
+					MSFT_pe_ratio: {
+						value: 40,
+						explanation: JSON.stringify({ ...structured, source: "model" }),
+						savedAt: now - 61_000,
+					},
+				},
+			}),
+		});
+		vi.stubGlobal("window", {});
+		vi.stubGlobal("localStorage", storage);
+
+		const { getCachedExplanation } = await import("@/hooks/useExplanation");
+
+		expect(getCachedExplanation("AAPL", "pe_ratio", 33.1)).toBeUndefined();
+		expect(getCachedExplanation("MSFT", "pe_ratio", 40)).toContain('"source":"model"');
 	});
 
 	it("repairs previously cached numbered JSON wrappers", async () => {

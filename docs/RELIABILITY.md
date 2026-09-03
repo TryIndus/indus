@@ -6,7 +6,9 @@ Indus bounds upstream work, degrades to useful cached or secondary data where po
 
 | Boundary | Deadline and retry | Cache | Fallback |
 |---|---|---|---|
-| Gemini 3.8 Flash generation and stream setup | 10-second attempt deadline; one retry for timeouts, network failures, and provider 5xx responses. Provider `429` responses are returned without retry amplification | None for user-specific model output | Context chat makes one non-streaming fallback attempt only when stream setup fails through a timeout, transport, or protocol error before emitting text |
+| Gemini 3.8 Flash chat and stream setup | 10-second attempt deadline; one retry for timeouts, network failures, and provider 5xx responses. Provider `429` responses are returned without retry amplification | None for user-specific model output | Context chat makes one non-streaming fallback attempt only when stream setup fails through a timeout, transport, or protocol error before emitting text |
+| Metric explanations | One on-demand Gemini attempt with a 6-second deadline | Client cache keyed by symbol, metric, and value: 15 minutes for model output and 1 minute for built-in fallback content | The server returns a non-directional explanation from the supplied value and checked-in metric definition when the provider fails or returns malformed content |
+| Research reports | 10-second attempt deadline; one retry for timeouts, network failures, and provider 5xx responses | None | The server builds the same validated report document from the trusted market snapshot when model generation is unavailable |
 | Historical market data | 6-second application deadline; one retry per provider. Alpaca's SDK request is capped at 5.5 seconds with SDK retries disabled so attempts cannot overlap | 30 seconds fresh plus 15 minutes stale-on-error; concurrent loads are deduplicated | Yahoo chart history is used when Alpaca fails or returns fewer than `min(2, requested limit)` bars; the better partial result is retained |
 | Company fundamentals | 6-second attempt deadline; one retry for both quote and summary surfaces | 60 seconds fresh plus 15 minutes stale-on-error; concurrent loads are deduplicated | A quote-only or summary-only response is returned when the other Yahoo surface fails |
 | Report evidence | 6-second attempt deadline; one retry for quote and summary surfaces | 60 seconds fresh plus 15 minutes stale-on-error | Reports continue with whichever bounded Yahoo snapshot remains available |
@@ -16,7 +18,9 @@ Market-data responses are marked `private, no-store` so request IDs, rate-limit 
 
 Incoming request cancellation propagates through retry and cache boundaries. Fetch-based provider calls are aborted when their final consumer disconnects; a deduplicated load remains active while another request still needs it. Alpaca SDK history calls retain the SDK's 5.5-second deadline because that helper does not expose caller cancellation, but disconnects stop local retries and Yahoo fallback work.
 
-Gemini requests use low thinking effort and omit deprecated sampling parameters. General responses allow 4,096 output tokens; reports and batched metric explanations allow 8,192. Non-streaming responses join every non-thinking text part and fail closed when Gemini reports a non-`STOP` finish reason. A report is saved as completed only when all required sections appear in order and the required educational disclaimer terminates the response. Older incomplete records remain unchanged but are identified as incomplete in the report viewer rather than presented or exported as finished work.
+Gemini requests use low thinking effort and omit deprecated sampling parameters. General responses allow 4,096 output tokens; reports and batched metric explanations allow 8,192. Non-streaming responses join every non-thinking text part and reject non-`STOP` finish reasons.
+
+New reports use a versioned JSON document contract validated by Zod. The model supplies prose and metric entries only; application code owns headings, typography, the educational disclaimer, and PDF layout. Model-authored Markdown, HTML, or LaTeX is neither requested nor executed. Completed reports download through an authenticated tenant-scoped PDF route. Older complete Markdown reports remain readable and exportable through a compatibility renderer, while truncated legacy records remain marked incomplete.
 
 ## Rate limits
 
@@ -51,6 +55,6 @@ Structured logs include the request ID, route, status, duration, provider, cache
 
 ## Failure behavior and rollback
 
-Provider exhaustion returns `502`; bounded provider timeouts return `504` for model requests; provider rate limits remain `429` and are not retried locally. Stale data is used only inside its configured stale window.
+Provider exhaustion returns `502`; bounded provider timeouts return `504` for model requests; provider rate limits remain `429` and are not retried locally. Metric explanations and reports are exceptions because they can return bounded, non-directional content from data already supplied by the application. Stale market data is used only inside its configured stale window.
 
 These controls do not change migrations or deployed data. Rollback is a normal code revert; no data rollback is required.

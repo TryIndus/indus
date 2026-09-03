@@ -113,6 +113,7 @@ const Hoverable: React.FC<HoverableProps> = ({
 		const valueAnalysis = parseValueAnalysis(explanation);
 
 		if (valueAnalysis) {
+			const isFallback = valueAnalysis.source === "fallback";
 			return (
 				<div className="space-y-4">
 					<div className="border-b border-border pb-2">
@@ -121,7 +122,7 @@ const Hoverable: React.FC<HoverableProps> = ({
 								text={valueAnalysis.metric_display}
 								className="text-base leading-relaxed flex-1"
 							/>
-							{valueAnalysis.evaluation && (
+							{!isFallback && valueAnalysis.evaluation && (
 								<QualitativeSignal
 									evaluation={valueAnalysis.evaluation}
 									showLabel={true}
@@ -134,6 +135,7 @@ const Hoverable: React.FC<HoverableProps> = ({
 					<div className="text-sm leading-relaxed">
 						<FormattedText text={valueAnalysis.insight} />
 					</div>
+					{isFallback && <p className="text-xs text-muted-foreground">Built-in explanation</p>}
 
 					{onChatTrigger && (
 						<ContextChatTrigger
@@ -169,7 +171,9 @@ const Hoverable: React.FC<HoverableProps> = ({
 	};
 
 	// Extract evaluation for display next to the number
-	const currentEvaluation = explanation ? parseValueAnalysis(explanation)?.evaluation : null;
+	const currentAnalysis = explanation ? parseValueAnalysis(explanation) : null;
+	const currentEvaluation =
+		currentAnalysis?.source === "fallback" ? null : currentAnalysis?.evaluation;
 
 	if (!Number.isFinite(value)) {
 		return <span className="inline-flex items-center gap-1.5">{children}</span>;

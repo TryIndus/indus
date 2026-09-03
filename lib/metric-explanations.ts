@@ -1,10 +1,44 @@
+import { METRIC_DEFINITIONS } from "@/lib/metric-definitions";
 import type { Item } from "@/lib/prompts";
+import { getMetricLabel } from "@/lib/prompts";
 import { valueAnalysisSchema } from "@/lib/schemas/api";
 import type { ValueAnalysis } from "@/lib/types";
 
 export const DEFAULT_EXPLANATION = "No explanation available.";
 
 const EVALUATIONS = new Set(["green", "red", "neutral", "amber"]);
+
+const DEFINITION_KEYS: Record<string, string> = {
+	price: "Stock Price",
+	pe_ratio: "P/E Ratio",
+	volume: "Trading Volume",
+	market_cap: "Market Cap",
+	enterprise_value: "Enterprise Value",
+	shares_outstanding: "Shares Outstanding",
+	revenue: "Revenue",
+	employees: "Employees",
+	price_to_book: "P/B Ratio",
+	price_to_sales: "P/S Ratio",
+	ev_to_sales: "EV/Sales",
+	ev_to_ebitda: "EV/EBITDA",
+	forward_pe: "Forward P/E",
+	peg_ratio: "PEG Ratio",
+	gross_margin: "Gross Margin",
+	ebitda_margin: "EBITDA Margin",
+	operating_margin: "Operating Margin",
+	net_margin: "Net Margin",
+	roa: "ROA",
+	roe: "ROE",
+	total_cash: "Total Cash",
+	total_debt: "Total Debt",
+	debt_to_equity: "Debt-to-Equity",
+	revenue_growth: "Revenue Growth",
+	earnings_growth: "Earnings Growth",
+	beta: "Beta",
+	dividend_yield: "Dividend Yield",
+	dividend_per_share: "Dividend Rate",
+	payout_ratio: "Payout Ratio",
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -31,6 +65,10 @@ export function parseValueAnalysis(value: unknown): ValueAnalysis | null {
 			metric_display: candidate.metric_display,
 			insight: candidate.insight,
 			evaluation,
+			source:
+				candidate.source === "model" || candidate.source === "fallback"
+					? candidate.source
+					: undefined,
 		});
 		return parsed.success ? parsed.data : null;
 	}
@@ -44,9 +82,12 @@ export function parseValueAnalysis(value: unknown): ValueAnalysis | null {
 	return null;
 }
 
-export function normalizeMetricExplanation(value: unknown): string | null {
+export function normalizeMetricExplanation(
+	value: unknown,
+	source?: ValueAnalysis["source"],
+): string | null {
 	const structured = parseValueAnalysis(value);
-	if (structured) return JSON.stringify(structured);
+	if (structured) return JSON.stringify(source ? { ...structured, source } : structured);
 	if (typeof value !== "string") return null;
 
 	const text = value.trim();
@@ -74,7 +115,10 @@ export function parseMetricExplanationResponse(
 		return Object.fromEntries(
 			items.map((item, index) => {
 				const value = parsed[String(index + 1)] ?? (items.length === 1 ? parsed : null);
-				return [explanationKey(item), normalizeMetricExplanation(value) ?? DEFAULT_EXPLANATION];
+				return [
+					explanationKey(item),
+					normalizeMetricExplanation(value, "model") ?? DEFAULT_EXPLANATION,
+				];
 			}),
 		);
 	}
@@ -89,5 +133,37 @@ export function parseMetricExplanationResponse(
 			explanationKey(item),
 			normalizeMetricExplanation(lines[index]) ?? DEFAULT_EXPLANATION,
 		]),
+	);
+}
+
+export function createMetricExplanationFallback(item: Item): string {
+	const definition = METRIC_DEFINITIONS[DEFINITION_KEYS[item.metric]]?.definition;
+	const insight = definition
+		? `${definition} This value alone does not establish whether the result is favorable; compare it with relevant history and related metrics.`
+		: "This is the currently supplied value. Compare it with relevant history and related metrics before drawing a conclusion.";
+
+	return JSON.stringify({
+		metric_display: getMetricLabel(item.symbol, item.metric, item.value),
+		insight,
+		evaluation: "neutral",
+		source: "fallback",
+	});
+}
+
+export function fillMissingMetricExplanations(
+	explanations: Record<string, string>,
+	items: Item[],
+): Record<string, string> {
+	return Object.fromEntries(
+		items.map((item) => {
+			const key = explanationKey(item);
+			const explanation = explanations[key];
+			return [
+				key,
+				explanation && explanation !== DEFAULT_EXPLANATION
+					? explanation
+					: createMetricExplanationFallback(item),
+			];
+		}),
 	);
 }

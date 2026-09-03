@@ -170,6 +170,7 @@ export const valueAnalysisSchema = z
 		metric_display: z.string().trim().min(1).max(240),
 		insight: z.string().trim().min(1).max(800),
 		evaluation: z.enum(["green", "red", "neutral", "amber"]),
+		source: z.enum(["model", "fallback"]).optional(),
 	})
 	.strict();
 

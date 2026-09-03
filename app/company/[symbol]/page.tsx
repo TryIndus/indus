@@ -22,8 +22,6 @@ import { FavoriteButtonCompact } from "@/components/FavoriteButton";
 import FinancialTable from "@/components/FinancialTable";
 import StockChart from "@/components/StockChart";
 import { Button } from "@/components/ui/button";
-import { batchPreload } from "@/hooks/useExplanation";
-import { buildExplanationItems } from "@/lib/explanation-items";
 import type { FinancialData, PageChartData } from "@/lib/types";
 import {
 	formatCurrency,
@@ -131,7 +129,6 @@ export default function CompanyPage() {
 			}
 			const data = result.data as FinancialData;
 			setFinancialData(data);
-			void batchPreload(buildExplanationItems(data));
 		} catch (stockError) {
 			setError(
 				stockError instanceof Error

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { GeminiClient, getGeminiResponseStatus } from "@/lib/ai/geminiClient";
+import { GeminiApiError, GeminiClient, getGeminiResponseStatus } from "@/lib/ai/geminiClient";
 import { env } from "@/lib/env";
-import { parseMetricExplanationResponse } from "@/lib/metric-explanations";
+import {
+	createMetricExplanationFallback,
+	fillMissingMetricExplanations,
+	parseMetricExplanationResponse,
+} from "@/lib/metric-explanations";
 import { logger } from "@/lib/observability/logger";
 import { finishRequestLog, getRequestHeaders, startRequestLog } from "@/lib/observability/request";
 import { type Item, makeBatchPrompt } from "@/lib/prompts";
@@ -42,16 +46,35 @@ export async function POST(req: Request) {
 
 		const items: Item[] = parsed.data;
 		const prompt = makeBatchPrompt(items);
-		const geminiClient = new GeminiClient(env.GEMINI_API_KEY);
-		const rawText = await geminiClient.generateContent(
-			[
-				{ role: "system", parts: [{ text: VALUE_ANALYSIS_SYSTEM_PROMPT }] },
-				{ role: "user", parts: [{ text: prompt }] },
-			],
-			{ responseMimeType: "application/json", maxOutputTokens: 8192 },
-			{ signal: req.signal, requestId: requestLog.requestId },
-		);
-		const explanations = parseMetricExplanationResponse(rawText, items);
+		const geminiClient = new GeminiClient(env.GEMINI_API_KEY, { attempts: 1, timeoutMs: 6_000 });
+		let explanations: Record<string, string>;
+		try {
+			const rawText = await geminiClient.generateContent(
+				[
+					{ role: "system", parts: [{ text: VALUE_ANALYSIS_SYSTEM_PROMPT }] },
+					{ role: "user", parts: [{ text: prompt }] },
+				],
+				{ responseMimeType: "application/json", maxOutputTokens: 8192 },
+				{ signal: req.signal, requestId: requestLog.requestId },
+			);
+			explanations = fillMissingMetricExplanations(
+				parseMetricExplanationResponse(rawText, items),
+				items,
+			);
+		} catch (error) {
+			if (req.signal.aborted) throw error;
+			logger.warn("batch_explain.provider_fallback", {
+				requestId: requestLog.requestId,
+				errorName: error instanceof Error ? error.name : "UnknownError",
+				providerStatus: error instanceof GeminiApiError ? error.status : undefined,
+			});
+			explanations = Object.fromEntries(
+				items.map((item) => [
+					`${item.symbol}_${item.metric}`,
+					createMetricExplanationFallback(item),
+				]),
+			);
+		}
 		finishRequestLog(requestLog, 200, { itemCount: items.length });
 		return NextResponse.json(
 			{ explanations },

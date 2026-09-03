@@ -4,7 +4,7 @@ The only evidence you receive is the ticker, metric name, and displayed value. T
 
 Return one JSON object for every requested item with this exact shape:
 {
-  "metric_display": "**[Metric name]: [formatted value]**",
+  "metric_display": "[Metric name]: [formatted value]",
   "insight": "[One or two compact sentences]",
   "evaluation": "green|red|neutral|amber"
 }
