@@ -9,27 +9,23 @@ export interface GeminiMessage {
 interface GeminiStreamChunk {
 	candidates?: Array<{
 		content?: {
-			parts?: Array<{ text?: string }>;
+			parts?: Array<{ text?: string; thought?: boolean }>;
 		};
 		finishReason?: string;
 	}>;
 }
 
 const BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const MODEL = "gemini-2.5-flash";
+export const GEMINI_MODEL = "gemini-3.8-flash";
 const GENERATION_CONFIG = {
-	temperature: 0.1,
-	topK: 1,
-	topP: 0.8,
-	maxOutputTokens: 2048,
+	maxOutputTokens: 4096,
+	thinkingConfig: { thinkingLevel: "low" as const },
 };
 
-interface GeminiGenerationConfig {
-	temperature?: number;
-	topK?: number;
-	topP?: number;
+export interface GeminiGenerationConfig {
 	maxOutputTokens?: number;
 	responseMimeType?: "application/json" | "text/plain";
+	thinkingConfig?: { thinkingLevel: "low" | "medium" | "high" };
 }
 
 interface GeminiClientOptions {
@@ -76,6 +72,20 @@ export class GeminiApiError extends Error {
 	}
 }
 
+export class GeminiIncompleteResponseError extends Error {
+	constructor(public readonly finishReason: string) {
+		super(`Gemini response ended with ${finishReason}`);
+		this.name = "GeminiIncompleteResponseError";
+	}
+}
+
+function getCandidateText(candidate: NonNullable<GeminiStreamChunk["candidates"]>[number]): string {
+	return (candidate.content?.parts ?? [])
+		.filter((part) => !part.thought)
+		.map((part) => part.text ?? "")
+		.join("");
+}
+
 export class GeminiClient {
 	private readonly apiKey: string;
 	private readonly attempts: number;
@@ -91,7 +101,7 @@ export class GeminiClient {
 		messages: GeminiMessage[],
 		options: GeminiRequestOptions = {},
 	): Promise<ReadableStream<Uint8Array>> {
-		const url = `${BASE_URL}/models/${MODEL}:streamGenerateContent?alt=sse`;
+		const url = `${BASE_URL}/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse`;
 
 		return executeWithRetry(
 			async ({ signal }) => {
@@ -144,7 +154,7 @@ export class GeminiClient {
 		generationConfig: GeminiGenerationConfig = {},
 		options: GeminiRequestOptions = {},
 	): Promise<string> {
-		const url = `${BASE_URL}/models/${MODEL}:generateContent`;
+		const url = `${BASE_URL}/models/${GEMINI_MODEL}:generateContent`;
 
 		return executeWithRetry(
 			async ({ signal }) => {
@@ -163,7 +173,12 @@ export class GeminiClient {
 				}
 
 				const data = (await response.json()) as GeminiStreamChunk;
-				const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+				const candidate = data.candidates?.[0];
+				if (candidate?.finishReason && candidate.finishReason !== "STOP") {
+					throw new GeminiIncompleteResponseError(candidate.finishReason);
+				}
+
+				const text = candidate ? getCandidateText(candidate) : "";
 				if (text) {
 					return text;
 				}
@@ -196,7 +211,8 @@ export class GeminiClient {
 	static parseStreamChunk(chunk: string): string | null {
 		try {
 			const data: GeminiStreamChunk = JSON.parse(chunk);
-			return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+			const candidate = data.candidates?.[0];
+			return candidate ? getCandidateText(candidate) || null : null;
 		} catch {
 			return null;
 		}

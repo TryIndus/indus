@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { GeminiClient, getGeminiResponseStatus } from "@/lib/ai/geminiClient";
-import { createReportMessages, extractReportSummary } from "@/lib/ai/report";
+import {
+	createReportMessages,
+	extractReportSummary,
+	REPORT_GENERATION_CONFIG,
+} from "@/lib/ai/report";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/observability/logger";
 import { finishRequestLog, getRequestHeaders, startRequestLog } from "@/lib/observability/request";
+import { isCompleteReportContent } from "@/lib/report-content";
 import { generateReportSchema } from "@/lib/schemas/api";
 import { type AiAccessClient, checkAiAccess, getAiQuotaHeaders } from "@/lib/security/ai-access";
 import { loadReportStockData } from "@/lib/server/report-stock-data";
@@ -78,9 +83,12 @@ export async function POST(request: Request) {
 		const geminiClient = new GeminiClient(env.GEMINI_API_KEY);
 		const reportContent = await geminiClient.generateContent(
 			createReportMessages(symbol, stockData),
-			{},
+			REPORT_GENERATION_CONFIG,
 			{ signal: request.signal, requestId: requestLog.requestId },
 		);
+		if (!isCompleteReportContent(reportContent)) {
+			throw new Error("Gemini returned an incomplete report");
+		}
 		const summary = extractReportSummary(reportContent, symbol);
 
 		const { data: completedReport, error: updateError } = await supabase

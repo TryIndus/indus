@@ -23,7 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { parseReportContent } from "@/lib/report-content";
+import { isCompleteReportContent, parseReportContent } from "@/lib/report-content";
 import { useAuth } from "@/lib/stores/auth-store";
 
 interface Report {
@@ -278,6 +278,10 @@ export default function ReportsPage() {
 
 	// Full-screen report view
 	if (viewMode === "view" && selectedReport) {
+		const reportIsIncomplete =
+			selectedReport.status === "completed" &&
+			!isCompleteReportContent(selectedReport.report_content);
+
 		return (
 			<div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
 				<div className="container mx-auto min-w-0 max-w-4xl px-4 py-6 sm:px-6">
@@ -297,20 +301,22 @@ export default function ReportsPage() {
 						<div className="flex items-center gap-3">
 							<Badge
 								variant={
-									selectedReport.status === "completed"
-										? "default"
-										: selectedReport.status === "generating"
-											? "secondary"
-											: "destructive"
+									reportIsIncomplete
+										? "destructive"
+										: selectedReport.status === "completed"
+											? "default"
+											: selectedReport.status === "generating"
+												? "secondary"
+												: "destructive"
 								}
 								className="px-3 py-1"
 							>
 								{selectedReport.status === "generating" && (
 									<div className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent mr-2" />
 								)}
-								{selectedReport.status}
+								{reportIsIncomplete ? "incomplete" : selectedReport.status}
 							</Badge>
-							{selectedReport.status === "completed" && (
+							{selectedReport.status === "completed" && !reportIsIncomplete && (
 								<Button
 									variant="outline"
 									size="sm"
@@ -368,10 +374,9 @@ export default function ReportsPage() {
 										<BarChart3 className="absolute inset-4 h-16 w-16 text-primary" />
 									</div>
 									<div className="space-y-2">
-										<h3 className="text-xl font-semibold">Generating Your Report</h3>
+										<h3 className="text-xl font-semibold">Generating report</h3>
 										<p className="text-muted-foreground">
-											Our AI is analyzing market data and crafting a comprehensive research report
-											for {selectedReport.symbol}...
+											Analyzing current data for {selectedReport.symbol}.
 										</p>
 									</div>
 									<div className="space-y-3 max-w-md mx-auto">
@@ -380,15 +385,21 @@ export default function ReportsPage() {
 										<Skeleton className="h-4 w-1/2" />
 									</div>
 								</div>
-							) : selectedReport.status === "error" ? (
+							) : selectedReport.status === "error" || reportIsIncomplete ? (
 								<div className="text-center py-16 space-y-4">
 									<div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center">
 										<FileText className="h-8 w-8 text-destructive" />
 									</div>
 									<div className="space-y-2">
-										<h3 className="text-xl font-semibold text-destructive">Generation Failed</h3>
+										<h3 className="text-xl font-semibold text-destructive">
+											{reportIsIncomplete
+												? "Report Generation Was Incomplete"
+												: "Generation Failed"}
+										</h3>
 										<p className="text-muted-foreground">
-											We encountered an error while generating your report. Please try again.
+											{reportIsIncomplete
+												? "The model stopped before every required section was generated. Return to the reports list and generate a replacement."
+												: "We encountered an error while generating your report. Please try again."}
 										</p>
 									</div>
 									<Button onClick={() => handleBackToList()} variant="outline">
@@ -412,7 +423,7 @@ export default function ReportsPage() {
 		<div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
 			<div className="container mx-auto p-6 space-y-8">
 				{/* Header */}
-				<div className="text-center space-y-4">
+				<div className="text-center space-y-2">
 					<div className="inline-flex items-center gap-3 p-3 bg-primary/10 rounded-full">
 						<TrendingUp className="h-8 w-8 text-primary" />
 					</div>
@@ -420,10 +431,7 @@ export default function ReportsPage() {
 						<h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
 							Research Reports
 						</h1>
-						<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-							Generate comprehensive AI-powered research reports for any stock. Get detailed
-							analysis, financial insights, and investment recommendations in minutes.
-						</p>
+						<p className="text-muted-foreground">Generate a report from current company data.</p>
 					</div>
 				</div>
 
@@ -434,9 +442,7 @@ export default function ReportsPage() {
 							<Plus className="h-6 w-6 text-primary" />
 							Generate New Report
 						</CardTitle>
-						<CardDescription className="text-base">
-							Enter any stock symbol to create a detailed research analysis
-						</CardDescription>
+						<CardDescription>Enter a stock symbol.</CardDescription>
 					</CardHeader>
 					<CardContent className="pb-8">
 						<div className="flex gap-4 max-w-md mx-auto">
@@ -485,10 +491,7 @@ export default function ReportsPage() {
 									<FileText className="h-10 w-10 text-muted-foreground" />
 								</div>
 								<h3 className="text-xl font-semibold mb-3">No reports yet</h3>
-								<p className="text-muted-foreground max-w-md mx-auto mb-6">
-									Start by generating your first research report. Our AI will analyze market data,
-									financial metrics, and provide comprehensive investment insights.
-								</p>
+								<p className="text-muted-foreground mb-6">Generate a report to save it here.</p>
 								<Button variant="outline" onClick={() => document.querySelector("input")?.focus()}>
 									Create Your First Report
 								</Button>

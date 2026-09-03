@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseReportContent } from "@/lib/report-content";
+import { isCompleteReportContent, parseReportContent } from "@/lib/report-content";
 
 describe("report content", () => {
 	it("keeps adjacent headings, paragraphs, and lists as complete blocks", () => {
@@ -15,5 +15,26 @@ describe("report content", () => {
 			{ kind: "heading", level: 2, text: "Risks" },
 			{ kind: "paragraph", text: "Demand may slow." },
 		]);
+	});
+
+	const completeReport = `## Executive Summary
+Summary.
+## Available Financial Snapshot
+Figures.
+## Data Limitations
+Limitations.
+This report is educational and is not investment advice.`;
+
+	it("recognizes all required sections followed by the disclaimer", () => {
+		expect(isCompleteReportContent(completeReport)).toBe(true);
+	});
+
+	it.each([
+		["mid-sentence output", "## Executive Summary\nApple has a market capitalization of 4,"],
+		["missing section", completeReport.replace("## Data Limitations\nLimitations.\n", "")],
+		["wrong section order", completeReport.replace("## Executive Summary", "## Data Limitations")],
+		["missing disclaimer", completeReport.replace(/This report.*$/, "")],
+	])("rejects %s", (_case, content) => {
+		expect(isCompleteReportContent(content)).toBe(false);
 	});
 });

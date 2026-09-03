@@ -1,4 +1,10 @@
+import { REPORT_DISCLAIMER } from "@/lib/report-content";
 import type { ReportStockData } from "@/lib/types";
+
+export const REPORT_GENERATION_CONFIG = {
+	maxOutputTokens: 8192,
+	thinkingConfig: { thinkingLevel: "low" as const },
+};
 
 const REPORT_SYSTEM_INSTRUCTION = `You create factual financial-data summaries for an educational dashboard.
 
@@ -13,7 +19,7 @@ export function createReportMessages(symbol: string, stockData: ReportStockData 
 			role: "user" as const,
 			parts: [
 				{
-					text: `Create a concise markdown report for ${symbol.toUpperCase()} from this supplied snapshot:\n${JSON.stringify(snapshot)}\n\nUse these sections:\n## Executive Summary\n## Available Financial Snapshot\n## Data Limitations\n\nUse 400-700 words when enough data is available, otherwise be shorter. Include exact supplied figures where useful. End with: "This report is educational and is not investment advice."`,
+					text: `Create a concise markdown report for ${symbol.toUpperCase()} from this supplied snapshot:\n${JSON.stringify(snapshot)}\n\nUse these sections:\n## Executive Summary\n## Available Financial Snapshot\n## Data Limitations\n\nUse 400-700 words when enough data is available, otherwise be shorter. Include exact supplied figures where useful. End with: "${REPORT_DISCLAIMER}"`,
 				},
 			],
 		},

@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 				{ role: "system", parts: [{ text: VALUE_ANALYSIS_SYSTEM_PROMPT }] },
 				{ role: "user", parts: [{ text: prompt }] },
 			],
-			{ responseMimeType: "application/json", temperature: 0.2 },
+			{ responseMimeType: "application/json", maxOutputTokens: 8192 },
 			{ signal: req.signal, requestId: requestLog.requestId },
 		);
 		const explanations = parseMetricExplanationResponse(rawText, items);

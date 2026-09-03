@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
-import { createReportMessages, extractReportSummary } from "@/lib/ai/report";
+import {
+	createReportMessages,
+	extractReportSummary,
+	REPORT_GENERATION_CONFIG,
+} from "@/lib/ai/report";
 
 describe("createReportMessages", () => {
 	test("prohibits unsupported research claims", () => {
@@ -19,6 +23,13 @@ describe("createReportMessages", () => {
 	test("marks a missing provider snapshot as unavailable", () => {
 		const messages = createReportMessages("MSFT", null);
 		expect(messages[1].parts[0].text).toContain('"unavailable":true');
+	});
+
+	test("allocates enough output for a complete report with bounded thinking", () => {
+		expect(REPORT_GENERATION_CONFIG).toEqual({
+			maxOutputTokens: 8192,
+			thinkingConfig: { thinkingLevel: "low" },
+		});
 	});
 });
 

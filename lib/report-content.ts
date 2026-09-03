@@ -3,6 +3,25 @@ export type ReportBlock =
 	| { kind: "paragraph"; text: string }
 	| { kind: "list"; items: string[] };
 
+export const REPORT_DISCLAIMER = "This report is educational and is not investment advice.";
+
+const REQUIRED_REPORT_HEADINGS = [
+	"Executive Summary",
+	"Available Financial Snapshot",
+	"Data Limitations",
+] as const;
+
+export function isCompleteReportContent(reportContent: string): boolean {
+	let previousHeadingIndex = -1;
+	for (const heading of REQUIRED_REPORT_HEADINGS) {
+		const headingIndex = reportContent.search(new RegExp(`^##\\s+${heading}\\s*$`, "im"));
+		if (headingIndex <= previousHeadingIndex) return false;
+		previousHeadingIndex = headingIndex;
+	}
+
+	return reportContent.trimEnd().endsWith(REPORT_DISCLAIMER);
+}
+
 export function parseReportContent(content: string): ReportBlock[] {
 	const blocks: ReportBlock[] = [];
 	const paragraph: string[] = [];

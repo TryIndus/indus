@@ -6,7 +6,7 @@ Indus bounds upstream work, degrades to useful cached or secondary data where po
 
 | Boundary | Deadline and retry | Cache | Fallback |
 |---|---|---|---|
-| Gemini generation and stream setup | 10-second attempt deadline; one retry for timeouts, network failures, and provider 5xx responses. Provider `429` responses are returned without retry amplification | None for user-specific model output | Context chat makes one non-streaming fallback attempt only when stream setup fails through a timeout, transport, or protocol error before emitting text |
+| Gemini 3.8 Flash generation and stream setup | 10-second attempt deadline; one retry for timeouts, network failures, and provider 5xx responses. Provider `429` responses are returned without retry amplification | None for user-specific model output | Context chat makes one non-streaming fallback attempt only when stream setup fails through a timeout, transport, or protocol error before emitting text |
 | Historical market data | 6-second application deadline; one retry per provider. Alpaca's SDK request is capped at 5.5 seconds with SDK retries disabled so attempts cannot overlap | 30 seconds fresh plus 15 minutes stale-on-error; concurrent loads are deduplicated | Yahoo chart history is used when Alpaca fails or returns fewer than `min(2, requested limit)` bars; the better partial result is retained |
 | Company fundamentals | 6-second attempt deadline; one retry for both quote and summary surfaces | 60 seconds fresh plus 15 minutes stale-on-error; concurrent loads are deduplicated | A quote-only or summary-only response is returned when the other Yahoo surface fails |
 | Report evidence | 6-second attempt deadline; one retry for quote and summary surfaces | 60 seconds fresh plus 15 minutes stale-on-error | Reports continue with whichever bounded Yahoo snapshot remains available |
@@ -15,6 +15,8 @@ Indus bounds upstream work, degrades to useful cached or secondary data where po
 Market-data responses are marked `private, no-store` so request IDs, rate-limit state, and degradation metadata cannot be replayed through a shared CDN cache. The bounded in-process caches remain intentionally opportunistic: warm serverless instances reuse them, while cold instances refill from providers.
 
 Incoming request cancellation propagates through retry and cache boundaries. Fetch-based provider calls are aborted when their final consumer disconnects; a deduplicated load remains active while another request still needs it. Alpaca SDK history calls retain the SDK's 5.5-second deadline because that helper does not expose caller cancellation, but disconnects stop local retries and Yahoo fallback work.
+
+Gemini requests use low thinking effort and omit deprecated sampling parameters. General responses allow 4,096 output tokens; reports and batched metric explanations allow 8,192. Non-streaming responses join every non-thinking text part and fail closed when Gemini reports a non-`STOP` finish reason. A report is saved as completed only when all required sections appear in order and the required educational disclaimer terminates the response. Older incomplete records remain unchanged but are identified as incomplete in the report viewer rather than presented or exported as finished work.
 
 ## Rate limits
 
