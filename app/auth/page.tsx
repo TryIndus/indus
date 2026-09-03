@@ -121,8 +121,7 @@ export default function AuthPage() {
 						<span className="italic text-primary">Keep the data together.</span>
 					</h1>
 					<p className="mt-6 max-w-md text-sm leading-6 text-muted-foreground">
-						Review market charts and company fundamentals, then ask questions using the data on that
-						page.
+						Save companies, generate reports, and revisit your research.
 					</p>
 					<div className="mt-9 flex items-center gap-2 text-xs text-muted-foreground">
 						<ShieldCheck className="size-4 text-primary" />
@@ -247,11 +246,12 @@ export default function AuthPage() {
 							</div>
 						</label>
 
-						<label className="block space-y-2 text-xs font-medium">
-							<span>Password</span>
+						<div className="space-y-2 text-xs font-medium">
+							<label htmlFor="password">Password</label>
 							<div className="relative">
 								<Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 								<Input
+									id="password"
 									type={showPassword ? "text" : "password"}
 									placeholder="Password"
 									autoComplete={isSignUp ? "new-password" : "current-password"}
@@ -272,7 +272,7 @@ export default function AuthPage() {
 									{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
 								</Button>
 							</div>
-						</label>
+						</div>
 
 						{message && (
 							<p

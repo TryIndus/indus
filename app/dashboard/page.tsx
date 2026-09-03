@@ -31,8 +31,7 @@ export default function Dashboard() {
 							Company research
 						</h1>
 						<p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">
-							Search a company, review its chart and fundamentals, then ask questions about the data
-							on the page.
+							Search for a company or continue with one of your favorites.
 						</p>
 					</div>
 					<div className="flex flex-col gap-2 sm:flex-row">
