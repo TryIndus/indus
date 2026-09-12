@@ -59,50 +59,13 @@ docker version
 bunx supabase --version
 ```
 
-## Local Docker disk use
+## Local Docker cleanup
 
-The temporary Supabase stacks used by database and authenticated browser tests
-are stopped and removed automatically, including on normal interruption. Docker
-retains images and BuildKit cache independently, which is useful for fast
-re-runs but can make Docker Desktop's disk image grow over time.
-
-Inspect usage without changing anything:
-
-```bash
-bun run docker:status
-```
-
-Remove stopped containers, unused networks, dangling images, and unused build
-cache without touching volumes:
-
-```bash
-bun run docker:cleanup
-```
-
-To also remove unused tagged images or volumes, use the script's explicit
-options. Those operations ask for confirmation because they can affect another
-local Docker project:
-
-```bash
-bash scripts/docker/cleanup.sh --all-unused --volumes
-```
-
-To permanently delete the local Indus Supabase data and the temporary
-database/authentication test stacks, run:
-
-```bash
-bun run docker:purge
-```
-
-This removes only Docker resources labelled for the `indus`, `indus-db-tests`,
-and `indus-auth-tests` Docker projects, then performs the standard
-unused-object cleanup. To aggressively reclaim space across all local Docker
-projects, including unused volumes, run `bun run docker:reclaim` and confirm
-the prompt.
-
-Docker Desktop may retain the virtual disk's allocated size after cleanup; use
-its documented disk-image compaction or reset controls only after confirming
-the Docker usage report.
+Temporary Supabase test stacks are removed on exit. Use `bun run docker:status`
+to inspect storage and `bun run docker:cleanup` to remove unused non-volume
+artifacts. `bun run docker:purge` permanently removes local Indus Supabase and
+test data; `bun run docker:reclaim` also removes unused images and volumes from
+all local Docker projects after confirmation.
 
 ## Verification layers
 
