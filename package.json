@@ -20,6 +20,8 @@
 		"db:start:test": "supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
 		"db:stop": "supabase stop --no-backup",
 		"db:reset": "supabase db reset --local",
+		"docker:status": "bash scripts/docker/cleanup.sh --status",
+		"docker:cleanup": "bash scripts/docker/cleanup.sh",
 		"test:database": "bash scripts/test-database.sh",
 		"test:integration": "playwright test --grep @integration --project=chromium",
 		"test:browser": "bun run build && E2E_USE_PRODUCTION=true playwright test --grep @browser",

@@ -59,6 +59,38 @@ docker version
 bunx supabase --version
 ```
 
+## Local Docker disk use
+
+The temporary Supabase stacks used by database and authenticated browser tests
+are stopped and removed automatically, including on normal interruption. Docker
+retains images and BuildKit cache independently, which is useful for fast
+re-runs but can make Docker Desktop's disk image grow over time.
+
+Inspect usage without changing anything:
+
+```bash
+bun run docker:status
+```
+
+Remove stopped containers, unused networks, dangling images, and unused build
+cache without touching volumes:
+
+```bash
+bun run docker:cleanup
+```
+
+To also remove unused tagged images or volumes, use the script's explicit
+options. Those operations ask for confirmation because they can affect another
+local Docker project:
+
+```bash
+bash scripts/docker/cleanup.sh --all-unused --volumes
+```
+
+Docker Desktop may retain the virtual disk's allocated size after cleanup; use
+its documented disk-image compaction or reset controls only after confirming
+the Docker usage report.
+
 ## Verification layers
 
 | Layer | Command | What it covers |
