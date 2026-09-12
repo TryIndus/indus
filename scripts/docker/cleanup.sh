@@ -58,10 +58,10 @@ is_indus_project() {
   esac
 }
 
-is_indus_volume() {
-  local volume_name="$1"
+is_indus_resource() {
+  local resource_name="$1"
   local project_id="$2"
-  is_indus_project "$project_id" || [[ "$volume_name" == indus_* || "$volume_name" == indus-* ]]
+  is_indus_project "$project_id" || [[ "$resource_name" == indus_* || "$resource_name" == indus-* || "$resource_name" == /indus_* || "$resource_name" == /indus-* ]]
 }
 
 resource_project_id() {
@@ -97,7 +97,8 @@ purge_indus_resources() {
     if [[ -z "$project_id" || "$project_id" == "<no value>" ]]; then
       project_id="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$resource_id" 2>/dev/null || true)"
     fi
-    is_indus_project "$project_id" && containers+=("$resource_id")
+    resource_name="$(docker inspect --format '{{.Name}}' "$resource_id")"
+    is_indus_resource "$resource_name" "$project_id" && containers+=("$resource_id")
   done < <(docker ps --all --quiet)
   if ((${#containers[@]})); then
     echo "Removing Indus Supabase and test-stack containers."
@@ -108,7 +109,7 @@ purge_indus_resources() {
   while IFS= read -r resource_id; do
     [[ -n "$resource_id" ]] || continue
     project_id="$(resource_project_id volume "$resource_id")"
-    is_indus_volume "$resource_id" "$project_id" && volumes_to_remove+=("$resource_id")
+    is_indus_resource "$resource_id" "$project_id" && volumes_to_remove+=("$resource_id")
   done < <(docker volume ls --quiet)
   if ((${#volumes_to_remove[@]})); then
     echo "Removing Indus Supabase and test-stack volumes."
@@ -119,7 +120,8 @@ purge_indus_resources() {
   while IFS= read -r resource_id; do
     [[ -n "$resource_id" ]] || continue
     project_id="$(resource_project_id network "$resource_id")"
-    is_indus_project "$project_id" && networks+=("$resource_id")
+    resource_name="$(docker network inspect --format '{{.Name}}' "$resource_id")"
+    is_indus_resource "$resource_name" "$project_id" && networks+=("$resource_id")
   done < <(docker network ls --quiet)
   if ((${#networks[@]})); then
     echo "Removing Indus Supabase and test-stack networks."
