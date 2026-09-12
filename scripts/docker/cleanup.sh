@@ -1,43 +1,32 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-
 usage() {
   cat <<'EOF'
-Usage: bash scripts/docker/cleanup.sh [--status] [--indus] [--all-unused] [--volumes] [--force]
+Usage: bash scripts/docker/cleanup.sh [--status] [--force]
 
-  --status       Show Docker's current disk usage without deleting anything.
-  --indus        Permanently remove local Indus Supabase and test-stack data.
-  --all-unused   Also remove unused tagged images from every local project.
-  --volumes      Also remove unused volumes from every local project.
-  --force        Do not ask before destructive cleanup.
+  --status  Show Docker's current disk usage without deleting anything.
+  --force   Skip confirmation before deleting Indus Docker resources.
 
-Without options, this removes stopped containers, unused networks, dangling
-images, and unused BuildKit cache. It never removes volumes by default.
+Without options, the script permanently removes Docker containers, images,
+volumes, and networks identifiable as Indus. Other projects are not pruned.
 EOF
 }
 
 status_only=false
-indus_purge=false
-all_unused=false
-volumes=false
 force=false
 
 for argument in "$@"; do
   case "$argument" in
     --status) status_only=true ;;
-    --indus) indus_purge=true ;;
-    --all-unused) all_unused=true ;;
-    --volumes) volumes=true ;;
     --force) force=true ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown option: $argument" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-if $status_only && ($indus_purge || $all_unused || $volumes || $force); then
-  echo "--status cannot be combined with cleanup options." >&2
+if $status_only && $force; then
+  echo "--status cannot be combined with --force." >&2
   exit 2
 fi
 
@@ -51,6 +40,13 @@ docker info >/dev/null 2>&1 || {
   exit 1
 }
 
+echo "Docker disk usage:"
+docker system df --verbose
+
+if $status_only; then
+  exit 0
+fi
+
 is_indus_project() {
   case "$1" in
     indus|indus-db-tests|indus-auth-tests) return 0 ;;
@@ -58,10 +54,11 @@ is_indus_project() {
   esac
 }
 
-is_indus_resource() {
-  local resource_name="$1"
-  local project_id="$2"
-  is_indus_project "$project_id" || [[ "$resource_name" == indus_* || "$resource_name" == indus-* || "$resource_name" == /indus_* || "$resource_name" == /indus-* ]]
+is_indus_name() {
+  case "$1" in
+    indus|indus-*|indus_*|/indus|/indus-*|/indus_*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 resource_project_id() {
@@ -76,89 +73,81 @@ resource_project_id() {
   printf '%s' "$project_id"
 }
 
-confirm_destructive_cleanup() {
-  $force && return 0
-  read -r -p "This permanently removes Docker data. Continue? [y/N] " answer
-  [[ "$answer" =~ ^[Yy]$ ]] || { echo "Cancelled."; exit 0; }
+is_indus_image() {
+  local image_id="$1"
+  local image_source
+  local image_title
+  local repository
+  local repo_tags
+
+  image_source="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.source"}}' "$image_id" 2>/dev/null || true)"
+  image_title="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.title"}}' "$image_id" 2>/dev/null || true)"
+  if [[ "$image_source" == "https://github.com/TryIndus/indus" || "$image_title" == "indus" ]]; then
+    return 0
+  fi
+
+  repo_tags="$(docker image inspect --format '{{join .RepoTags " "}}' "$image_id" 2>/dev/null || true)"
+  for repository in $repo_tags; do
+    repository="${repository%:*}"
+    is_indus_name "${repository##*/}" && return 0
+  done
+  return 1
 }
 
-purge_indus_resources() {
-  echo "Stopping the local Indus Supabase stack without a backup."
-  if command -v bunx >/dev/null 2>&1; then
-    bunx supabase stop --workdir "$repo_root" --no-backup >/dev/null 2>&1 || true
-  else
-    echo "bunx is unavailable; removing identifiable residual Indus Docker resources directly." >&2
+declare -a containers=()
+declare -a images=()
+declare -a volumes=()
+declare -a networks=()
+
+while IFS= read -r resource_id; do
+  [[ -n "$resource_id" ]] || continue
+  project_id="$(docker inspect --format '{{index .Config.Labels "com.supabase.cli.project"}}' "$resource_id" 2>/dev/null || true)"
+  if [[ -z "$project_id" || "$project_id" == "<no value>" ]]; then
+    project_id="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$resource_id" 2>/dev/null || true)"
   fi
-
-  declare -a containers=()
-  while IFS= read -r resource_id; do
-    [[ -n "$resource_id" ]] || continue
-    project_id="$(docker inspect --format '{{index .Config.Labels "com.supabase.cli.project"}}' "$resource_id" 2>/dev/null || true)"
-    if [[ -z "$project_id" || "$project_id" == "<no value>" ]]; then
-      project_id="$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$resource_id" 2>/dev/null || true)"
-    fi
-    resource_name="$(docker inspect --format '{{.Name}}' "$resource_id")"
-    is_indus_resource "$resource_name" "$project_id" && containers+=("$resource_id")
-  done < <(docker ps --all --quiet)
-  if ((${#containers[@]})); then
-    echo "Removing Indus Supabase and test-stack containers."
-    docker rm --force "${containers[@]}" >/dev/null
+  resource_name="$(docker inspect --format '{{.Name}}' "$resource_id")"
+  image_id="$(docker inspect --format '{{.Image}}' "$resource_id")"
+  if is_indus_project "$project_id" || is_indus_name "$resource_name" || is_indus_image "$image_id"; then
+    containers+=("$resource_id")
   fi
+done < <(docker ps --all --quiet)
 
-  declare -a volumes_to_remove=()
-  while IFS= read -r resource_id; do
-    [[ -n "$resource_id" ]] || continue
-    project_id="$(resource_project_id volume "$resource_id")"
-    is_indus_resource "$resource_id" "$project_id" && volumes_to_remove+=("$resource_id")
-  done < <(docker volume ls --quiet)
-  if ((${#volumes_to_remove[@]})); then
-    echo "Removing Indus Supabase and test-stack volumes."
-    docker volume rm "${volumes_to_remove[@]}" >/dev/null
+while IFS= read -r resource_id; do
+  [[ -n "$resource_id" ]] || continue
+  project_id="$(resource_project_id volume "$resource_id")"
+  if is_indus_project "$project_id" || is_indus_name "$resource_id"; then
+    volumes+=("$resource_id")
   fi
+done < <(docker volume ls --quiet)
 
-  declare -a networks=()
-  while IFS= read -r resource_id; do
-    [[ -n "$resource_id" ]] || continue
-    project_id="$(resource_project_id network "$resource_id")"
-    resource_name="$(docker network inspect --format '{{.Name}}' "$resource_id")"
-    is_indus_resource "$resource_name" "$project_id" && networks+=("$resource_id")
-  done < <(docker network ls --quiet)
-  if ((${#networks[@]})); then
-    echo "Removing Indus Supabase and test-stack networks."
-    docker network rm "${networks[@]}" >/dev/null 2>&1 || true
+while IFS= read -r resource_id; do
+  [[ -n "$resource_id" ]] || continue
+  project_id="$(resource_project_id network "$resource_id")"
+  resource_name="$(docker network inspect --format '{{.Name}}' "$resource_id")"
+  if is_indus_project "$project_id" || is_indus_name "$resource_name"; then
+    networks+=("$resource_id")
   fi
-}
+done < <(docker network ls --quiet)
 
-echo "Docker disk usage before cleanup:"
-docker system df --verbose
+while IFS= read -r resource_id; do
+  [[ -n "$resource_id" ]] || continue
+  is_indus_image "$resource_id" && images+=("$resource_id")
+done < <(docker image ls --all --quiet | sort -u)
 
-if $status_only; then
+echo "Indus resources selected: ${#containers[@]} containers, ${#images[@]} images, ${#volumes[@]} volumes, ${#networks[@]} networks."
+if ((${#containers[@]} + ${#images[@]} + ${#volumes[@]} + ${#networks[@]} == 0)); then
   exit 0
 fi
 
-if $indus_purge || $all_unused || $volumes; then
-  confirm_destructive_cleanup
+if ! $force; then
+  read -r -p "Permanently delete every selected Indus Docker resource? [y/N] " answer
+  [[ "$answer" =~ ^[Yy]$ ]] || { echo "Cancelled."; exit 0; }
 fi
 
-if $indus_purge; then
-  purge_indus_resources
-fi
+((${#containers[@]} == 0)) || docker rm --force "${containers[@]}" >/dev/null
+((${#volumes[@]} == 0)) || docker volume rm "${volumes[@]}" >/dev/null
+((${#networks[@]} == 0)) || docker network rm "${networks[@]}" >/dev/null
+((${#images[@]} == 0)) || docker image rm --force "${images[@]}" >/dev/null
 
-echo "Removing stopped containers, unused networks, dangling images, and unused BuildKit cache."
-docker container prune --force
-docker network prune --force
-docker image prune --force
-docker builder prune --force
-
-if $all_unused; then
-  echo "Removing unused tagged images."
-  docker image prune --all --force
-fi
-
-if $volumes; then
-  echo "Removing unused volumes."
-  docker volume prune --force
-fi
-
-echo "Docker disk usage after cleanup:"
-docker system df --verbose
+echo "Indus Docker cleanup complete."
+docker system df

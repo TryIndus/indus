@@ -48,6 +48,9 @@ jobs:
       - name: Run unit coverage
         run: bun run test:unit:coverage
 
+      - name: Test Docker cleanup boundaries
+        run: bun run test:docker-cleanup
+
       - name: Build production application
         run: bun run build
 
