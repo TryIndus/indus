@@ -58,6 +58,12 @@ is_indus_project() {
   esac
 }
 
+is_indus_volume() {
+  local volume_name="$1"
+  local project_id="$2"
+  is_indus_project "$project_id" || [[ "$volume_name" == indus_* || "$volume_name" == indus-* ]]
+}
+
 resource_project_id() {
   local resource_type="$1"
   local resource_id="$2"
@@ -102,7 +108,7 @@ purge_indus_resources() {
   while IFS= read -r resource_id; do
     [[ -n "$resource_id" ]] || continue
     project_id="$(resource_project_id volume "$resource_id")"
-    is_indus_project "$project_id" && volumes_to_remove+=("$resource_id")
+    is_indus_volume "$resource_id" "$project_id" && volumes_to_remove+=("$resource_id")
   done < <(docker volume ls --quiet)
   if ((${#volumes_to_remove[@]})); then
     echo "Removing Indus Supabase and test-stack volumes."
