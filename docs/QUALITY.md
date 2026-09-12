@@ -87,6 +87,19 @@ local Docker project:
 bash scripts/docker/cleanup.sh --all-unused --volumes
 ```
 
+To permanently delete the local Indus Supabase data and the temporary
+database/authentication test stacks, run:
+
+```bash
+bun run docker:purge
+```
+
+This removes only Docker resources labelled for the `indus`, `indus-db-tests`,
+and `indus-auth-tests` Docker projects, then performs the standard
+unused-object cleanup. To aggressively reclaim space across all local Docker
+projects, including unused volumes, run `bun run docker:reclaim` and confirm
+the prompt.
+
 Docker Desktop may retain the virtual disk's allocated size after cleanup; use
 its documented disk-image compaction or reset controls only after confirming
 the Docker usage report.

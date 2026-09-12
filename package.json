@@ -22,6 +22,8 @@
 		"db:reset": "supabase db reset --local",
 		"docker:status": "bash scripts/docker/cleanup.sh --status",
 		"docker:cleanup": "bash scripts/docker/cleanup.sh",
+		"docker:purge": "bash scripts/docker/cleanup.sh --indus",
+		"docker:reclaim": "bash scripts/docker/cleanup.sh --all-unused --volumes",
 		"test:database": "bash scripts/test-database.sh",
 		"test:integration": "playwright test --grep @integration --project=chromium",
 		"test:browser": "bun run build && E2E_USE_PRODUCTION=true playwright test --grep @browser",
