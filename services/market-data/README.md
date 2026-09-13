@@ -1,6 +1,6 @@
 # Indus Market Data Service
 
-The dormant Phase 3 Rust service owns provider ingestion, normalized Kafka events, historical market persistence, and authenticated browser streaming. It does not own users, portfolios, reports, or authorization policy. The legacy Next.js stream remains unchanged until the Phase 4 cutover.
+The Rust service owns provider ingestion, normalized Kafka events, historical market persistence, and authenticated browser streaming. It does not own users, portfolios, reports, or authorization policy. The legacy Next.js stream remains unchanged until the controlled traffic cutover.
 
 ## Interfaces
 

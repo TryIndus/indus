@@ -1,6 +1,6 @@
 # AWS infrastructure
 
-Phase 4 uses two Terraform boundaries:
+The AWS platform uses two Terraform boundaries:
 
 - `bootstrap/shared` runs once in the shared-services account. It creates the
   encrypted remote-state bucket, immutable ECR repositories, and the GitHub
@@ -10,15 +10,21 @@ Phase 4 uses two Terraform boundaries:
   same reviewed environment module.
 
 Terraform never stores application secret values. It creates only Secrets
-Manager containers and IAM access boundaries; an operator supplies values with
-`scripts/aws/put-secret.sh` over an audited AWS session. Never pass secret
-values through `-var`, `.tfvars`, plans, outputs, or CI logs.
+Manager containers and IAM access boundaries; an operator supplies values over
+an audited, short-lived AWS session. Never pass secret values through `-var`,
+`.tfvars`, plans, outputs, or CI logs. Workloads use IRSA and the Secrets Store
+CSI driver to read only their assigned secret.
+
+Commit every `.terraform.lock.hcl` file. It pins reviewed provider versions and
+package checksums for reproducible local and CI execution; it contains neither
+Terraform state nor secrets. Local `.terraform/` directories, backend files,
+plans, state, and variable files remain ignored.
 
 RDS Proxy has three Secrets Manager auth entries: platform runtime, market
 writer, and migration-only. These are distinct PostgreSQL logins; do not reuse
 one password across containers. Runtime configuration secrets hold the matching
 proxy URLs, while only the migration service account can read the migration
-credential. See `docs/runbooks/database-roles.md` for the staged bootstrap.
+credential.
 
 Copy the checked-in examples to ignored local files, replace account-specific
 placeholders, and bootstrap in this order:
@@ -40,8 +46,9 @@ terraform -chdir=infra/terraform/environments/development plan \
 ```
 
 Apply is intentionally not wrapped in repository automation. Follow
-`docs/runbooks/aws-bootstrap.md`, require plan review, and use a short-lived
+`docs/runbooks/aws-legacy-next.md`, require plan review, and use a short-lived
 federated operator session. Production uses deletion protection, multi-AZ
 capacity, longer retention, required MFA, and a two-person apply gate.
 
-Run `scripts/validate-phase4.sh` for non-mutating local validation.
+The AWS foundation workflow performs non-mutating Terraform formatting and
+validation plus Helm linting and rendering.
