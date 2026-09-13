@@ -59,6 +59,13 @@ docker version
 bunx supabase --version
 ```
 
+## Local Docker cleanup
+
+Temporary Supabase test stacks are removed on exit. Use `bun run docker:status`
+to inspect storage. `bun run docker:cleanup` permanently removes Indus Docker
+containers, images, volumes, and networks after confirmation; it does not prune
+resources shared with other projects.
+
 ## Verification layers
 
 | Layer | Command | What it covers |
