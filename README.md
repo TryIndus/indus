@@ -2,9 +2,17 @@
 
 https://github.com/user-attachments/assets/82d2c5de-a971-4c8b-8481-fa68fcffc9e4
 
-Indus is an intelligent financial analysis platform that provides comprehensive stock market data, real-time charts, and AI-powered insights to help investors make informed decisions. Built with Next.js, TypeScript, SSE, Alpaca API, Yahoo Finance, Google Gemini, and TradingView.
+Indus is a financial intelligence platform for authenticated stock and cryptocurrency research, live market data, model-assisted analysis, and generated reports. The primary platform uses React, Rails, Rust, PostgreSQL, Kafka, Temporal, Gemini, and AWS. The original Next.js and Supabase application remains available as a controlled rollback path.
 
-## Prerequisites
+## Primary platform development
+
+The primary local topology runs through Docker Compose so its service boundaries match the deployed platform without requiring Ruby, Rust, PostgreSQL, Kafka, or Temporal installations on the host. See the [application runbook](./docs/runbooks/local-application-platform.md) for Rails and React work, or the [distributed-platform runbook](./docs/runbooks/local-distributed-platform.md) for the complete local system.
+
+## Legacy rollback application
+
+The root package contains the retained Next.js and Supabase application. Use the following workflow only when verifying rollback compatibility or maintaining that bounded implementation.
+
+### Prerequisites
 
 - [Bun](https://bun.sh/) v1.0 or later
 - A [Supabase](https://supabase.com/) project (free tier works)
@@ -16,7 +24,7 @@ Indus is an intelligent financial analysis platform that provides comprehensive 
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/vicdenz/indus.git
+git clone https://github.com/TryIndus/indus.git
 cd indus
 ```
 
@@ -64,7 +72,7 @@ bun run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Available Scripts
+## Legacy application scripts
 
 | Command | Description |
 |---|---|
@@ -93,7 +101,10 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 |---|---|
 | [Quality and Security Verification](./docs/QUALITY.md) | Security boundaries, local verification layers, budgets, and troubleshooting |
 | [Runtime Reliability](./docs/RELIABILITY.md) | Provider deadlines, retries, caching, fallbacks, rate limits, health checks, and diagnostics |
-| [Revamp Plan](./docs/REVAMP_PLAN.md) | In-progress application modernization plan retained during the revamp |
+| [Application Platform](./docs/architecture/application-platform.md) | React, Rails, authentication, contracts, write reliability, and model boundaries |
+| [Market Data](./docs/architecture/market-data.md) | Rust ingestion, Kafka delivery, PostgreSQL retention, and authenticated streaming |
+| [Research Workflows](./docs/architecture/distributed-research-workflows.md) | Outbox delivery, Temporal execution, evidence validation, and report artifacts |
+| [Rollback](./docs/runbooks/rollback.md) | Traffic, workload, data-reconciliation, and evidence-retention procedure |
 
 ## Features
 
@@ -128,18 +139,16 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 15 (App Router) + React 19 |
-| Language | TypeScript 5 (strict mode) |
-| Styling | Tailwind CSS v4 + shadcn/ui (Radix) + Lucide icons + next-themes |
-| Auth & DB | Supabase (PostgreSQL + Auth with Google OAuth) |
-| State | Zustand + TanStack Query |
-| AI | Google Gemini 3.8 Flash via the REST API |
-| Real-time | SSE via Next.js Route Handlers (streams Alpaca WebSocket bars to clients) |
-| Charts | TradingView Lightweight Charts v5 |
-| Financial Data | Alpaca Trade API + Yahoo Finance 2 |
-| Validation | Zod (API inputs + environment variables) |
-| Linting | Biome |
-| Testing | Vitest + pgTAP + Playwright + axe-core |
+| Web | React 19, Vite, TypeScript, TanStack Router and Query, Zod |
+| API | Ruby 3.4, Rails 8, Pundit, PostgreSQL, Sidekiq, Redis |
+| Market data | Rust, Tokio, Axum, Alpaca, Kafka, PostgreSQL, authenticated SSE |
+| Workflows | Transactional outbox, Kafka, Temporal, S3 report artifacts |
+| Identity | Supabase browser adapter; Rails verification adapters for Supabase and Amazon Cognito |
+| AI | Google Gemini behind a provider-neutral, server-side model gateway |
+| Contracts | OpenAPI and Protobuf with deterministic generated clients |
+| Platform | AWS EKS, Aurora PostgreSQL, ElastiCache, MSK, S3, Secrets Manager, Argo CD |
+| Infrastructure | Terraform, Helm, GitOps, Docker |
+| Verification | RSpec, RuboCop, Brakeman, Rust tests and Clippy, Vitest, Playwright, axe-core |
 
 ## License
 
