@@ -44,7 +44,7 @@ Every `/v1` request requires a verified bearer token. The token issuer and audie
 
 Model-backed operations are owned by a task registry in `ModelGateway`. Each task pins a prompt version, receives bounded server-side evidence, supplies Gemini with a structured response schema when supported, rejects unrecognized citations, normalizes usage and provider failures, and consumes a per-user quota before invocation. Quota writes use a dedicated database connection so a billable provider failure cannot roll the charge back with the surrounding idempotency transaction.
 
-Phase 3 publishes committed outbox rows to Kafka and starts durable report workflows through an idempotent consumer. Temporal uses stable workflow IDs and persistent activity leases to prevent overlapping model and artifact work. Research claims must cite allowlisted evidence with matching as-of values before artifacts are stored. See the [workflow architecture](../../docs/architecture/distributed-research-workflows.md) and [recovery runbook](../../docs/runbooks/report-workflow-recovery.md).
+Committed outbox rows are published to Kafka, and an idempotent consumer starts durable report workflows. Temporal uses stable workflow IDs and persistent activity leases to prevent overlapping model and artifact work. Research claims must cite allowlisted evidence with matching as-of values before artifacts are stored. See the [workflow architecture](../../docs/architecture/distributed-research-workflows.md) and [recovery runbook](../../docs/runbooks/report-workflow-recovery.md).
 
 `GET /healthz` proves the process can serve HTTP. `GET /readyz` additionally verifies PostgreSQL connectivity and returns `503` when it is unavailable. Neither endpoint requires authentication.
 
@@ -63,4 +63,4 @@ The service tests use generated signing keys and deterministic provider fixtures
 
 ## Rollback
 
-Before traffic is cut over, rollback consists of stopping this service; the current Next.js runtime remains unchanged. Once this schema contains production writes, use forward-only corrective migrations and the phase cutover runbook rather than reversing migrations that may discard data.
+Before traffic is cut over, rollback consists of stopping this service; the current Next.js runtime remains unchanged. Once this schema contains production writes, use forward-only corrective migrations and the controlled cutover runbook rather than reversing migrations that may discard data.
