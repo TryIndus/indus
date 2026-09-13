@@ -1,6 +1,6 @@
 # AWS deployment of the current application
 
-Phase 1 moves the current Next.js application from Vercel to AWS without changing its product or data boundaries. Supabase remains the identity and database provider; Alpaca, Yahoo Finance, and Gemini remain the provider boundaries. Do not use this runbook to cut over to the replacement Rails, React, or Rust services.
+This runbook moves the current Next.js application from Vercel to AWS without changing its product or data boundaries. Supabase remains the identity and database provider; Alpaca, Yahoo Finance, and Gemini remain the provider boundaries. Do not use this runbook to cut over to the replacement Rails, React, or Rust services.
 
 ## Release contract
 
@@ -20,5 +20,5 @@ The Kubernetes workload is rendered by `infra/helm/indus-legacy-next`. It requir
 
 - Terraform creates secret containers only. Secret values are supplied outside Terraform and must never enter state, plans, CI logs, or Git.
 - Do not use a `NEXT_PUBLIC_` prefix for Alpaca or Gemini credentials.
-- `edge_runtime = "replacement"` is reserved for Phase 4. Changing it before the replacement platform is accepted is an unauthorized production cutover.
+- `edge_runtime = "replacement"` is reserved for the controlled replacement-platform cutover. Changing it before the replacement platform is accepted is unauthorized.
 - The production domain must remain a subdomain while weighted Route 53 routing is in use; apex records require a separately reviewed DNS design.
