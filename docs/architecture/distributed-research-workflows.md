@@ -24,9 +24,9 @@ Every Rails event has a versioned envelope with an event ID, producer, occurrenc
 
 Each report uses workflow ID `report-<report UUID>` with duplicate workflow starts rejected. Activities use persistent leases keyed by report and activity name. A live lease prevents overlapping model or artifact writes; a stale lease can be reclaimed after its expiry. Completed activity results are reused on Temporal replay or redelivery.
 
-The workflow progresses through evidence loading, grounded model generation, artifact persistence, and terminal metadata persistence. Activity retries handle transient dependencies. Cancellation records `cancelled` in PostgreSQL, emits a lifecycle event, and requests Temporal cancellation. Failure and cancellation activities are safe to redeliver.
+The workflow progresses through evidence loading, evidence-backed model generation, artifact persistence, and terminal metadata persistence. Activity retries handle transient dependencies. Cancellation records `cancelled` in PostgreSQL, emits a lifecycle event, and requests Temporal cancellation. Failure and cancellation activities are safe to redeliver.
 
-## Grounding and artifacts
+## Evidence and artifacts
 
 Evidence items have an allowlisted source ID and an as-of timestamp. User focus and provider text remain untrusted data inside the model request. The model adapter supplies a server-owned instruction, and `ModelGateway` rejects output unless every research claim cites an allowed source ID with a matching as-of value. This is a validation boundary, not a claim that model output is inherently trustworthy.
 
