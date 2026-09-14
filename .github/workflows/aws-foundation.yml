@@ -9,6 +9,8 @@ on:
       - infra/**
       - docs/runbooks/aws-legacy-next.md
       - .github/workflows/aws-foundation.yml
+      - .github/workflows/aws-legacy-promote.yml
+      - .github/workflows/aws-legacy-release.yml
   push:
     branches: [main]
     paths:
@@ -18,6 +20,8 @@ on:
       - infra/**
       - docs/runbooks/aws-legacy-next.md
       - .github/workflows/aws-foundation.yml
+      - .github/workflows/aws-legacy-promote.yml
+      - .github/workflows/aws-legacy-release.yml
   workflow_dispatch:
 
 permissions:
@@ -31,6 +35,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate GitHub Actions workflows
+        run: |
+          docker run --rm --volume "$PWD:/repo:ro" --workdir /repo \
+            rhysd/actionlint@sha256:6f03470d0152251d7f07f7c4dc019dbe7024c72cd952f839544c7798843efa8f \
+            -color
 
       - name: Validate Terraform formatting and environments
         shell: bash
@@ -61,3 +71,12 @@ jobs:
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=ci-public-anon-key \
             --tag indus-legacy-next:ci \
             .
+
+      - name: Scan the current application container
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: indus-legacy-next:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH

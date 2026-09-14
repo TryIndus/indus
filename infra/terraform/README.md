@@ -51,4 +51,6 @@ federated operator session. Production uses deletion protection, multi-AZ
 capacity, longer retention, required MFA, and a two-person apply gate.
 
 The AWS foundation workflow performs non-mutating Terraform formatting and
-validation plus Helm linting and rendering.
+validation plus Helm linting and rendering. After shared bootstrap, the AWS
+legacy release workflow uses GitHub OIDC to publish, scan, sign, attest, and
+promote immutable application images through digest-only GitOps pull requests.

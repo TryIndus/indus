@@ -12,7 +12,7 @@ The Kubernetes workload is rendered by `infra/helm/indus-legacy-next`. It requir
 
 1. Apply and review Terraform in development, then staging. Never apply a plan that creates or changes an unexpected public DNS record, KMS key, secret value, or production data resource.
 2. Create the manually managed `legacy_next` secret with the five required keys. Confirm the workload role can read only that secret and its KMS key.
-3. Publish a signed immutable image, hydrate the GitOps value with its digest, and wait for the deployment, target-group health, authenticated browser smoke test, and accessibility smoke test to pass.
+3. Let `AWS legacy release` publish the development image, then use `Promote AWS legacy image` to promote that same digest to staging and production. Review and merge each digest-only promotion pull request, then wait for Argo CD health, target-group health, the authenticated browser smoke test, and the accessibility smoke test to pass.
 4. Set `edge_runtime = "legacy-next"`, begin Route 53 weighted routing from the Vercel hostname to AWS, and stop immediately if readiness, authentication, provider errors, or client error rates exceed the cutover threshold.
 5. Roll back by returning Route 53 weight to the Vercel origin or by restoring the last known-good immutable AWS image. Do not delete Vercel, Supabase, or secrets until the documented rollback window completes.
 
