@@ -45,3 +45,11 @@ next-env.d.ts
 
 # custom
 /.trunk
+
+# terraform working data and local configuration
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+**/backend.hcl
+**/terraform.tfvars

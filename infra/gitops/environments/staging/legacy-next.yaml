@@ -1,0 +1,11 @@
+image: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/legacy-next@sha256:0000000000000000000000000000000000000000000000000000000000000000
+serviceAccountRoleArn: arn:aws:iam::333333333333:role/indus-staging-legacy-next
+runtimeSecretArn: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/legacy-next
+targetGroupArn: arn:aws:elasticloadbalancing:ca-central-1:333333333333:targetgroup/replace-legacy-next/0000000000000000
+awsRegion: ca-central-1
+replicas: 2
+minReplicas: 2
+maxReplicas: 6
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits: { cpu: "1", memory: 1Gi }
