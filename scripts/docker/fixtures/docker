@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+printf '%s\n' "$*" >>"$DOCKER_CLEANUP_TEST_LOG"
+for last_argument; do :; done
+
+case "$1 ${2:-}" in
+  "info ") exit 0 ;;
+  "system df") echo "mock Docker usage" ;;
+  "ps --all") printf '%s\n' indus-container control-container ;;
+  "volume ls") printf '%s\n' indus-volume control-volume ;;
+  "network ls") printf '%s\n' indus-network control-network ;;
+  "image ls") printf '%s\n' indus-image control-image ;;
+  "rm --force"|"volume rm"|"network rm"|"image rm") exit 0 ;;
+  "inspect --format")
+    case "$last_argument:$*" in
+      indus-container:*com.supabase.cli.project*) echo indus ;;
+      control-container:*com.supabase.cli.project*) echo control ;;
+      indus-container:*\.Name*) echo /indus-container ;;
+      control-container:*\.Name*) echo /control-container ;;
+      indus-container:*\.Image*) echo indus-image ;;
+      control-container:*\.Image*) echo control-image ;;
+      *) echo "<no value>" ;;
+    esac
+    ;;
+  "volume inspect"|"network inspect")
+    case "$last_argument:$*" in
+      indus-*:*com.supabase.cli.project*) echo indus ;;
+      control-*:*com.supabase.cli.project*) echo control ;;
+      indus-network:*\.Name*) echo indus-network ;;
+      control-network:*\.Name*) echo control-network ;;
+      *) echo "<no value>" ;;
+    esac
+    ;;
+  "image inspect")
+    case "$last_argument:$*" in
+      indus-image:*org.opencontainers.image.title*) echo indus ;;
+      indus-image:*\.RepoTags*) echo indus-web:test ;;
+      control-image:*\.RepoTags*) echo control:test ;;
+      *) echo "<no value>" ;;
+    esac
+    ;;
+  *) echo "Unexpected Docker command: $*" >&2; exit 1 ;;
+esac
