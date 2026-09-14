@@ -6,7 +6,7 @@ locals {
     ManagedBy   = "Terraform"
     Repository  = var.github_repository
   })
-  repositories = toset(["platform-api", "market-data", "research-worker", "web"])
+  repositories = toset(["legacy-next", "platform-api", "market-data", "research-worker", "web"])
 }
 
 resource "aws_kms_key" "shared" {
@@ -144,7 +144,6 @@ data "aws_iam_policy_document" "ecr_pull" {
     actions = [
       "ecr:BatchCheckLayerAvailability",
       "ecr:BatchGetImage",
-      "ecr:BatchGetImage",
       "ecr:GetDownloadUrlForLayer",
     ]
     principals {
@@ -203,7 +202,9 @@ data "aws_iam_policy_document" "github_build" {
   statement {
     actions = [
       "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
       "ecr:CompleteLayerUpload",
+      "ecr:DescribeImages",
       "ecr:GetDownloadUrlForLayer",
       "ecr:InitiateLayerUpload",
       "ecr:PutImage",
@@ -259,6 +260,7 @@ data "aws_iam_policy_document" "github_promotion" {
     actions = [
       "ecr:BatchCheckLayerAvailability",
       "ecr:BatchGetImage",
+      "ecr:DescribeImages",
       "ecr:GetDownloadUrlForLayer",
     ]
     resources = values(aws_ecr_repository.this)[*].arn

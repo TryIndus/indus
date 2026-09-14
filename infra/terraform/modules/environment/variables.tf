@@ -153,7 +153,7 @@ variable "alert_email_endpoints" {
 
 variable "shared_ecr_repository_arns" {
   type        = map(string)
-  description = "Immutable shared-services ECR repository ARNs keyed by platform-api, market-data, research-worker, and web."
+  description = "Immutable shared-services ECR repository ARNs keyed by workload, including legacy-next."
 }
 
 variable "shared_ecr_repository_urls" {

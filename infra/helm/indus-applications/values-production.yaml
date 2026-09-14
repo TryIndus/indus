@@ -6,3 +6,7 @@ roles:
   loadBalancer: arn:aws:iam::444444444444:role/indus-production-load-balancer
   otelCollector: arn:aws:iam::444444444444:role/indus-production-otel-collector
 prometheusRemoteWriteUrl: https://aps-workspaces.ca-central-1.amazonaws.com/workspaces/replace-production/api/v1/remote_write
+legacyNext:
+  enabled: true
+platform:
+  enabled: false
