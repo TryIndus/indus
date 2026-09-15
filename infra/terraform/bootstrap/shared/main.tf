@@ -236,7 +236,6 @@ data "aws_iam_policy_document" "github_promotion_assume" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repository}:environment:development",
         "repo:${var.github_repository}:environment:staging",
         "repo:${var.github_repository}:environment:production",
       ]

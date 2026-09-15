@@ -1,11 +1,11 @@
 image: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/legacy-next@sha256:0000000000000000000000000000000000000000000000000000000000000000
 serviceAccountRoleArn: arn:aws:iam::444444444444:role/indus-production-legacy-next
-runtimeSecretArn: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/legacy-next
-targetGroupArn: arn:aws:elasticloadbalancing:ca-central-1:444444444444:targetgroup/replace-legacy-next/0000000000000000
-awsRegion: ca-central-1
-replicas: 3
-minReplicas: 3
-maxReplicas: 10
+runtimeSecretArn: arn:aws:secretsmanager:us-east-1:444444444444:secret:indus-production/legacy-next
+targetGroupArn: arn:aws:elasticloadbalancing:us-east-1:444444444444:targetgroup/replace-legacy-next/0000000000000000
+awsRegion: us-east-1
+replicas: 1
+minReplicas: 1
+maxReplicas: 2
 resources:
   requests: { cpu: 250m, memory: 512Mi }
   limits: { cpu: "1", memory: 1Gi }

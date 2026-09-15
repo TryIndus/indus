@@ -7,7 +7,7 @@ on:
         description: Environment that receives the existing immutable image
         required: true
         type: choice
-        options: [staging, production]
+        options: [production]
       digest:
         description: Existing signed ECR digest, including the sha256 prefix
         required: true
