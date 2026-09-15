@@ -35,6 +35,17 @@ output "observability" {
   }
 }
 
+output "migration_foundation" {
+  value = {
+    artifacts_bucket     = aws_s3_bucket.migration["artifacts"].id
+    export_bucket        = aws_s3_bucket.migration["supabase-export"].id
+    cognito_user_pool_id = aws_cognito_user_pool.migration.id
+    database_secret_arn  = aws_rds_cluster.migration.master_user_secret[0].secret_arn
+    rds_proxy_endpoint   = aws_db_proxy.migration.endpoint
+    aurora_cluster_arn   = aws_rds_cluster.migration.arn
+  }
+}
+
 output "shared_ecr_repository_urls" {
   value = var.shared_ecr_repository_urls
 }

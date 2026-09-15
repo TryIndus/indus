@@ -56,6 +56,30 @@ variable "alert_email_addresses" {
   default = []
 }
 
+variable "cognito_callback_urls" {
+  type        = list(string)
+  description = "Exact OAuth callback URLs reserved for the replacement application."
+  default     = []
+}
+
+variable "cognito_logout_urls" {
+  type        = list(string)
+  description = "Exact Cognito logout URLs reserved for the replacement application."
+  default     = []
+}
+
+variable "database_min_acu" {
+  type        = number
+  description = "Aurora Serverless v2 minimum ACU for the migration target."
+  default     = 0.5
+}
+
+variable "database_max_acu" {
+  type        = number
+  description = "Aurora Serverless v2 maximum ACU for the migration target."
+  default     = 4
+}
+
 variable "shared_ecr_repository_urls" {
   type = map(string)
 }

@@ -154,13 +154,14 @@ All services must emit structured logs, OpenTelemetry traces, RED metrics, depen
 
 ## AWS Topology
 
-![AWS staging and production topology](architecture/aws-topology.svg)
+![AWS migration foundation](architecture/aws-migration-foundation.svg)
 
-The Mermaid source for this diagram is
-[`docs/architecture/aws-topology.mmd`](architecture/aws-topology.mmd).
+The diagram source is
+[`docs/architecture/aws_migration_foundation.py`](architecture/aws_migration_foundation.py).
 
 - Use separate AWS accounts for shared services, staging, and production. Run the AWS runtime in `us-east-1`; CloudFront remains the global edge.
 - Provision networking, EKS, DNS, certificates, runtime secrets, and basic observability through Terraform. Defer managed data services until the phase that uses them.
+- The migration foundation provisions Aurora PostgreSQL, RDS Proxy, Cognito, encrypted export/audit buckets, and backups before data or authentication traffic is cut over. Supabase remains authoritative until export, reconciliation, and rollback rehearsals pass.
 - Run Rails API, Sidekiq, Temporal workers, Rust ingestion, and Rust streaming workloads on EKS.
 - Keep managed stateful services outside the cluster: Aurora, ElastiCache, MSK, and S3.
 - Use ECR for images and Argo CD for declarative cluster reconciliation.

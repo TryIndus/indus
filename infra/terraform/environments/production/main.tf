@@ -56,6 +56,26 @@ variable "alert_email_addresses" {
   default = []
 }
 
+variable "cognito_callback_urls" {
+  type    = list(string)
+  default = []
+}
+
+variable "cognito_logout_urls" {
+  type    = list(string)
+  default = []
+}
+
+variable "database_min_acu" {
+  type    = number
+  default = 0.5
+}
+
+variable "database_max_acu" {
+  type    = number
+  default = 4
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
@@ -88,6 +108,10 @@ module "environment" {
   aws_traffic_weight         = var.aws_traffic_weight
   shared_ecr_repository_urls = var.shared_ecr_repository_urls
   alert_email_addresses      = var.alert_email_addresses
+  cognito_callback_urls      = var.cognito_callback_urls
+  cognito_logout_urls        = var.cognito_logout_urls
+  database_min_acu           = var.database_min_acu
+  database_max_acu           = var.database_max_acu
   tags                       = var.tags
 }
 
