@@ -16,7 +16,7 @@ variable "aws_region" {
 
   validation {
     condition     = var.aws_region == "us-east-1"
-    error_message = "This reduced foundation is intentionally pinned to us-east-1."
+    error_message = "aws_region must be us-east-1."
   }
 }
 

@@ -154,6 +154,11 @@ All services must emit structured logs, OpenTelemetry traces, RED metrics, depen
 
 ## AWS Topology
 
+![AWS staging and production topology](architecture/aws-topology.svg)
+
+The Mermaid source for this diagram is
+[`docs/architecture/aws-topology.mmd`](architecture/aws-topology.mmd).
+
 - Use separate AWS accounts for shared services, staging, and production. Run the AWS runtime in `us-east-1`; CloudFront remains the global edge.
 - Provision networking, EKS, DNS, certificates, runtime secrets, and basic observability through Terraform. Defer managed data services until the phase that uses them.
 - Run Rails API, Sidekiq, Temporal workers, Rust ingestion, and Rust streaming workloads on EKS.
@@ -161,7 +166,7 @@ All services must emit structured logs, OpenTelemetry traces, RED metrics, depen
 - Use ECR for images and Argo CD for declarative cluster reconciliation.
 - Use GitHub Actions only to verify changes, build and sign images, publish artifacts, and update GitOps references.
 - Use CloudFront as the single public origin: serve React assets from S3 and route `/api/*` to Rails and `/stream/*` to Rust through WAF and an Application Load Balancer.
-- The initial foundation uses one active workload AZ, plus a second empty ALB subnet required by ALB. Document this accepted availability trade-off; add regional recovery only when the stateful platform is introduced.
+- The initial foundation uses one active workload AZ, plus a second empty ALB subnet required by ALB. A primary-AZ, node, or NAT outage makes the environment unavailable; this is an explicit cost/reliability trade-off, not high availability. Add regional recovery only when the stateful platform is introduced.
 
 ## Repository Direction
 

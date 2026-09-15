@@ -1,16 +1,5 @@
 # AWS deployment of the current application
 
-This runbook moves the current Next.js application from Vercel to AWS without
-changing its product or provider boundaries. Supabase remains the identity and
-database provider; Alpaca, Yahoo Finance, and Gemini remain provider
-boundaries.
-
-The Phase 1 runtime is `us-east-1` only. CloudFront is in front of the
-application and connects over HTTPS to the ALB. The ALB
-occupies two public subnets as required by AWS, while the one EKS worker node
-and its workload live only in the primary private subnet. Cross-zone ALB
-routing reaches that primary target from either ALB subnet.
-
 ## Release contract
 
 Build the root `Dockerfile` with the two publishable Supabase build arguments.
@@ -38,10 +27,3 @@ from reaching the pod.
    error rates regress.
 5. Roll back by returning DNS weight to Vercel or restoring the previous
    signed image.
-
-## Accepted reliability boundary
-
-The application data plane is single-AZ and single-node. A primary AZ, NAT,
-node, or pod outage makes the environment unavailable. The secondary ALB subnet
-exists solely to meet ALB requirements and preserve edge connectivity; it has
-no workload targets. Do not represent this design as highly available.

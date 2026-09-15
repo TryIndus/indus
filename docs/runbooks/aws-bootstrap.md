@@ -1,27 +1,14 @@
-# Minimal AWS bootstrap and GitOps activation
+# AWS bootstrap and GitOps activation
 
 Use this runbook only after a reviewed Terraform plan is approved. The
 foundation creates billable AWS resources and must run from a short-lived,
 MFA-backed operator session. Never place AWS access keys or application secret
 values in GitHub, Terraform variables, plans, state, or Git.
 
-The Phase 1 footprint is deliberately limited to staging and production in
-`us-east-1`. Each environment has one EKS cluster, one active worker-node AZ,
-one NAT gateway, one runtime secret, CloudFront, and an ALB. The ALB
-uses two public subnets because AWS requires it, but all application targets
-run in the primary private subnet. A primary-AZ outage causes application
-downtime; this is an accepted cost/reliability trade-off, not HA.
-
-See [the rendered architecture diagram](../architecture/aws-minimal.svg) and
-[its Mermaid source](../architecture/aws-minimal.mmd).
-
-![Minimal AWS staging and production topology](../architecture/aws-minimal.svg)
-
 ## Prerequisites
 
 - One shared-services AWS account and isolated staging and production accounts.
-- One owned domain. Delegate `staging.<domain>` to the staging account and keep
-  the production application zone in the production account.
+- Route 53 hosted zones that match the checked-in environment inputs.
 - Terraform, AWS CLI, Helm, and kubectl installed locally.
 - MFA-backed roles that can apply the reviewed shared and environment plans.
 
@@ -48,9 +35,8 @@ repository variables from its outputs:
 
 ## 2. Provision staging, then production
 
-Copy the checked-in staging examples to ignored local files, replace every
-placeholder with shared bootstrap outputs, account ID, Route 53 zone, and
-approved operator CIDRs. Run:
+Copy the checked-in staging examples to ignored local files and replace every
+placeholder with shared bootstrap outputs, account ID, and Route 53 zone. Run:
 
 ```bash
 terraform -chdir=infra/terraform/environments/staging init \

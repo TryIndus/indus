@@ -1,20 +1,14 @@
-# Minimal AWS infrastructure
+# AWS infrastructure
 
-Phase 1 has two Terraform boundaries:
+Terraform has two boundaries:
 
 - `bootstrap/shared` runs once in the shared-services account. It creates
   encrypted remote state, immutable ECR repositories, and GitHub Actions OIDC
   roles.
 - `environments/{staging,production}` runs in isolated runtime accounts. Each
-  uses a distinct state key and the same minimal environment module.
+  uses a distinct state key and the same environment module.
 
-Each environment is limited to a CloudFront edge, a two-subnet ALB, one
-active EKS worker-node AZ, one NAT gateway, one runtime secret, and basic
-CloudWatch/SNS observability. Terraform never stores runtime secret values.
-
-The two ALB subnets are mandatory, but only the primary private subnet receives
-application nodes and pods. This saves cost at the expense of application
-availability during a primary-AZ failure.
+Terraform never stores runtime secret values.
 
 Provider locks are committed for reproducibility. Local `.terraform/`, backend
 files, plans, state, and variable files remain ignored.
