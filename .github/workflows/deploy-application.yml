@@ -1,0 +1,137 @@
+name: Deploy application
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-application-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_SHARED_REGION }}
+  ECR_REPOSITORY: indus/legacy-next
+
+jobs:
+  target:
+    name: Validate branch target
+    runs-on: ubuntu-24.04
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
+    steps:
+      - id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF_NAME" in
+            staging) echo "environment=staging" >> "$GITHUB_OUTPUT" ;;
+            main) echo "environment=production" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Deployments must run from staging or main." >&2; exit 1 ;;
+          esac
+
+  deploy:
+    name: Build and publish ${{ needs.target.outputs.environment }} application
+    needs: target
+    environment: ${{ needs.target.outputs.environment }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    if: vars.AWS_BUILD_ROLE_ARN != ''
+    steps:
+      - name: Check out requested branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate deployment configuration
+        env:
+          BUILD_ROLE_ARN: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$AWS_REGION"
+          test -n "$BUILD_ROLE_ARN"
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          role-session-name: indus-application-${{ github.run_id }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      - name: Build immutable image
+        id: build
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$ECR_REGISTRY/$ECR_REPOSITORY:sha-$GITHUB_SHA"
+          docker build --build-arg "NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL" \
+            --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" --tag "$image" .
+          echo "image_tag=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Scan release image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.build.outputs.image_tag }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Generate release SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.build.outputs.image_tag }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          artifact-name: application-${{ github.sha }}.spdx.json
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Push, sign, and attest immutable image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push "${{ steps.build.outputs.image_tag }}"
+          digest="$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" \
+            --image-ids "imageTag=sha-$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text)"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          image="$ECR_REGISTRY/$ECR_REPOSITORY@$digest"
+          cosign sign --yes "$image"
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$image"
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+
+      - name: Update the branch GitOps digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          values="infra/gitops/environments/${{ needs.target.outputs.environment }}/legacy-next.yaml"
+          awk -v image="$IMAGE" '/^image: / { print "image: " image; next } { print }' "$values" > "$values.next"
+          mv "$values.next" "$values"
+
+      - name: Commit GitOps digest to the deployment branch
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          add-paths: infra/gitops/environments/${{ needs.target.outputs.environment }}/legacy-next.yaml
+          base: ${{ github.ref_name }}
+          branch: deploy/application-${{ github.ref_name }}-${{ github.sha }}
+          commit-message: Deploy application to ${{ needs.target.outputs.environment }}
+          title: Deploy application to ${{ needs.target.outputs.environment }}
+          body: Deploys `${{ env.IMAGE }}` from `${{ github.ref_name }}`.
+          delete-branch: true

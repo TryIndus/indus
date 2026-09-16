@@ -197,7 +197,7 @@ resource "aws_s3_bucket" "data" {
   for_each = local.data_buckets
 
   bucket        = "${local.name}-${each.value}-${data.aws_caller_identity.current.account_id}"
-  force_destroy = false
+  force_destroy = !local.production
 
   tags = merge(local.common_tags, {
     DataClass = each.value

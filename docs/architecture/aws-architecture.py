@@ -12,7 +12,7 @@ from diagrams.onprem.vcs import Github
 with Diagram(
     "Indus AWS architecture",
     filename="docs/architecture/aws-architecture",
-    outformat=["png", "svg"],
+    outformat="png",
     show=False,
     direction="LR",
     graph_attr={
@@ -32,25 +32,25 @@ with Diagram(
     route53 = Route53("Route 53")
     cloudfront = CloudFront("CloudFront")
 
-    with Cluster("AWS account · us-east-1", graph_attr={"margin": "32", "pad": "0.8"}):
-        with Cluster("Public subnets · two AZs", graph_attr={"margin": "28", "pad": "0.6"}):
+    with Cluster("AWS Account [us-east-1]", graph_attr={"margin": "32", "pad": "0.8"}):
+        with Cluster("Public Subnets [2 AZs]", graph_attr={"margin": "28", "pad": "0.6"}):
             alb = ELB("Application Load Balancer")
 
-        with Cluster("Private subnets · active workload AZ", graph_attr={"margin": "28", "pad": "0.6"}):
+        with Cluster("Private Subnets [Active Workload AZ]", graph_attr={"margin": "28", "pad": "0.6"}):
             eks = EKS("EKS workloads")
-            secrets = SecretsManager("Runtime secrets")
+            secrets = SecretsManager("Runtime Secrets")
 
-        with Cluster("Private data boundary · two AZs", graph_attr={"margin": "28", "pad": "0.6"}):
+        with Cluster("Private Data Boundary [2 AZs]", graph_attr={"margin": "28", "pad": "0.6"}):
             aurora = Aurora("Aurora PostgreSQL")
             proxy = RDS("RDS Proxy")
-            cognito = Cognito("Cognito user pool")
-            exports = S3("Encrypted export and audit buckets")
-            logs = Cloudwatch("Database and application logs")
+            cognito = Cognito("Cognito User Pool")
+            exports = S3("Encrypted Export and Audit Buckets")
+            logs = Cloudwatch("Database and Application Logs")
 
     users >> route53 >> cloudfront >> Edge(label="HTTPS") >> alb >> eks
-    github >> Edge(label="immutable image and data job") >> eks
+    github >> Edge(label="Immutable Image and Data Job") >> eks
     eks >> Edge(label="TLS") >> proxy >> aurora
     eks >> secrets
     eks >> cognito
-    eks >> Edge(label="verified export artifacts") >> exports
+    eks >> Edge(label="Verified Export Artifacts") >> exports
     aurora >> logs

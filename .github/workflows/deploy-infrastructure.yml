@@ -1,0 +1,94 @@
+name: Deploy infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Terraform operation
+        required: true
+        type: choice
+        options: [plan, apply, destroy]
+      confirmation:
+        description: Required only for staging destroy
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-infrastructure-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  target:
+    name: Validate branch and operation
+    runs-on: ubuntu-24.04
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
+    steps:
+      - id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF_NAME" in
+            staging) environment=staging ;;
+            main) environment=production ;;
+            *) echo "Infrastructure deployments must run from staging or main." >&2; exit 1 ;;
+          esac
+          if [[ "${{ inputs.operation }}" == destroy ]]; then
+            [[ "$environment" == staging ]] || { echo "Production destroy is not implemented." >&2; exit 1; }
+            [[ "${{ inputs.confirmation }}" == destroy-staging ]] || { echo "Use confirmation destroy-staging." >&2; exit 1; }
+          fi
+          echo "environment=$environment" >> "$GITHUB_OUTPUT"
+
+  terraform:
+    name: ${{ inputs.operation }} ${{ needs.target.outputs.environment }} infrastructure
+    needs: target
+    environment: ${{ needs.target.outputs.environment }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: hashicorp/setup-terraform@d4998ee65f164d6c8958387c2ee8910df98f4c08 # v3.1.0
+        with:
+          terraform_version: 1.14.2
+
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ vars.AWS_TERRAFORM_REGION }}
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          role-session-name: indus-infrastructure-${{ github.run_id }}
+
+      - name: Restore environment configuration
+        env:
+          BACKEND_CONFIG_B64: ${{ secrets.TF_BACKEND_CONFIG_B64 }}
+          TFVARS_B64: ${{ secrets.TF_VARS_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$BACKEND_CONFIG_B64"
+          test -n "$TFVARS_B64"
+          environment="${{ needs.target.outputs.environment }}"
+          printf '%s' "$BACKEND_CONFIG_B64" | base64 --decode > "infra/terraform/environments/$environment/backend.hcl"
+          printf '%s' "$TFVARS_B64" | base64 --decode > "infra/terraform/environments/$environment/terraform.tfvars"
+
+      - name: Plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          environment="${{ needs.target.outputs.environment }}"
+          terraform -chdir="infra/terraform/environments/$environment" init -input=false -backend-config=backend.hcl
+          if [[ "${{ inputs.operation }}" == destroy ]]; then
+            terraform -chdir="infra/terraform/environments/$environment" plan -destroy -input=false -out=approved.tfplan
+          else
+            terraform -chdir="infra/terraform/environments/$environment" plan -input=false -out=approved.tfplan
+          fi
+
+      - name: Apply reviewed plan
+        if: inputs.operation == 'apply' || inputs.operation == 'destroy'
+        shell: bash
+        run: terraform -chdir=infra/terraform/environments/${{ needs.target.outputs.environment }} apply -input=false approved.tfplan

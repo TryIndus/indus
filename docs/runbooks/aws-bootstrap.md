@@ -1,7 +1,6 @@
 # AWS bootstrap and GitOps activation
 
-Use this runbook only after a reviewed Terraform plan is approved. The
-foundation creates billable AWS resources and must run from a short-lived,
+Use this runbook only after a reviewed Terraform plan is approved. AWS creates billable resources and must run from a short-lived,
 MFA-backed operator session. Never place AWS access keys or application secret
 values in GitHub, Terraform variables, plans, state, or Git.
 
@@ -29,7 +28,8 @@ repository variables from its outputs:
 
 - `AWS_SHARED_REGION=us-east-1`
 - `AWS_BUILD_ROLE_ARN`
-- `AWS_PROMOTION_ROLE_ARN`
+- `AWS_TERRAFORM_ROLE_ARN`
+- `AWS_TERRAFORM_REGION=us-east-1`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
@@ -69,8 +69,8 @@ workload role can read only this secret.
 Replace account-specific placeholders in
 `infra/helm/indus-applications/values-<environment>.yaml` and
 `infra/gitops/environments/<environment>/legacy-next.yaml` with Terraform
-outputs. Leave the zero digest until the release workflow opens its first
-promotion PR.
+outputs. Leave the zero digest until the deployment workflow opens its first
+deployment PR.
 
 ```bash
 aws eks update-kubeconfig --region us-east-1 --name indus-staging
@@ -82,20 +82,20 @@ helm upgrade --install argocd argo/argo-cd \
 kubectl apply -f infra/gitops/bootstrap/staging.yaml
 ```
 
-Verify Argo CD applications are healthy before promotion. Only the current
+Verify Argo CD applications are healthy before deployment. Only the current
 Next.js workload and required add-ons run in Phase 1.
 
-## 5. Release, cut over, and roll back
+## 5. Configure branch deployment
 
-Every relevant push to `main` builds, scans, signs, attests, and publishes one
-immutable image, then opens a staging digest-promotion PR. Merge that PR only
-after checks pass; Argo CD reconciles the exact digest. Promote the same digest
-to production through the manual `Promote AWS legacy image` workflow.
+Create `staging` from `main` after this PR merges. Configure GitHub Environment
+variables `AWS_TERRAFORM_ROLE_ARN` and `AWS_TERRAFORM_REGION`, plus base64
+secrets `TF_BACKEND_CONFIG_B64` and `TF_VARS_B64`, in each environment. The
+encoded files are the environment's ignored `backend.hcl` and `terraform.tfvars`.
 
-Production starts with Route 53 sending 0% traffic to AWS and 100% to Vercel.
-Increase `aws_traffic_weight` only after CloudFront, ALB target health,
-authenticated browser checks, and accessibility smoke tests pass. Roll back by
-restoring the prior signed digest or by returning the DNS weight to Vercel.
+Use `./bin/indus deploy app staging` from `staging` or
+`./bin/indus deploy app production` from `main`. Infrastructure is dispatched
+with `./bin/indus deploy infra <staging|production> <plan|apply|destroy>`.
+Staging destroy additionally requires `--confirm`; production destroy is not
+available.
 
-Do not retire Vercel, the prior image, or the secret until the rollback window
-closes.
+Merge reviewed changes from `staging` to `main` before production deployment.

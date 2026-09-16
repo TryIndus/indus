@@ -15,13 +15,13 @@ from reaching the pod.
 
 ## Cutover and rollback
 
-1. Apply staging, review its Terraform plan and acceptance checks, then apply
-   production from a separately reviewed plan.
+1. Run the explicit staging infrastructure plan and apply from `staging`, then
+   deploy the application from `staging`.
 2. Store the five required values in the production `legacy-next` secret and
    confirm the pod role can read only it.
-3. Promote the same signed image from staging to production. Wait for Argo CD,
-   CloudFront, ALB target health, authenticated browser smoke tests, and
-   accessibility tests.
+3. Merge the reviewed `staging` branch into `main`, then deploy the application
+   and infrastructure explicitly from `main`. Wait for Argo CD, CloudFront, ALB
+   target health, authenticated browser smoke tests, and accessibility tests.
 4. Increase Route 53 `aws_traffic_weight` gradually from the Vercel origin to
    CloudFront. Stop if readiness, authentication, provider errors, or client
    error rates regress.

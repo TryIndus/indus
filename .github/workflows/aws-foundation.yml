@@ -1,4 +1,4 @@
-name: AWS foundation verification
+name: AWS platform verification
 
 on:
   pull_request:
@@ -9,10 +9,10 @@ on:
       - infra/**
       - docs/runbooks/aws-legacy-next.md
       - .github/workflows/aws-foundation.yml
-      - .github/workflows/aws-legacy-promote.yml
-      - .github/workflows/aws-legacy-release.yml
+      - .github/workflows/deploy-application.yml
+      - .github/workflows/deploy-infrastructure.yml
   push:
-    branches: [main]
+    branches: [staging, main]
     paths:
       - Dockerfile
       - .dockerignore
@@ -20,8 +20,8 @@ on:
       - infra/**
       - docs/runbooks/aws-legacy-next.md
       - .github/workflows/aws-foundation.yml
-      - .github/workflows/aws-legacy-promote.yml
-      - .github/workflows/aws-legacy-release.yml
+      - .github/workflows/deploy-application.yml
+      - .github/workflows/deploy-infrastructure.yml
   workflow_dispatch:
 
 permissions:
