@@ -15,7 +15,7 @@ terraform {
 
 provider "aws" {
   region              = var.aws_region
-  allowed_account_ids = [var.shared_account_id]
+  allowed_account_ids = [var.project_account_id]
 
   default_tags {
     tags = local.common_tags

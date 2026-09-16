@@ -4,7 +4,7 @@ clusterName: indus-production
 vpcId: vpc-replace-production
 awsRegion: us-east-1
 roles:
-  loadBalancer: arn:aws:iam::444444444444:role/indus-production-load-balancer
+  loadBalancer: arn:aws:iam::111111111111:role/indus-production-load-balancer
 legacyNext:
   enabled: true
 platform:

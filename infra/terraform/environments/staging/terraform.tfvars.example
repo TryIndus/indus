@@ -1,4 +1,4 @@
-account_id        = "333333333333"
+account_id        = "111111111111"
 aws_region        = "us-east-1"
 vpc_cidr          = "10.30.0.0/16"
 domain_name       = "app.staging.indus.example.com"

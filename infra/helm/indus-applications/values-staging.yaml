@@ -4,7 +4,7 @@ clusterName: indus-staging
 vpcId: vpc-replace-staging
 awsRegion: us-east-1
 roles:
-  loadBalancer: arn:aws:iam::333333333333:role/indus-staging-load-balancer
+  loadBalancer: arn:aws:iam::111111111111:role/indus-staging-load-balancer
 legacyNext:
   enabled: true
 platform:
