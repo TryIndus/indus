@@ -1,5 +1,5 @@
-resource "aws_cognito_user_pool" "migration" {
-  name                     = "${local.name}-migration"
+resource "aws_cognito_user_pool" "this" {
+  name                     = local.name
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
   deletion_protection      = local.production ? "ACTIVE" : "INACTIVE"
@@ -21,9 +21,9 @@ resource "aws_cognito_user_pool" "migration" {
   tags = local.common_tags
 }
 
-resource "aws_cognito_user_pool_client" "migration" {
-  name         = "migration-web"
-  user_pool_id = aws_cognito_user_pool.migration.id
+resource "aws_cognito_user_pool_client" "web" {
+  name         = "web"
+  user_pool_id = aws_cognito_user_pool.this.id
 
   generate_secret                      = false
   prevent_user_existence_errors        = "ENABLED"
@@ -42,7 +42,7 @@ resource "aws_cognito_user_pool_client" "migration" {
   }
 }
 
-resource "aws_cognito_user_pool_domain" "migration" {
+resource "aws_cognito_user_pool_domain" "this" {
   domain       = "${local.name}-${data.aws_caller_identity.current.account_id}"
-  user_pool_id = aws_cognito_user_pool.migration.id
+  user_pool_id = aws_cognito_user_pool.this.id
 }

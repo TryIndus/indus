@@ -70,13 +70,13 @@ variable "cognito_logout_urls" {
 
 variable "database_min_acu" {
   type        = number
-  description = "Aurora Serverless v2 minimum ACU for the migration target."
+  description = "Aurora Serverless v2 minimum ACU for the application data store."
   default     = 0.5
 }
 
 variable "database_max_acu" {
   type        = number
-  description = "Aurora Serverless v2 maximum ACU for the migration target."
+  description = "Aurora Serverless v2 maximum ACU for the application data store."
   default     = 4
 }
 

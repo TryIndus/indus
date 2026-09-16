@@ -10,27 +10,37 @@ from diagrams.onprem.vcs import Github
 
 
 with Diagram(
-    "Indus AWS migration foundation",
-    filename="docs/architecture/aws-migration-foundation",
+    "Indus AWS architecture",
+    filename="docs/architecture/aws-architecture",
     outformat=["png", "svg"],
     show=False,
-    direction="TB",
-    graph_attr={"pad": "0.5", "nodesep": "0.6", "ranksep": "0.8", "bgcolor": "white"},
+    direction="LR",
+    graph_attr={
+        "pad": "1.4",
+        "nodesep": "1.3",
+        "ranksep": "1.8",
+        "splines": "ortho",
+        "bgcolor": "white",
+        "fontname": "Arial",
+        "fontsize": "20",
+    },
+    node_attr={"fontname": "Arial", "fontsize": "14"},
+    edge_attr={"fontname": "Arial", "fontsize": "12"},
 ):
     users = Users("Users")
     github = Github("GitHub Actions")
     route53 = Route53("Route 53")
     cloudfront = CloudFront("CloudFront")
 
-    with Cluster("AWS account · us-east-1"):
-        with Cluster("Public subnets · two AZs"):
+    with Cluster("AWS account · us-east-1", graph_attr={"margin": "32", "pad": "0.8"}):
+        with Cluster("Public subnets · two AZs", graph_attr={"margin": "28", "pad": "0.6"}):
             alb = ELB("Application Load Balancer")
 
-        with Cluster("Private subnets · active workload AZ"):
-            eks = EKS("EKS migration workloads")
-            secrets = SecretsManager("Runtime and migration secrets")
+        with Cluster("Private subnets · active workload AZ", graph_attr={"margin": "28", "pad": "0.6"}):
+            eks = EKS("EKS workloads")
+            secrets = SecretsManager("Runtime secrets")
 
-        with Cluster("Private data boundary · two AZs"):
+        with Cluster("Private data boundary · two AZs", graph_attr={"margin": "28", "pad": "0.6"}):
             aurora = Aurora("Aurora PostgreSQL")
             proxy = RDS("RDS Proxy")
             cognito = Cognito("Cognito user pool")
@@ -38,7 +48,7 @@ with Diagram(
             logs = Cloudwatch("Database and application logs")
 
     users >> route53 >> cloudfront >> Edge(label="HTTPS") >> alb >> eks
-    github >> Edge(label="immutable image and migration job") >> eks
+    github >> Edge(label="immutable image and data job") >> eks
     eks >> Edge(label="TLS") >> proxy >> aurora
     eks >> secrets
     eks >> cognito

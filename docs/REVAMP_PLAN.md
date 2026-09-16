@@ -154,20 +154,20 @@ All services must emit structured logs, OpenTelemetry traces, RED metrics, depen
 
 ## AWS Topology
 
-![AWS migration foundation](architecture/aws-migration-foundation.svg)
+![AWS architecture](architecture/aws-architecture.svg)
 
 The diagram source is
-[`docs/architecture/aws_migration_foundation.py`](architecture/aws_migration_foundation.py).
+[`docs/architecture/aws-architecture.py`](architecture/aws-architecture.py).
 
 - Use separate AWS accounts for shared services, staging, and production. Run the AWS runtime in `us-east-1`; CloudFront remains the global edge.
 - Provision networking, EKS, DNS, certificates, runtime secrets, and basic observability through Terraform. Defer managed data services until the phase that uses them.
-- The migration foundation provisions Aurora PostgreSQL, RDS Proxy, Cognito, encrypted export/audit buckets, and backups before data or authentication traffic is cut over. Supabase remains authoritative until export, reconciliation, and rollback rehearsals pass.
+- The AWS data platform provisions Aurora PostgreSQL, RDS Proxy, Cognito, encrypted export/audit buckets, and backups before data or authentication traffic is cut over. Supabase remains authoritative until export, reconciliation, and rollback rehearsals pass.
 - Run Rails API, Sidekiq, Temporal workers, Rust ingestion, and Rust streaming workloads on EKS.
 - Keep managed stateful services outside the cluster: Aurora, ElastiCache, MSK, and S3.
 - Use ECR for images and Argo CD for declarative cluster reconciliation.
 - Use GitHub Actions only to verify changes, build and sign images, publish artifacts, and update GitOps references.
 - Use CloudFront as the single public origin: serve React assets from S3 and route `/api/*` to Rails and `/stream/*` to Rust through WAF and an Application Load Balancer.
-- The initial foundation uses one active workload AZ, plus a second empty ALB subnet required by ALB. A primary-AZ, node, or NAT outage makes the environment unavailable; this is an explicit cost/reliability trade-off, not high availability. Add regional recovery only when the stateful platform is introduced.
+- The initial platform uses one active workload AZ, plus a second empty ALB subnet required by ALB. A primary-AZ, node, or NAT outage makes the environment unavailable; this is an explicit cost/reliability trade-off, not high availability. Add regional recovery only when the stateful platform is introduced.
 
 ## Repository Direction
 

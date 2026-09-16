@@ -35,14 +35,14 @@ output "observability" {
   }
 }
 
-output "migration_foundation" {
+output "data_platform" {
   value = {
-    artifacts_bucket     = aws_s3_bucket.migration["artifacts"].id
-    export_bucket        = aws_s3_bucket.migration["supabase-export"].id
-    cognito_user_pool_id = aws_cognito_user_pool.migration.id
-    database_secret_arn  = aws_rds_cluster.migration.master_user_secret[0].secret_arn
-    rds_proxy_endpoint   = aws_db_proxy.migration.endpoint
-    aurora_cluster_arn   = aws_rds_cluster.migration.arn
+    artifacts_bucket     = aws_s3_bucket.data["artifacts"].id
+    export_bucket        = aws_s3_bucket.data["exports"].id
+    cognito_user_pool_id = aws_cognito_user_pool.this.id
+    database_secret_arn  = aws_rds_cluster.data.master_user_secret[0].secret_arn
+    rds_proxy_endpoint   = aws_db_proxy.data.endpoint
+    aurora_cluster_arn   = aws_rds_cluster.data.arn
   }
 }
 

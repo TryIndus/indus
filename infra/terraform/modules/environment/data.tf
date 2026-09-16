@@ -1,19 +1,19 @@
-resource "aws_kms_key" "migration" {
-  description             = "${local.name} migration data encryption"
+resource "aws_kms_key" "data" {
+  description             = "${local.name} data encryption"
   deletion_window_in_days = local.production ? 30 : 7
   enable_key_rotation     = true
 
   tags = local.common_tags
 }
 
-resource "aws_kms_alias" "migration" {
-  name          = "alias/${local.name}-migration"
-  target_key_id = aws_kms_key.migration.key_id
+resource "aws_kms_alias" "data" {
+  name          = "alias/${local.name}"
+  target_key_id = aws_kms_key.data.key_id
 }
 
 resource "aws_security_group" "database" {
   name        = "${local.name}-aurora"
-  description = "PostgreSQL migration target from RDS Proxy only"
+  description = "PostgreSQL data store from RDS Proxy only"
   vpc_id      = aws_vpc.this.id
 
   tags = local.common_tags
@@ -54,17 +54,17 @@ resource "aws_security_group_rule" "proxy_to_database" {
   source_security_group_id = aws_security_group.database.id
 }
 
-resource "aws_db_subnet_group" "migration" {
+resource "aws_db_subnet_group" "data" {
   name       = "${local.name}-aurora"
   subnet_ids = values(aws_subnet.private)[*].id
 
   tags = local.common_tags
 }
 
-resource "aws_rds_cluster_parameter_group" "migration" {
+resource "aws_rds_cluster_parameter_group" "data" {
   name        = "${local.name}-aurora-postgresql"
   family      = "aurora-postgresql17"
-  description = "PostgreSQL settings for the Supabase migration target"
+  description = "PostgreSQL settings for the application data store"
 
   parameter {
     name         = "rds.force_ssl"
@@ -81,25 +81,25 @@ resource "aws_rds_cluster_parameter_group" "migration" {
   tags = local.common_tags
 }
 
-resource "aws_rds_cluster" "migration" {
-  cluster_identifier              = "${local.name}-migration"
+resource "aws_rds_cluster" "data" {
+  cluster_identifier              = local.name
   engine                          = "aurora-postgresql"
   engine_mode                     = "provisioned"
   engine_version                  = "17.5"
   database_name                   = "indus"
   master_username                 = "indus_admin"
   manage_master_user_password     = true
-  master_user_secret_kms_key_id   = aws_kms_key.migration.arn
-  db_subnet_group_name            = aws_db_subnet_group.migration.name
-  db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.migration.name
+  master_user_secret_kms_key_id   = aws_kms_key.data.arn
+  db_subnet_group_name            = aws_db_subnet_group.data.name
+  db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.data.name
   vpc_security_group_ids          = [aws_security_group.database.id]
   storage_encrypted               = true
-  kms_key_id                      = aws_kms_key.migration.arn
+  kms_key_id                      = aws_kms_key.data.arn
   backup_retention_period         = local.production ? 35 : 7
   copy_tags_to_snapshot           = true
   deletion_protection             = local.production
   skip_final_snapshot             = !local.production
-  final_snapshot_identifier       = local.production ? "${local.name}-migration-final" : null
+  final_snapshot_identifier       = local.production ? "${local.name}-final" : null
   enabled_cloudwatch_logs_exports = ["postgresql"]
 
   serverlessv2_scaling_configuration {
@@ -110,12 +110,12 @@ resource "aws_rds_cluster" "migration" {
   tags = local.common_tags
 }
 
-resource "aws_rds_cluster_instance" "migration" {
-  identifier                   = "${local.name}-migration-1"
-  cluster_identifier           = aws_rds_cluster.migration.id
+resource "aws_rds_cluster_instance" "data" {
+  identifier                   = "${local.name}-1"
+  cluster_identifier           = aws_rds_cluster.data.id
   instance_class               = "db.serverless"
-  engine                       = aws_rds_cluster.migration.engine
-  engine_version               = aws_rds_cluster.migration.engine_version
+  engine                       = aws_rds_cluster.data.engine
+  engine_version               = aws_rds_cluster.data.engine_version
   auto_minor_version_upgrade   = true
   publicly_accessible          = false
   performance_insights_enabled = true
@@ -146,13 +146,13 @@ data "aws_iam_policy_document" "rds_proxy" {
   statement {
     effect    = "Allow"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_rds_cluster.migration.master_user_secret[0].secret_arn]
+    resources = [aws_rds_cluster.data.master_user_secret[0].secret_arn]
   }
 
   statement {
     effect    = "Allow"
     actions   = ["kms:Decrypt"]
-    resources = [aws_kms_key.migration.arn]
+    resources = [aws_kms_key.data.arn]
   }
 }
 
@@ -162,8 +162,8 @@ resource "aws_iam_role_policy" "rds_proxy" {
   policy = data.aws_iam_policy_document.rds_proxy.json
 }
 
-resource "aws_db_proxy" "migration" {
-  name                   = "${local.name}-migration"
+resource "aws_db_proxy" "data" {
+  name                   = local.name
   engine_family          = "POSTGRESQL"
   role_arn               = aws_iam_role.rds_proxy.arn
   vpc_subnet_ids         = values(aws_subnet.private)[*].id
@@ -173,28 +173,28 @@ resource "aws_db_proxy" "migration" {
   auth {
     auth_scheme = "SECRETS"
     iam_auth    = "DISABLED"
-    secret_arn  = aws_rds_cluster.migration.master_user_secret[0].secret_arn
+    secret_arn  = aws_rds_cluster.data.master_user_secret[0].secret_arn
   }
 
   tags = local.common_tags
 }
 
-resource "aws_db_proxy_default_target_group" "migration" {
-  db_proxy_name = aws_db_proxy.migration.name
+resource "aws_db_proxy_default_target_group" "data" {
+  db_proxy_name = aws_db_proxy.data.name
 }
 
-resource "aws_db_proxy_target" "migration" {
-  db_cluster_identifier = aws_rds_cluster.migration.id
-  db_proxy_name         = aws_db_proxy.migration.name
-  target_group_name     = aws_db_proxy_default_target_group.migration.name
+resource "aws_db_proxy_target" "data" {
+  db_cluster_identifier = aws_rds_cluster.data.id
+  db_proxy_name         = aws_db_proxy.data.name
+  target_group_name     = aws_db_proxy_default_target_group.data.name
 }
 
 locals {
-  migration_buckets = toset(["artifacts", "audit", "supabase-export"])
+  data_buckets = toset(["artifacts", "audit", "exports"])
 }
 
-resource "aws_s3_bucket" "migration" {
-  for_each = local.migration_buckets
+resource "aws_s3_bucket" "data" {
+  for_each = local.data_buckets
 
   bucket        = "${local.name}-${each.value}-${data.aws_caller_identity.current.account_id}"
   force_destroy = false
@@ -204,8 +204,8 @@ resource "aws_s3_bucket" "migration" {
   })
 }
 
-resource "aws_s3_bucket_public_access_block" "migration" {
-  for_each = aws_s3_bucket.migration
+resource "aws_s3_bucket_public_access_block" "data" {
+  for_each = aws_s3_bucket.data
 
   bucket                  = each.value.id
   block_public_acls       = true
@@ -214,8 +214,8 @@ resource "aws_s3_bucket_public_access_block" "migration" {
   restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_versioning" "migration" {
-  for_each = aws_s3_bucket.migration
+resource "aws_s3_bucket_versioning" "data" {
+  for_each = aws_s3_bucket.data
 
   bucket = each.value.id
 
@@ -224,14 +224,14 @@ resource "aws_s3_bucket_versioning" "migration" {
   }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "migration" {
-  for_each = aws_s3_bucket.migration
+resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
+  for_each = aws_s3_bucket.data
 
   bucket = each.value.id
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.migration.arn
+      kms_master_key_id = aws_kms_key.data.arn
       sse_algorithm     = "aws:kms"
     }
   }
