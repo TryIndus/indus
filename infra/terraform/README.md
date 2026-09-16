@@ -2,11 +2,12 @@
 
 Terraform has two boundaries:
 
-- `bootstrap/shared` runs once in the shared-services account. It creates
+- `bootstrap/shared` runs once in the dedicated Indus member account. It creates
   encrypted remote state, immutable ECR repositories, and GitHub Actions OIDC
   roles.
-- `environments/{staging,production}` runs in isolated runtime accounts. Each
-  uses a distinct state key and the same environment module.
+- `environments/{staging,production}` runs in that same member account. Each
+  uses a distinct state key, VPC, IAM boundary, and copy of the environment
+  module.
 
 Terraform never stores runtime secret values.
 

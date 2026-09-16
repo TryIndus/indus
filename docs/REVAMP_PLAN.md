@@ -159,7 +159,7 @@ All services must emit structured logs, OpenTelemetry traces, RED metrics, depen
 The diagram source is
 [`docs/architecture/aws-architecture.py`](architecture/aws-architecture.py).
 
-- Use separate AWS accounts for shared services, staging, and production. Run the AWS runtime in `us-east-1`; CloudFront remains the global edge.
+- Keep the AWS Organizations management and billing account free of project workloads. Place all Indus resources in one dedicated member account, with separate Terraform state, VPCs, IAM roles, and resource names for shared services, staging, and production. Run the AWS runtime in `us-east-1`; CloudFront remains the global edge.
 - Provision networking, EKS, DNS, certificates, runtime secrets, and basic observability through Terraform. Defer managed data services until the phase that uses them.
 - The AWS data platform provisions Aurora PostgreSQL, RDS Proxy, Cognito, encrypted export/audit buckets, and backups before data or authentication traffic is cut over. Supabase remains authoritative until export, reconciliation, and rollback rehearsals pass.
 - Run Rails API, Sidekiq, Temporal workers, Rust ingestion, and Rust streaming workloads on EKS.

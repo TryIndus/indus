@@ -6,12 +6,13 @@ values in GitHub, Terraform variables, plans, state, or Git.
 
 ## Prerequisites
 
-- One shared-services AWS account and isolated staging and production accounts.
+- An AWS Organization whose management account contains no Indus workloads, and
+  one dedicated member account containing shared services, staging, and production.
 - Route 53 hosted zones that match the checked-in environment inputs.
 - Terraform, AWS CLI, Helm, and kubectl installed locally.
 - MFA-backed roles that can apply the reviewed shared and environment plans.
 - For workflow-driven Terraform, an execution role and GitHub OIDC provider
-  provisioned by the account administrator in each runtime account. Trust must
+  provisioned by the account administrator in the Indus member account. Trust must
   require audience `sts.amazonaws.com` and subject
   `repo:TryIndus/indus:environment:staging` or
   `repo:TryIndus/indus:environment:production`, respectively. The role needs
@@ -22,8 +23,8 @@ values in GitHub, Terraform variables, plans, state, or Git.
 ## 1. Bootstrap shared services
 
 Copy `infra/terraform/bootstrap/shared/terraform.tfvars.example` to ignored
-`terraform.tfvars`, replace the account IDs, and authenticate to the shared
-services account. Review the exact plan before applying it:
+`terraform.tfvars`, replace the project account ID, and authenticate to the
+Indus member account. Review the exact plan before applying it:
 
 Set `terraform_execution_role_arns` to the pre-provisioned staging and production
 execution-role ARNs. This grants those exact roles access to their shared state
@@ -47,7 +48,8 @@ GitHub Environment to that environment's public Supabase build configuration.
 ## 2. Provision an environment
 
 Copy the checked-in staging examples to ignored local files and replace every
-placeholder with shared bootstrap outputs, account ID, and Route 53 zone. Run:
+placeholder with shared bootstrap outputs, the Indus member account ID, and
+Route 53 zone. Run:
 
 ```bash
 terraform -chdir=infra/terraform/environments/staging init \
