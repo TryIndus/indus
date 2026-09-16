@@ -28,7 +28,7 @@ permissions:
 env:
   AWS_REGION: ${{ vars.AWS_SHARED_REGION }}
   ECR_REPOSITORY: indus/legacy-next
-  RELEASE_ENVIRONMENT: development
+  RELEASE_ENVIRONMENT: staging
 
 jobs:
   publish:
@@ -129,11 +129,11 @@ jobs:
           echo "image=$image" >> "$GITHUB_OUTPUT"
 
   promote:
-    name: Open development promotion
+    name: Open staging promotion
     needs: publish
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    environment: development
+    environment: staging
     permissions:
       contents: write
       id-token: write

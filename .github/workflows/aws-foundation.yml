@@ -48,7 +48,7 @@ jobs:
           set -euo pipefail
           image='hashicorp/terraform@sha256:6bbb82d575aa7bd4f0a2c6e3a0838ab9590426c08a71d7a2783643f01004d356'
           docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" fmt -check -recursive infra/terraform
-          for environment in development staging production; do
+          for environment in staging production; do
             docker run --rm --entrypoint /bin/sh --env TF_DATA_DIR=/tmp/terraform-data \
               --volume "$PWD:/workspace" --workdir "/workspace/infra/terraform/environments/$environment" "$image" \
               -ec 'terraform init -backend=false -input=false && terraform validate'

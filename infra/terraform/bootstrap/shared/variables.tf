@@ -10,11 +10,11 @@ variable "shared_account_id" {
 
 variable "environment_account_ids" {
   type        = map(string)
-  description = "Environment account IDs keyed by development, staging, and production."
+  description = "Environment account IDs keyed by staging and production."
 
   validation {
-    condition     = length(setsubtract(toset(["development", "staging", "production"]), toset(keys(var.environment_account_ids)))) == 0
-    error_message = "All three environment account IDs are required."
+    condition     = length(setsubtract(toset(["staging", "production"]), toset(keys(var.environment_account_ids)))) == 0
+    error_message = "Staging and production account IDs are required."
   }
 }
 
