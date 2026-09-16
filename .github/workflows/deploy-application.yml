@@ -38,6 +38,11 @@ jobs:
     environment: ${{ needs.target.outputs.environment }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+      id-token: write
     steps:
       - name: Check out requested branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -47,8 +52,6 @@ jobs:
           BUILD_ROLE_ARN: ${{ vars.AWS_BUILD_ROLE_ARN }}
           SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          APP_ID: ${{ vars.DEPLOY_APP_ID }}
-          APP_PRIVATE_KEY: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
         shell: bash
         run: |
           set -euo pipefail
@@ -56,8 +59,6 @@ jobs:
           test -n "$BUILD_ROLE_ARN"
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_ANON_KEY"
-          test -n "$APP_ID"
-          test -n "$APP_PRIVATE_KEY"
 
       - name: Configure short-lived AWS credentials
         uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
@@ -127,19 +128,11 @@ jobs:
           awk -v image="$IMAGE" '/^image: / { print "image: " image; next } { print }' "$values" > "$values.next"
           mv "$values.next" "$values"
 
-      - name: Create repository-scoped deployment token
-        id: app-token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
-        with:
-          app-id: ${{ vars.DEPLOY_APP_ID }}
-          private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
       - name: Open GitOps digest pull request
+        id: deployment-pr
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ github.token }}
           add-paths: infra/gitops/environments/${{ needs.target.outputs.environment }}/legacy-next.yaml
           base: ${{ github.ref_name }}
           branch: deploy/application-${{ github.ref_name }}-${{ github.sha }}
@@ -147,3 +140,16 @@ jobs:
           title: Deploy application to ${{ needs.target.outputs.environment }}
           body: Deploys `${{ env.IMAGE }}` from `${{ github.ref_name }}`.
           delete-branch: true
+
+      # Explicit dispatch avoids relying on automatic CI for token-created PRs.
+      - name: Dispatch verification for the deployment PR
+        if: steps.deployment-pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYMENT_BRANCH: deploy/application-${{ github.ref_name }}-${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOYMENT_BRANCH"
+          gh workflow run verification.yml --ref "$DEPLOYMENT_BRANCH"
+          gh workflow run aws-foundation.yml --ref "$DEPLOYMENT_BRANCH"

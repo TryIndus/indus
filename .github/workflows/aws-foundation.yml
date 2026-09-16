@@ -45,7 +45,9 @@ jobs:
             -color
 
       - name: Check infrastructure lifecycle behavior
-        run: ruby scripts/deploy/test-infrastructure.rb
+        run: |
+          ruby scripts/deploy/test-infrastructure.rb
+          ruby scripts/deploy/test-application.rb
 
       - name: Validate Terraform formatting and environments
         shell: bash

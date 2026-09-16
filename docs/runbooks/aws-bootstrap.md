@@ -111,10 +111,17 @@ ignored `backend.hcl` and `terraform.tfvars`.
 Restrict the staging GitHub Environment to branch `staging` and production to
 branch `main`; the AWS trust policies use environment subjects. Set each
 environment's `AWS_TERRAFORM_ROLE_ARN` to its administrator-provisioned execution
-role. Install a GitHub App on this repository with Contents and Pull Requests
-write permissions, set `DEPLOY_APP_ID`, and store its private key as
-`DEPLOY_APP_PRIVATE_KEY`. The application workflow uses its token so deployment
-PRs trigger required CI checks.
+role. In the organization's Settings > Actions > General > Workflow permissions,
+enable **Allow GitHub Actions to create and approve pull requests**, then enable
+the corresponding option in this repository's Actions settings. Keep the default
+token permissions read-only; the deployment job explicitly requests the write
+permissions it needs. No GitHub App or private-key secret is required.
+
+The workflow uses `GITHUB_TOKEN` to open the deployment PR and explicitly
+dispatches both verification workflows on its head branch, because PRs created
+with this token do not automatically start `pull_request` checks. Checks
+run against that branch's commit before the PR is merged. The workflow does not
+approve or merge its own PRs.
 
 Use `./bin/indus deploy app staging` from `staging` or
 `./bin/indus deploy app production` from `main`. Infrastructure is dispatched
