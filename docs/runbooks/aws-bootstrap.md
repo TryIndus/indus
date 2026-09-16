@@ -87,15 +87,20 @@ Next.js workload and required add-ons run in Phase 1.
 
 ## 5. Configure branch deployment
 
-Create `staging` from `main` after this PR merges. Configure GitHub Environment
-variables `AWS_TERRAFORM_ROLE_ARN` and `AWS_TERRAFORM_REGION`, plus base64
-secrets `TF_BACKEND_CONFIG_B64` and `TF_VARS_B64`, in each environment. The
-encoded files are the environment's ignored `backend.hcl` and `terraform.tfvars`.
+When developers need a shared deployed environment, create `staging` from
+`main`. Configure GitHub Environment variables `AWS_TERRAFORM_ROLE_ARN` and
+`AWS_TERRAFORM_REGION`, plus base64 secrets `TF_BACKEND_CONFIG_B64` and
+`TF_VARS_B64`, in each environment. The encoded files are the environment's
+ignored `backend.hcl` and `terraform.tfvars`.
 
 Use `./bin/indus deploy app staging` from `staging` or
 `./bin/indus deploy app production` from `main`. Infrastructure is dispatched
-with `./bin/indus deploy infra <staging|production> <plan|apply|destroy>`.
-Staging destroy additionally requires `--confirm`; production destroy is not
-available.
+with `./bin/indus deploy infra <staging|production> <plan|apply|tear-up|tear-down|destroy>`.
+`tear-down` removes the staging runtime while retaining data, identity, DNS,
+zone, network, secrets, and buckets. `tear-up` restores the runtime. After a
+tear-up, repeat the Argo CD installation and bootstrap commands in step 4
+before deploying the application. Both staging tear-down and full staging
+destroy require `--confirm`; production lifecycle operations are not available.
 
-Merge reviewed changes from `staging` to `main` before production deployment.
+Merge reviewed feature pull requests into `main` before production deployment.
+Use `staging` only when developers need a shared deployed environment.

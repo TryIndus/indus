@@ -166,8 +166,8 @@ The diagram source is
 - Keep managed stateful services outside the cluster: Aurora, ElastiCache, MSK, and S3.
 - Use ECR for images and Argo CD for declarative cluster reconciliation.
 - Use GitHub Actions only to verify changes, build and sign images, publish artifacts, and update GitOps references.
-- `staging` is the integration branch and the sole source of staging deployments. `main` is the production branch and the sole source of production deployments. Promote reviewed changes through a pull request from `staging` to `main`.
-- Application and infrastructure deployments are explicit, branch-bound workflow dispatches initiated through the repository CLI. The staging infrastructure may be destroyed only through an explicit staging confirmation; production destruction is not implemented.
+- `main` is the normal destination for reviewed feature pull requests and the sole source of production deployments. `staging` is an optional shared developer branch and the sole source of staging deployments; it is not a required promotion path to `main`.
+- Application and infrastructure deployments are explicit, branch-bound workflow dispatches initiated through the repository CLI. `tear-down` removes the staging runtime while preserving the data, identity, DNS zone, network, secret, and bucket boundaries; `tear-up` restores it. Full staging destroy requires an explicit confirmation. Production lifecycle operations are not implemented.
 - Use CloudFront as the single public origin: serve React assets from S3 and route `/api/*` to Rails and `/stream/*` to Rust through WAF and an Application Load Balancer.
 - The initial platform uses one active workload AZ, plus a second empty ALB subnet required by ALB. A primary-AZ, node, or NAT outage makes the environment unavailable; this is an explicit cost/reliability trade-off, not high availability. Add regional recovery only when the stateful platform is introduced.
 

@@ -7,9 +7,9 @@ on:
         description: Terraform operation
         required: true
         type: choice
-        options: [plan, apply, destroy]
+        options: [plan, apply, tear-up, tear-down, destroy]
       confirmation:
-        description: Required only for staging destroy
+        description: Required for staging tear-down or destroy
         required: false
         type: string
 
@@ -37,6 +37,12 @@ jobs:
             main) environment=production ;;
             *) echo "Infrastructure deployments must run from staging or main." >&2; exit 1 ;;
           esac
+          if [[ "${{ inputs.operation }}" == tear-up || "${{ inputs.operation }}" == tear-down || "${{ inputs.operation }}" == destroy ]]; then
+            [[ "$environment" == staging ]] || { echo "Staging lifecycle operations must run from staging." >&2; exit 1; }
+          fi
+          if [[ "${{ inputs.operation }}" == tear-down ]]; then
+            [[ "${{ inputs.confirmation }}" == tear-down-staging ]] || { echo "Use confirmation tear-down-staging." >&2; exit 1; }
+          fi
           if [[ "${{ inputs.operation }}" == destroy ]]; then
             [[ "$environment" == staging ]] || { echo "Production destroy is not implemented." >&2; exit 1; }
             [[ "${{ inputs.confirmation }}" == destroy-staging ]] || { echo "Use confirmation destroy-staging." >&2; exit 1; }
@@ -84,11 +90,37 @@ jobs:
           terraform -chdir="infra/terraform/environments/$environment" init -input=false -backend-config=backend.hcl
           if [[ "${{ inputs.operation }}" == destroy ]]; then
             terraform -chdir="infra/terraform/environments/$environment" plan -destroy -input=false -out=approved.tfplan
+          elif [[ "${{ inputs.operation }}" == tear-down ]]; then
+            targets=(
+              -target=module.environment.aws_cloudfront_distribution.this
+              -target=module.environment.aws_route53_record.application
+              -target=module.environment.aws_route53_record.legacy
+              -target=module.environment.aws_route53_record.origin
+              -target=module.environment.aws_lb_listener.https
+              -target=module.environment.aws_lb_target_group.legacy_next
+              -target=module.environment.aws_lb.this
+              -target=module.environment.aws_security_group_rule.cluster_from_alb
+              -target=module.environment.aws_security_group_rule.proxy_from_cluster
+              -target=module.environment.aws_eks_addon.this
+              -target=module.environment.aws_eks_node_group.system
+              -target=module.environment.aws_eks_access_policy_association.cluster_admin
+              -target=module.environment.aws_eks_access_entry.cluster_admin
+              -target=module.environment.aws_eks_cluster.this
+              -target=module.environment.aws_db_proxy_target.data
+              -target=module.environment.aws_db_proxy_default_target_group.data
+              -target=module.environment.aws_db_proxy.data
+              -target=module.environment.aws_rds_cluster_instance.data
+              -target=module.environment.aws_rds_cluster.data
+              -target=module.environment.aws_backup_selection.primary
+              -target=module.environment.aws_nat_gateway.primary
+              -target=module.environment.aws_eip.nat
+            )
+            terraform -chdir="infra/terraform/environments/$environment" plan -destroy -input=false -out=approved.tfplan "${targets[@]}"
           else
             terraform -chdir="infra/terraform/environments/$environment" plan -input=false -out=approved.tfplan
           fi
 
       - name: Apply reviewed plan
-        if: inputs.operation == 'apply' || inputs.operation == 'destroy'
+        if: inputs.operation == 'apply' || inputs.operation == 'tear-up' || inputs.operation == 'tear-down' || inputs.operation == 'destroy'
         shell: bash
         run: terraform -chdir=infra/terraform/environments/${{ needs.target.outputs.environment }} apply -input=false approved.tfplan

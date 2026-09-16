@@ -13,7 +13,7 @@ function run(commandName, args, options = {}) {
 }
 
 if (command !== "deploy" || !["app", "infra"].includes(component)) {
-	fail("Usage: indus deploy app | infra staging | production [plan | apply | destroy] [--confirm]");
+	fail("Usage: indus deploy app staging | production or indus deploy infra staging | production plan | apply | tear-up | tear-down | destroy [--confirm]");
 }
 
 if (! ["staging", "production"].includes(operation)) {
@@ -36,12 +36,12 @@ if (component === "app") {
 	process.exit(0);
 }
 
-if (! ["plan", "apply", "destroy"].includes(confirmation)) {
-	fail("Infrastructure deployment requires plan, apply, or destroy.");
+if (! ["plan", "apply", "tear-up", "tear-down", "destroy"].includes(confirmation)) {
+	fail("Infrastructure deployment requires plan, apply, tear-up, tear-down, or destroy.");
 }
 
-if (operation === "production" && confirmation === "destroy") {
-	fail("Production destroy is not implemented.");
+if (operation === "production" && ["tear-up", "tear-down", "destroy"].includes(confirmation)) {
+	fail("Production lifecycle operations are not implemented.");
 }
 
 const args = [
@@ -54,11 +54,11 @@ const args = [
 	`operation=${confirmation}`,
 ];
 
-if (confirmation === "destroy") {
+if (["tear-down", "destroy"].includes(confirmation)) {
 	if (process.argv[6] !== "--confirm") {
-		fail("Staging destroy requires --confirm.");
+		fail(`Staging ${confirmation} requires --confirm.`);
 	}
-	args.push("-f", "confirmation=destroy-staging");
+	args.push("-f", `confirmation=${confirmation}-staging`);
 }
 
 run("gh", args, { stdio: "inherit" });
