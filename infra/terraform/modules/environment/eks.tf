@@ -27,6 +27,10 @@ resource "aws_eks_cluster" "this" {
   role_arn = aws_iam_role.eks_cluster.arn
   version  = "1.34"
 
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+  }
+
   vpc_config {
     endpoint_private_access = true
     endpoint_public_access  = true
@@ -90,7 +94,11 @@ resource "aws_eks_node_group" "system" {
     max_unavailable = 1
   }
 
-  depends_on = [aws_iam_role_policy_attachment.eks_node]
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_node,
+    aws_route_table_association.private,
+    aws_route_table_association.public,
+  ]
 
   tags = local.common_tags
 }
@@ -139,7 +147,7 @@ resource "aws_eks_access_entry" "cluster_admin" {
 
 resource "aws_eks_access_policy_association" "cluster_admin" {
   cluster_name  = aws_eks_cluster.this.name
-  principal_arn = aws_iam_role.cluster_admin.arn
+  principal_arn = aws_eks_access_entry.cluster_admin.principal_arn
   policy_arn    = "arn:${data.aws_partition.current.partition}:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
   access_scope {

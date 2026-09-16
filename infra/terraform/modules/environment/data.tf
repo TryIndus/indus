@@ -118,6 +118,7 @@ resource "aws_rds_cluster_instance" "data" {
   engine_version               = aws_rds_cluster.data.engine_version
   auto_minor_version_upgrade   = true
   publicly_accessible          = false
+  availability_zone            = local.primary_az
   performance_insights_enabled = true
 
   tags = local.common_tags
@@ -170,6 +171,8 @@ resource "aws_db_proxy" "data" {
   vpc_security_group_ids = [aws_security_group.rds_proxy.id]
   require_tls            = true
 
+  depends_on = [aws_iam_role_policy.rds_proxy]
+
   auth {
     auth_scheme = "SECRETS"
     iam_auth    = "DISABLED"
@@ -187,6 +190,8 @@ resource "aws_db_proxy_target" "data" {
   db_cluster_identifier = aws_rds_cluster.data.id
   db_proxy_name         = aws_db_proxy.data.name
   target_group_name     = aws_db_proxy_default_target_group.data.name
+
+  depends_on = [aws_rds_cluster_instance.data]
 }
 
 locals {

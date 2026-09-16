@@ -14,7 +14,7 @@ locals {
   workload_service_accounts = {
     legacy-next = {
       namespace = "indus"
-      name      = "legacy-next"
+      name      = "indus-legacy-next"
     }
     aws-load-balancer-controller = {
       namespace = "kube-system"
@@ -76,6 +76,7 @@ data "aws_iam_policy_document" "load_balancer_controller" {
   statement {
     effect = "Allow"
     actions = [
+      "ec2:DescribeInstances",
       "ec2:DescribeNetworkInterfaces",
       "ec2:DescribeSecurityGroups",
       "ec2:DescribeSubnets",
@@ -83,6 +84,8 @@ data "aws_iam_policy_document" "load_balancer_controller" {
       "elasticloadbalancing:DeregisterTargets",
       "elasticloadbalancing:DescribeTargetGroups",
       "elasticloadbalancing:DescribeTargetHealth",
+      "elasticloadbalancing:ModifyTargetGroup",
+      "elasticloadbalancing:ModifyTargetGroupAttributes",
       "elasticloadbalancing:RegisterTargets",
     ]
     resources = ["*"]
