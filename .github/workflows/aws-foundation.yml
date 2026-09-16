@@ -7,6 +7,7 @@ on:
       - .dockerignore
       - next.config.ts
       - infra/**
+      - scripts/deploy/**
       - docs/runbooks/aws-legacy-next.md
       - .github/workflows/aws-foundation.yml
       - .github/workflows/deploy-application.yml
@@ -18,6 +19,7 @@ on:
       - .dockerignore
       - next.config.ts
       - infra/**
+      - scripts/deploy/**
       - docs/runbooks/aws-legacy-next.md
       - .github/workflows/aws-foundation.yml
       - .github/workflows/deploy-application.yml
@@ -42,15 +44,18 @@ jobs:
             rhysd/actionlint@sha256:6f03470d0152251d7f07f7c4dc019dbe7024c72cd952f839544c7798843efa8f \
             -color
 
+      - name: Check infrastructure lifecycle behavior
+        run: ruby scripts/deploy/test-infrastructure.rb
+
       - name: Validate Terraform formatting and environments
         shell: bash
         run: |
           set -euo pipefail
           image='hashicorp/terraform@sha256:6bbb82d575aa7bd4f0a2c6e3a0838ab9590426c08a71d7a2783643f01004d356'
           docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" fmt -check -recursive infra/terraform
-          for environment in staging production; do
+          for directory in bootstrap/shared environments/staging environments/production; do
             docker run --rm --entrypoint /bin/sh --env TF_DATA_DIR=/tmp/terraform-data \
-              --volume "$PWD:/workspace" --workdir "/workspace/infra/terraform/environments/$environment" "$image" \
+              --volume "$PWD:/workspace" --workdir "/workspace/infra/terraform/$directory" "$image" \
               -ec 'terraform init -backend=false -input=false && terraform validate'
           done
 
@@ -62,6 +67,13 @@ jobs:
           for chart in infra/helm/indus-applications infra/helm/indus-platform infra/helm/indus-legacy-next; do
             docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" lint "$chart"
             docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" template indus "$chart" >/dev/null
+          done
+
+          for environment in staging production; do
+            docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" \
+              template indus infra/helm/indus-applications \
+              -f "infra/helm/indus-applications/values-$environment.yaml" \
+              | ruby scripts/deploy/test-gitops.rb "$environment"
           done
 
       - name: Build the current application container

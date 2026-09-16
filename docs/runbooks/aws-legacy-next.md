@@ -15,8 +15,8 @@ from reaching the pod.
 
 ## Cutover and rollback
 
-1. Run the explicit staging infrastructure plan and apply from `staging`, then
-   deploy the application from `staging`.
+1. Optionally rehearse the deployment in the developer environment by running
+   infrastructure and application deployment from `staging`.
 2. Store the five required values in the production `legacy-next` secret and
    confirm the pod role can read only it.
 3. Merge the reviewed feature pull request into `main`, then deploy the

@@ -1,4 +1,5 @@
 environment: staging
+revision: staging
 clusterName: indus-staging
 vpcId: vpc-replace-staging
 awsRegion: us-east-1

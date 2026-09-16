@@ -1,4 +1,5 @@
 environment: production
+revision: main
 clusterName: indus-production
 vpcId: vpc-replace-production
 awsRegion: us-east-1

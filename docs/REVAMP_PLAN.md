@@ -17,7 +17,7 @@ This is the target architecture, not a description of the current repository. Do
 - Prefer asynchronous Kafka events between services; use synchronous APIs only when the caller needs an immediate answer.
 - Use PostgreSQL for transactional and historical market data until measured scale justifies another datastore.
 - Treat schemas, migrations, authorization, observability, and rollback procedures as part of every feature.
-- Promote the same immutable container images through staging and production.
+- Build immutable container images from each environment's branch; staging is optional developer infrastructure.
 - Require measurable reliability and security outcomes instead of technology adoption alone.
 
 ## Target Stack
@@ -167,7 +167,7 @@ The diagram source is
 - Use ECR for images and Argo CD for declarative cluster reconciliation.
 - Use GitHub Actions only to verify changes, build and sign images, publish artifacts, and update GitOps references.
 - `main` is the normal destination for reviewed feature pull requests and the sole source of production deployments. `staging` is an optional shared developer branch and the sole source of staging deployments; it is not a required promotion path to `main`.
-- Application and infrastructure deployments are explicit, branch-bound workflow dispatches initiated through the repository CLI. `tear-down` removes the staging runtime while preserving the data, identity, DNS zone, network, secret, and bucket boundaries; `tear-up` restores it. Full staging destroy requires an explicit confirmation. Production lifecycle operations are not implemented.
+- Application and infrastructure deployments are explicit, branch-bound workflow dispatches initiated through the repository CLI. `tear-down` removes staging compute, database instances, proxy, edge, and NAT while retaining the Aurora cluster volume, identity, DNS zone, VPC/subnets, secrets, and buckets; `tear-up` restores the runtime. Retained storage and services can still incur charges. Full staging destroy requires an explicit confirmation. Production lifecycle operations are not implemented.
 - Use CloudFront as the single public origin: serve React assets from S3 and route `/api/*` to Rails and `/stream/*` to Rust through WAF and an Application Load Balancer.
 - The initial platform uses one active workload AZ, plus a second empty ALB subnet required by ALB. A primary-AZ, node, or NAT outage makes the environment unavailable; this is an explicit cost/reliability trade-off, not high availability. Add regional recovery only when the stateful platform is introduced.
 

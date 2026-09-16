@@ -8,9 +8,8 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
   id-token: write
-  pull-requests: write
 
 env:
   AWS_REGION: ${{ vars.AWS_SHARED_REGION }}
@@ -39,7 +38,6 @@ jobs:
     environment: ${{ needs.target.outputs.environment }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    if: vars.AWS_BUILD_ROLE_ARN != ''
     steps:
       - name: Check out requested branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,6 +47,8 @@ jobs:
           BUILD_ROLE_ARN: ${{ vars.AWS_BUILD_ROLE_ARN }}
           SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          APP_ID: ${{ vars.DEPLOY_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
         shell: bash
         run: |
           set -euo pipefail
@@ -56,6 +56,8 @@ jobs:
           test -n "$BUILD_ROLE_ARN"
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_ANON_KEY"
+          test -n "$APP_ID"
+          test -n "$APP_PRIVATE_KEY"
 
       - name: Configure short-lived AWS credentials
         uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
@@ -77,7 +79,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image="$ECR_REGISTRY/$ECR_REPOSITORY:sha-$GITHUB_SHA"
+          image="$ECR_REGISTRY/$ECR_REPOSITORY:sha-$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           docker build --build-arg "NEXT_PUBLIC_SUPABASE_URL=$SUPABASE_URL" \
             --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" --tag "$image" .
           echo "image_tag=$image" >> "$GITHUB_OUTPUT"
@@ -110,7 +112,7 @@ jobs:
           set -euo pipefail
           docker push "${{ steps.build.outputs.image_tag }}"
           digest="$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" \
-            --image-ids "imageTag=sha-$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text)"
+            --image-ids "imageTag=sha-$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --query 'imageDetails[0].imageDigest' --output text)"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           image="$ECR_REGISTRY/$ECR_REPOSITORY@$digest"
           cosign sign --yes "$image"
@@ -125,9 +127,19 @@ jobs:
           awk -v image="$IMAGE" '/^image: / { print "image: " image; next } { print }' "$values" > "$values.next"
           mv "$values.next" "$values"
 
-      - name: Commit GitOps digest to the deployment branch
+      - name: Create repository-scoped deployment token
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.DEPLOY_APP_ID }}
+          private-key: ${{ secrets.DEPLOY_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Open GitOps digest pull request
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
+          token: ${{ steps.app-token.outputs.token }}
           add-paths: infra/gitops/environments/${{ needs.target.outputs.environment }}/legacy-next.yaml
           base: ${{ github.ref_name }}
           branch: deploy/application-${{ github.ref_name }}-${{ github.sha }}

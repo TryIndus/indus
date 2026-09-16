@@ -24,6 +24,20 @@ variable "github_repository" {
   default     = "TryIndus/indus"
 }
 
+variable "terraform_execution_role_arns" {
+  type        = map(string)
+  description = "Pre-provisioned environment Actions roles allowed to assume their shared state role without MFA."
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for environment, arn in var.terraform_execution_role_arns :
+      contains(["staging", "production"], environment) && can(regex("^arn:aws:iam::[0-9]{12}:role/.+$", arn))
+    ])
+    error_message = "Use staging or production keys and IAM role ARNs."
+  }
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

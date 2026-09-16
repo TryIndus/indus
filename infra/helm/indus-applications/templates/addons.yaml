@@ -54,6 +54,10 @@ spec:
     repoURL: https://aws.github.io/secrets-store-csi-driver-provider-aws
     chart: secrets-store-csi-driver-provider-aws
     targetRevision: 2.1.1
+    helm:
+      valuesObject:
+        secrets-store-csi-driver:
+          install: false
   destination: { server: "https://kubernetes.default.svc", namespace: kube-system }
   syncPolicy:
     automated: { prune: true, selfHeal: true }

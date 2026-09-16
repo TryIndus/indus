@@ -182,7 +182,10 @@ data "aws_iam_policy_document" "github_build_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/main"]
+      values = [
+        "repo:${var.github_repository}:environment:staging",
+        "repo:${var.github_repository}:environment:production",
+      ]
     }
   }
 }
@@ -274,6 +277,18 @@ resource "aws_iam_role_policy" "github_promotion" {
 
 data "aws_iam_policy_document" "state_assume" {
   for_each = var.environment_account_ids
+
+  dynamic "statement" {
+    for_each = lookup(var.terraform_execution_role_arns, each.key, null) == null ? [] : [var.terraform_execution_role_arns[each.key]]
+    content {
+      sid     = "EnvironmentAutomation"
+      actions = ["sts:AssumeRole"]
+      principals {
+        type        = "AWS"
+        identifiers = [statement.value]
+      }
+    }
+  }
 
   statement {
     actions = ["sts:AssumeRole"]
