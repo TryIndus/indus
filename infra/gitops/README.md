@@ -6,10 +6,10 @@ plane and workload values before bootstrapping that environment. Secret values
 are never stored here.
 
 Argo CD owns add-ons, admission policies, and application workloads. The
-`AWS legacy release` GitHub Actions workflow publishes a scanned, signed,
-immutable image and opens a promotion pull request; it does not call Kubernetes
-or mutate a deployment. Merging that pull request lets Argo CD reconcile the
-exact digest. Promotion order is development, staging, production.
+staging cluster watches `staging`; the production cluster watches `main`.
+`./bin/indus deploy app staging` and `./bin/indus deploy app production`
+publish immutable images and open a digest-only pull request against the
+corresponding deployment branch. Argo CD reconciles the exact merged digest.
 
 The only imperative bootstrap is the pinned Argo CD installation described in
 `docs/runbooks/aws-bootstrap.md`. After the root application is submitted,

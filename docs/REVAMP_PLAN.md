@@ -17,7 +17,7 @@ This is the target architecture, not a description of the current repository. Do
 - Prefer asynchronous Kafka events between services; use synchronous APIs only when the caller needs an immediate answer.
 - Use PostgreSQL for transactional and historical market data until measured scale justifies another datastore.
 - Treat schemas, migrations, authorization, observability, and rollback procedures as part of every feature.
-- Promote the same immutable container images through development, staging, and production.
+- Build immutable container images from each environment's branch; staging is optional developer infrastructure.
 - Require measurable reliability and security outcomes instead of technology adoption alone.
 
 ## Target Stack
@@ -154,14 +154,22 @@ All services must emit structured logs, OpenTelemetry traces, RED metrics, depen
 
 ## AWS Topology
 
-- Use separate AWS accounts for shared services, development, staging, and production.
-- Provision networking, EKS, data services, DNS, certificates, secrets, and observability through Terraform.
+![AWS architecture](architecture/aws-architecture.png)
+
+The diagram source is
+[`docs/architecture/aws-architecture.py`](architecture/aws-architecture.py).
+
+- Use separate AWS accounts for shared services, staging, and production. Run the AWS runtime in `us-east-1`; CloudFront remains the global edge.
+- Provision networking, EKS, DNS, certificates, runtime secrets, and basic observability through Terraform. Defer managed data services until the phase that uses them.
+- The AWS data platform provisions Aurora PostgreSQL, RDS Proxy, Cognito, encrypted export/audit buckets, and backups before data or authentication traffic is cut over. Supabase remains authoritative until export, reconciliation, and rollback rehearsals pass.
 - Run Rails API, Sidekiq, Temporal workers, Rust ingestion, and Rust streaming workloads on EKS.
 - Keep managed stateful services outside the cluster: Aurora, ElastiCache, MSK, and S3.
 - Use ECR for images and Argo CD for declarative cluster reconciliation.
 - Use GitHub Actions only to verify changes, build and sign images, publish artifacts, and update GitOps references.
+- `main` is the normal destination for reviewed feature pull requests and the sole source of production deployments. `staging` is an optional shared developer branch and the sole source of staging deployments; it is not a required promotion path to `main`.
+- Application and infrastructure deployments are explicit, branch-bound workflow dispatches initiated through the repository CLI. `tear-down` removes staging compute, database instances, proxy, edge, and NAT while retaining the Aurora cluster volume, identity, DNS zone, VPC/subnets, secrets, and buckets; `tear-up` restores the runtime. Retained storage and services can still incur charges. Full staging destroy requires an explicit confirmation. Production lifecycle operations are not implemented.
 - Use CloudFront as the single public origin: serve React assets from S3 and route `/api/*` to Rails and `/stream/*` to Rust through WAF and an Application Load Balancer.
-- Back up Aurora, version critical S3 buckets, test restore procedures, and document regional recovery objectives.
+- The initial platform uses one active workload AZ, plus a second empty ALB subnet required by ALB. A primary-AZ, node, or NAT outage makes the environment unavailable; this is an explicit cost/reliability trade-off, not high availability. Add regional recovery only when the stateful platform is introduced.
 
 ## Repository Direction
 
@@ -278,7 +286,7 @@ Acceptance criteria:
 ### Phase 4 PR: Replacement Platform Cutover and Legacy Decommissioning
 
 - Provision replacement-managed stateful services only through the Phase 1 Terraform foundation: Aurora PostgreSQL, RDS Proxy, ElastiCache, MSK, S3, Cognito, and the managed observability integrations. The existing AWS deployment, edge, secret, image, and GitOps controls are not reimplemented here.
-- Deploy the already-built replacement workloads to development and staging, exercise SLO dashboards, alerts, backup restoration, disaster recovery, capacity, security, and image rollback.
+- Deploy the already-built replacement workloads to staging, exercise SLO dashboards, alerts, backup restoration, disaster recovery, capacity, security, and image rollback.
 - Configure Cognito and rehearse identity and data migration before the production window.
 - Freeze incompatible changes, execute final synchronization, reconcile data, and shift traffic gradually with explicit abort thresholds.
 - Observe the target platform through the rollback window before deliberately retiring the AWS-hosted legacy Next.js application, Supabase, compatibility routes, legacy credentials, and redundant data copies.

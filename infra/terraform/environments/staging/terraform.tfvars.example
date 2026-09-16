@@ -1,19 +1,19 @@
 account_id        = "333333333333"
-aws_region        = "ca-central-1"
+aws_region        = "us-east-1"
 vpc_cidr          = "10.30.0.0/16"
 domain_name       = "app.staging.indus.example.com"
 route53_zone_name = "staging.indus.example.com"
-cognito_callback_urls = ["https://app.staging.indus.example.com/auth/callback"]
-cognito_logout_urls   = ["https://app.staging.indus.example.com/"]
+legacy_origin_hostname = "indus-trade.vercel.app"
+aws_traffic_weight     = 0
+alert_email_addresses  = ["on-call@example.com"]
+cognito_callback_urls  = ["https://app.staging.indus.example.com/auth/callback"]
+cognito_logout_urls    = ["https://app.staging.indus.example.com"]
 
-shared_ecr_repository_arns = {
-  legacy-next = "arn:aws:ecr:us-east-1:111111111111:repository/indus/legacy-next",
-  platform-api = "arn:aws:ecr:us-east-1:111111111111:repository/indus/platform-api", market-data = "arn:aws:ecr:us-east-1:111111111111:repository/indus/market-data",
-  research-worker = "arn:aws:ecr:us-east-1:111111111111:repository/indus/research-worker", web = "arn:aws:ecr:us-east-1:111111111111:repository/indus/web"
-}
 shared_ecr_repository_urls = {
-  legacy-next = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/legacy-next",
-  platform-api = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api", market-data = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/market-data",
-  research-worker = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker", web = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/web"
+  legacy-next     = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/legacy-next"
+  platform-api    = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api"
+  market-data     = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/market-data"
+  research-worker = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker"
+  web             = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/web"
 }
 tags = { CostCenter = "engineering", Owner = "platform" }
