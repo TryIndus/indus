@@ -18,7 +18,7 @@ end
 
 project = documents.find { |document| document["kind"] == "AppProject" }
 allowed = project.fetch("spec").fetch("clusterResourceWhitelist").map { |rule| rule.fetch("kind") }
-%w[MutatingWebhookConfiguration ValidatingWebhookConfiguration CSIDriver APIService].each do |kind|
+%w[MutatingWebhookConfiguration ValidatingWebhookConfiguration CSIDriver APIService IngressClass].each do |kind|
   raise "Required addon kind #{kind} blocked by AppProject" unless allowed.include?(kind)
 end
 
