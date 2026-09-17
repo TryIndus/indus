@@ -3,7 +3,6 @@ require "digest"
 
 module Authentication
   class Unauthorized < StandardError; end
-  class ConfigurationError < StandardError; end
 
   class << self
     attr_writer :verifier
@@ -85,8 +84,9 @@ module Authentication
   class UserInfoLoader
     class FetchError < StandardError; end
 
-    def initialize(ttl: 60, clock: Time)
+    def initialize(ttl: 60, max_entries: 1_000, clock: Time)
       @ttl = ttl
+      @max_entries = max_entries
       @clock = clock
       @cache = {}
       @mutex = Mutex.new
@@ -94,13 +94,20 @@ module Authentication
 
     def call(url, token)
       cache_key = Digest::SHA256.hexdigest(token)
-      @mutex.synchronize do
+      cached = @mutex.synchronize do
         cached = @cache[cache_key]
-        return cached[:value] if cached && cached[:expires_at] > @clock.now
-
-        @cache[cache_key] = { value: fetch(url, token), expires_at: @clock.now + @ttl }
-        @cache[cache_key][:value]
+        cached[:value] if cached && cached[:expires_at] > @clock.now
       end
+      return cached if cached
+
+      value = fetch(url, token)
+      @mutex.synchronize do
+        now = @clock.now
+        @cache.delete_if { |_key, entry| entry[:expires_at] <= now }
+        @cache.shift while @cache.size >= @max_entries
+        @cache[cache_key] = { value: value, expires_at: now + @ttl }
+      end
+      value
     end
 
     private
