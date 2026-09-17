@@ -9,7 +9,7 @@ export interface AuthAdapter {
   getUser(): Promise<AuthUser | null>
   signIn(): Promise<void>
   completeSignIn(): Promise<void>
-  signOut(): Promise<void>
+  signOut(): Promise<boolean>
   accessToken(): Promise<string | null>
 }
 
@@ -38,7 +38,7 @@ class CognitoAuthAdapter implements AuthAdapter {
 
   async signIn() { await this.manager.signinRedirect() }
   async completeSignIn() { await this.manager.signinRedirectCallback() }
-  async signOut() { await this.manager.signoutRedirect() }
+  async signOut() { await this.manager.signoutRedirect(); return true }
   async accessToken() { return (await this.activeUser())?.access_token ?? null }
 }
 
@@ -46,7 +46,7 @@ class UnconfiguredAuthAdapter implements AuthAdapter {
   async getUser() { return null }
   async signIn() { throw new Error('Authentication is not configured for this environment.') }
   async completeSignIn() { throw new Error('Authentication is not configured for this environment.') }
-  async signOut() {}
+  async signOut() { return false }
   async accessToken() { return null }
 }
 
@@ -57,7 +57,7 @@ class E2eAuthAdapter implements AuthAdapter {
   async getUser() { return browserStorage()?.getItem(E2E_AUTH_KEY) === 'true' ? { id: 'e2e-user', email: 'investor@example.test' } : null }
   async signIn() { browserStorage()?.setItem(E2E_AUTH_KEY, 'true') }
   async completeSignIn() { browserStorage()?.setItem(E2E_AUTH_KEY, 'true') }
-  async signOut() { browserStorage()?.removeItem(E2E_AUTH_KEY) }
+  async signOut() { browserStorage()?.removeItem(E2E_AUTH_KEY); return false }
   async accessToken() { return browserStorage()?.getItem(E2E_AUTH_KEY) === 'true' ? 'e2e-access-token' : null }
 }
 

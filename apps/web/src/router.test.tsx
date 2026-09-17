@@ -22,7 +22,7 @@ function context(authenticated: boolean, resolve: (path: string) => unknown | Pr
       getUser: vi.fn(async () => authState ? { id: 'user-1', email: 'user@example.test' } : null),
       signIn: vi.fn(async () => { authState = true }),
       completeSignIn: vi.fn(async () => { authState = true }),
-      signOut: vi.fn(async () => { authState = false }),
+      signOut: vi.fn(async () => { authState = false; return false }),
       accessToken: vi.fn(async () => null),
     },
     api: {
@@ -193,7 +193,7 @@ describe('application routing', () => {
     expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
     expect(callbackRouter.state.location.pathname).toBe('/dashboard')
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    await waitFor(() => expect(callbackRouter.options.context.auth.signOut).toHaveBeenCalled())
+    await waitFor(() => expect(callbackRouter.state.location.pathname).toBe('/auth'))
   })
 
   it('renders a stable not-found boundary', async () => {
