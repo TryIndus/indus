@@ -143,7 +143,7 @@ See [Quality and Security Verification](./docs/QUALITY.md) for prerequisites, se
 | API | Ruby 3.4, Rails 8, Pundit, PostgreSQL, Sidekiq, Redis |
 | Market data | Rust, Tokio, Axum, Alpaca, Kafka, PostgreSQL, authenticated SSE |
 | Workflows | Transactional outbox, Kafka, Temporal, S3 report artifacts |
-| Identity | Supabase browser adapter; Rails verification adapters for Supabase and Amazon Cognito |
+| Identity | Amazon Cognito hosted sign-in with PKCE and Cognito-only Rails access-token verification |
 | AI | Google Gemini behind a provider-neutral, server-side model gateway |
 | Contracts | OpenAPI and Protobuf with deterministic generated clients |
 | Platform | AWS EKS, Aurora PostgreSQL, ElastiCache, MSK, S3, Secrets Manager, Argo CD |

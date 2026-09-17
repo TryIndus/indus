@@ -30,7 +30,7 @@ RSpec.describe Authentication::TokenVerifier do
     expect { verifier.verify(token(sub: nil)) }.to raise_error(Authentication::Unauthorized, /subject/)
   end
 
-  it "supports the explicitly configured legacy Supabase HMAC boundary" do
+  it "supports an explicitly configured HMAC boundary" do
     hmac = described_class.new(issuer: issuer, audience: "authenticated", algorithms: [ "HS256" ], verification_key: "secret")
     signed = JWT.encode({ iss: issuer, sub: "legacy-user", aud: "authenticated", exp: 5.minutes.from_now.to_i }, "secret", "HS256")
     expect(hmac.verify(signed)).to include("sub" => "legacy-user")

@@ -21,6 +21,7 @@ function context(authenticated: boolean, resolve: (path: string) => unknown | Pr
     auth: {
       getUser: vi.fn(async () => authState ? { id: 'user-1', email: 'user@example.test' } : null),
       signIn: vi.fn(async () => { authState = true }),
+      completeSignIn: vi.fn(async () => { authState = true }),
       signOut: vi.fn(async () => { authState = false }),
       accessToken: vi.fn(async () => null),
     },
@@ -182,16 +183,17 @@ describe('application routing', () => {
     expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
   })
 
-  it('completes the sign-in and sign-out navigation lifecycle', async () => {
+  it('starts hosted sign-in and completes the callback lifecycle', async () => {
     const router = await renderPath('/auth', false)
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'investor@example.test' } })
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to secure sign in' }))
+    await waitFor(() => expect(router.options.context.auth.signIn).toHaveBeenCalled())
 
+    cleanupView()
+    const callbackRouter = await renderPath('/auth/callback', false)
     expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
-    expect(router.state.location.pathname).toBe('/dashboard')
+    expect(callbackRouter.state.location.pathname).toBe('/dashboard')
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/auth'))
+    await waitFor(() => expect(callbackRouter.options.context.auth.signOut).toHaveBeenCalled())
   })
 
   it('renders a stable not-found boundary', async () => {

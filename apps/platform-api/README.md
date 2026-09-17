@@ -1,13 +1,13 @@
 # Platform API
 
-The platform API is the Rails boundary introduced during the Indus runtime migration. It is additive: the existing application remains authoritative until a separately verified cutover.
+The platform API is the Rails boundary for the Indus application.
 
 ## Runtime
 
 - Ruby 3.4.10 and Rails 8.1.3.1
 - PostgreSQL for durable state
 - Sidekiq and Redis for asynchronous work
-- Supabase JWT verification during migration; a dormant Cognito verifier supports the later identity cutover
+- Amazon Cognito access-token verification and verified profile lookup
 - Google Gemini behind `ModelGateway`
 
 Use the repository's containerized Rails toolchain rather than the host Ruby installation. Dependencies are pinned in `Gemfile.lock`.
@@ -26,11 +26,9 @@ The service fails closed when required identity, database, or model configuratio
 | `TEMPORAL_NAMESPACE` | Temporal namespace; defaults to `default` |
 | `REPORT_ARTIFACT_BUCKET` | S3-compatible bucket for generated report artifacts |
 | `OBJECT_STORAGE_ENDPOINT` | Optional path-style endpoint used by local MinIO |
-| `AUTH_PROVIDER` | `supabase` during migration or `cognito` at cutover |
-| `SUPABASE_JWT_ISSUER` | Expected token issuer |
-| `SUPABASE_JWT_AUDIENCE` | Expected token audience; defaults to `authenticated` |
-| `SUPABASE_JWKS_URL` | Optional explicit HTTPS JWKS endpoint |
-| `SUPABASE_JWT_SECRET` | Optional legacy HS256 verifier secret during migration; prefer JWKS signing keys |
+| `COGNITO_JWT_ISSUER` | Exact Cognito user-pool issuer |
+| `COGNITO_CLIENT_ID` | Public app-client ID accepted by the API |
+| `COGNITO_USERINFO_URL` | HTTPS Cognito user-info endpoint used to retrieve verified profile attributes |
 | `GEMINI_API_KEY` | Server-side Gemini credential |
 | `GEMINI_MODEL` | Model selection; defaults to `gemini-2.5-flash` |
 | `OTEL_TRACES_EXPORTER` | Trace exporter; defaults to `none` so local and test runs make no export attempts |
@@ -40,7 +38,7 @@ Production also requires Rails' standard `SECRET_KEY_BASE`. No Rails master key 
 
 ## Boundaries
 
-Every `/v1` request requires a verified bearer token. The token issuer and audience are fixed by server configuration, and Pundit scopes every tenant-owned query by the internal user identifier. Mutations require an `Idempotency-Key`; the mutation, audit event, and replay response commit in one transaction. Reusing a key with the same request replays the recorded response, while changing the request returns `409`. Reports are created together with an outbox event in that transaction; workers may process that event only after commit. Provider credentials and provider payloads do not cross the API boundary.
+Every `/v1` request requires a signed Cognito access token. The API fixes the issuer and app-client ID in server configuration, rejects ID tokens, confirms that Cognito returns the same subject and a verified email, and then lets Pundit scope every tenant-owned query by the internal user identifier. Mutations require an `Idempotency-Key`; the mutation, audit event, and replay response commit in one transaction. Reusing a key with the same request replays the recorded response, while changing the request returns `409`. Reports are created together with an outbox event in that transaction; workers may process that event only after commit. Provider credentials and provider payloads do not cross the API boundary.
 
 Model-backed operations are owned by a task registry in `ModelGateway`. Each task pins a prompt version, receives bounded server-side evidence, supplies Gemini with a structured response schema when supported, rejects unrecognized citations, normalizes usage and provider failures, and consumes a per-user quota before invocation. Quota writes use a dedicated database connection so a billable provider failure cannot roll the charge back with the surrounding idempotency transaction.
 
@@ -59,7 +57,7 @@ bundle exec rubocop
 bundle exec brakeman --no-pager
 ```
 
-The service tests use generated signing keys and deterministic provider fixtures. They never call Supabase, Gemini, or Yahoo over the network.
+The service tests use generated signing keys and deterministic provider fixtures. They never call Cognito, Gemini, or Yahoo over the network.
 
 ## Rollback
 

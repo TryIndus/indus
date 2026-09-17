@@ -64,7 +64,7 @@ The primary platform consists of:
 - A Rust market-data service in `services/market-data`, using Tokio and Axum for Alpaca ingestion, PostgreSQL persistence, Kafka delivery, and authenticated SSE fanout.
 - Kafka for durable domain-event delivery and Temporal for recoverable multi-step report workflows.
 - Google Gemini behind the provider-neutral Rails `ModelGateway`; prompts, evidence, schemas, quotas, and normalized failures remain application-owned.
-- Supabase browser authentication with Rails support for verified Supabase or Cognito tokens, plus Aurora PostgreSQL, ElastiCache, MSK, S3, EKS, Argo CD, Terraform, Helm, AWS Secrets Manager, and workload identity definitions for AWS.
+- Amazon Cognito browser authentication and Cognito-only Rails access-token verification, plus Aurora PostgreSQL, ElastiCache, MSK, S3, EKS, Argo CD, Terraform, Helm, AWS Secrets Manager, and workload identity definitions for AWS.
 - OpenAPI and Protobuf contracts under `contracts/`, with generated clients checked for deterministic regeneration.
 
 The root Next.js and Supabase application remains in the repository as a bounded rollback path. Do not add new product behavior to it unless the requested work explicitly concerns rollback compatibility or legacy removal.

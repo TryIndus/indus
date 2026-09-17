@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { ArrowUpRight, Search as SearchIcon, ShieldCheck, Sparkles } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { z } from 'zod'
 import { favoritePageSchema, favoriteRequest, favoriteSchema, fundamentalsSchema, instrumentPageSchema, marketSummarySchema, portfolioPageSchema, portfolioRequest, portfolioSchema, reportPageSchema, reportRequest, reportSchema, userSchema, userUpdateRequest, type ReportPage } from './lib/api'
 import { useAppContext } from './app-context'
@@ -9,9 +9,15 @@ import { EmptyState, ErrorState, LoadingState, PageHeader } from './components/S
 import { LivePriceCard } from './components/LivePrice'
 
 export function AuthPage() {
-  const { auth } = useAppContext(); const navigate = useNavigate(); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
-  const submit = async (event: FormEvent) => { event.preventDefault(); setBusy(true); setError(''); try { await auth.signIn(email, password); await navigate({ to: '/dashboard' }) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Sign in failed.') } finally { setBusy(false) } }
-  return <main className="grid min-h-screen place-items-center p-5"><section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950/80 p-7 shadow-2xl"><p className="eyebrow">Financial intelligence</p><h1 className="mt-3 text-3xl font-semibold">Welcome to Indus</h1><p className="muted mt-2">Research markets with evidence, context, and clear controls.</p><form onSubmit={submit} className="mt-7 space-y-4">{error && <p role="alert" className="rounded-lg border border-rose-900 bg-rose-950/40 p-3 text-sm text-rose-200">{error}</p>}<label className="block text-sm">Email<input required type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5" /></label><label className="block text-sm">Password<input required type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5" /></label><button disabled={busy} className="w-full rounded-lg bg-sky-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60">{busy ? 'Signing in…' : 'Sign in securely'}</button></form><p className="muted mt-6 flex items-center gap-2 text-xs"><ShieldCheck size={15} />Credentials are sent only to the configured identity provider.</p></section></main>
+	const { auth } = useAppContext(); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
+	const signIn = async () => { setBusy(true); setError(''); try { await auth.signIn() } catch (cause) { setError(cause instanceof Error ? cause.message : 'Sign in failed.'); setBusy(false) } }
+	return <main className="grid min-h-screen place-items-center p-5"><section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950/80 p-7 shadow-2xl"><p className="eyebrow">Financial intelligence</p><h1 className="mt-3 text-3xl font-semibold">Welcome to Indus</h1><p className="muted mt-2">Research markets with evidence, context, and clear controls.</p><div className="mt-7 space-y-4">{error && <p role="alert" className="rounded-lg border border-rose-900 bg-rose-950/40 p-3 text-sm text-rose-200">{error}</p>}<button type="button" onClick={signIn} disabled={busy} className="w-full rounded-lg bg-sky-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60">{busy ? 'Opening secure sign in…' : 'Continue to secure sign in'}</button></div><p className="muted mt-6 flex items-center gap-2 text-xs"><ShieldCheck size={15} />Sign in and account recovery are handled by Amazon Cognito.</p></section></main>
+}
+
+export function AuthCallbackPage() {
+	const { auth } = useAppContext(); const navigate = useNavigate(); const [error, setError] = useState('')
+	useEffect(() => { void auth.completeSignIn().then(() => navigate({ to: '/dashboard', replace: true })).catch(cause => setError(cause instanceof Error ? cause.message : 'Sign in could not be completed.')) }, [auth, navigate])
+	return <main className="grid min-h-screen place-items-center p-5"><section className="card w-full max-w-md text-center">{error ? <><h1 className="text-2xl font-semibold">Sign in failed</h1><p role="alert" className="mt-3 text-rose-300">{error}</p><a href="/auth" className="mt-5 inline-block text-sky-300">Try again</a></> : <><h1 className="text-2xl font-semibold">Completing sign in</h1><p role="status" className="muted mt-3">Verifying your secure session…</p></>}</section></main>
 }
 
 export function DashboardPage() {

@@ -4,7 +4,6 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-indus-local-access-key}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-indus-local-secret-key}
-      AUTH_PROVIDER: ${AUTH_PROVIDER:-supabase}
       DATABASE_URL: postgres://indus:indus-local-password@postgres:5432/indus_development
       KAFKA_AUTH_MODE: plaintext
       KAFKA_BROKERS: redpanda:9092

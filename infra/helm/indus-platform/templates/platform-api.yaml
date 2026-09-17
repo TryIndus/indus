@@ -43,9 +43,9 @@ spec:
             - secretRef: { name: platform-api-runtime }
           env:
             - { name: PORT, value: "3000" }
-            - { name: AUTH_PROVIDER, value: "cognito" }
             - { name: COGNITO_JWT_ISSUER, value: {{ .Values.identity.issuer | quote }} }
             - { name: COGNITO_CLIENT_ID, value: {{ .Values.identity.audience | quote }} }
+            - { name: COGNITO_USERINFO_URL, value: {{ .Values.identity.userInfoUrl | quote }} }
             - { name: AWS_REGION, value: {{ .Values.aws.region | quote }} }
             - { name: REDIS_AUTH_MODE, value: "iam" }
             - { name: REDIS_ENDPOINT, value: {{ .Values.config.redisEndpoint | quote }} }

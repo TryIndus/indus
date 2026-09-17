@@ -46,6 +46,16 @@ output "data_platform" {
   }
 }
 
+output "identity" {
+  value = {
+    user_pool_id = aws_cognito_user_pool.this.id
+    client_id    = aws_cognito_user_pool_client.web.id
+    issuer       = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.this.id}"
+    hosted_ui    = "https://${aws_cognito_user_pool_domain.this.domain}.auth.${var.aws_region}.amazoncognito.com"
+    userinfo_url = "https://${aws_cognito_user_pool_domain.this.domain}.auth.${var.aws_region}.amazoncognito.com/oauth2/userInfo"
+  }
+}
+
 output "shared_ecr_repository_urls" {
   value = var.shared_ecr_repository_urls
 }

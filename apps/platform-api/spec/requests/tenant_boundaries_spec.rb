@@ -2,7 +2,7 @@ require "rails_helper"
 require Rails.root.join("app/services/fundamentals_provider")
 
 RSpec.describe "tenant API boundaries", type: :request do
-  let(:claims) { { "iss" => "https://example.supabase.co/auth/v1", "sub" => "current-user", "email" => "user@example.test" } }
+  let(:claims) { { "iss" => "https://cognito-idp.us-east-1.amazonaws.com/test-pool", "sub" => "current-user", "email" => "user@example.test" } }
   let(:verifier) { instance_double(Authentication::TokenVerifier, verify: claims) }
   let(:headers) { { "Authorization" => "Bearer valid-test-token", "Idempotency-Key" => SecureRandom.uuid } }
 

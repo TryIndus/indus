@@ -3,7 +3,7 @@ require "cgi"
 require Rails.root.join("app/services/fundamentals_provider")
 
 RSpec.describe "security and failure boundaries", type: :request do
-  let(:claims) { { "iss" => "https://example.supabase.co/auth/v1", "sub" => "boundary-user", "email" => "boundary@example.test" } }
+  let(:claims) { { "iss" => "https://cognito-idp.us-east-1.amazonaws.com/test-pool", "sub" => "boundary-user", "email" => "boundary@example.test" } }
   let(:verifier) { instance_double(Authentication::TokenVerifier, verify: claims) }
   let(:auth) { { "Authorization" => "Bearer token" } }
   let(:key) { "request-boundary-0001" }

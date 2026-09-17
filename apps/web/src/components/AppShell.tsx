@@ -1,4 +1,4 @@
-import { Link, Outlet, useRouter } from '@tanstack/react-router'
+import { Link, Outlet } from '@tanstack/react-router'
 import { BarChart3, FileText, Heart, LayoutDashboard, LogOut, Menu, Search, Settings, WalletCards, X } from 'lucide-react'
 import { useState } from 'react'
 import { useAppContext } from '../app-context'
@@ -11,8 +11,7 @@ const links = [
 export function AppShell() {
   const [open, setOpen] = useState(false)
   const { auth } = useAppContext()
-  const router = useRouter()
-  const signOut = async () => { await auth.signOut(); await router.navigate({ to: '/auth' }) }
+	const signOut = async () => { await auth.signOut() }
   return <div className="min-h-screen md:grid md:grid-cols-[16rem_1fr]">
     <a href="#main" className="fixed -top-20 left-4 z-50 rounded bg-sky-400 px-4 py-2 text-slate-950 focus:top-4">Skip to content</a>
     <header className="flex h-16 items-center justify-between border-b border-slate-800 px-5 md:hidden">

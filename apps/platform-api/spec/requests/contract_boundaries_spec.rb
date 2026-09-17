@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "OpenAPI product boundaries", type: :request do
-  let(:claims) { { "iss" => "https://example.supabase.co/auth/v1", "sub" => "contract-user", "email" => "contract@example.test" } }
+  let(:claims) { { "iss" => "https://cognito-idp.us-east-1.amazonaws.com/test-pool", "sub" => "contract-user", "email" => "contract@example.test" } }
   let(:verifier) { instance_double(Authentication::TokenVerifier, verify: claims) }
   let(:auth) { { "Authorization" => "Bearer token" } }
   let(:write_headers) { auth.merge("Idempotency-Key" => SecureRandom.uuid) }
