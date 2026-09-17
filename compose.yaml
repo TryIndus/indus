@@ -68,6 +68,7 @@ services:
 
   market-data:
     profiles: ["distributed"]
+    image: indus-market-data:local
     build:
       context: ./services/market-data
     environment:
@@ -97,6 +98,7 @@ services:
 
   platform-api:
     profiles: ["application"]
+    image: indus-platform-api:local
     build:
       context: ./apps/platform-api
     environment:
@@ -117,6 +119,7 @@ services:
 
   web:
     profiles: ["application"]
+    image: indus-web:local
     build:
       context: ./apps/web
       args:

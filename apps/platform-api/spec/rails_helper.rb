@@ -3,6 +3,7 @@ ENV["COGNITO_JWT_ISSUER"] ||= "https://cognito-idp.us-east-1.amazonaws.com/test-
 ENV["COGNITO_CLIENT_ID"] ||= "test-client"
 ENV["COGNITO_USERINFO_URL"] ||= "https://indus-test.auth.us-east-1.amazoncognito.com/oauth2/userInfo"
 
+require_relative "support/coverage"
 require File.expand_path("../config/environment", __dir__)
 abort("The Rails environment is running in production mode!") if Rails.env.production?
 require "rspec/rails"

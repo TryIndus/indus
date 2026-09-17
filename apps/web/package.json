@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "preview": "vite preview"
   },
@@ -32,6 +33,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "@vitest/coverage-v8": "4.1.10",
     "jsdom": "^30.0.1",
     "oxlint": "^1.75.0",
     "tailwindcss": "^4.3.3",
