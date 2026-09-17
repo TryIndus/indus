@@ -83,3 +83,45 @@ impl ServiceHealth {
 fn state(value: bool) -> &'static str {
     if value { "ready" } else { "unavailable" }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn readiness_requires_every_configured_dependency() {
+        let health = ServiceHealth::default();
+
+        let initial = health.readiness();
+        assert!(!initial.ready);
+        assert_eq!(initial.database, "unavailable");
+        assert_eq!(initial.kafka, "unavailable");
+        assert_eq!(initial.upstream, "disabled");
+
+        health.set_database_ready(true);
+        health.set_kafka_ready(true);
+        assert!(health.readiness().ready);
+
+        health.set_upstream_required(true);
+        assert!(!health.readiness().ready);
+        assert_eq!(health.readiness().upstream, "unavailable");
+
+        health.set_upstream_connected(true);
+        assert!(health.readiness().ready);
+        assert!(health.upstream_connected());
+    }
+
+    #[test]
+    fn shutdown_and_upstream_event_state_are_observable() {
+        let health = ServiceHealth::default();
+        assert!(health.is_live());
+        assert_eq!(health.last_upstream_event(), None);
+
+        health.record_upstream_event();
+        assert!(health.last_upstream_event().is_some_and(|timestamp| timestamp > 0));
+
+        health.mark_shutting_down();
+        assert!(!health.is_live());
+        assert!(!health.readiness().ready);
+    }
+}

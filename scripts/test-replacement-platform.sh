@@ -10,6 +10,16 @@ payload="indus-platform-validation-${GITHUB_RUN_ID:-local}"
 cleanup() {
   "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
+
+diagnose_failure() {
+  local exit_code=$?
+  echo "Replacement platform validation failed; current container state follows." >&2
+  "${compose[@]}" ps >&2 || true
+  "${compose[@]}" logs --no-color --tail 200 platform-api market-data web postgres redis redpanda >&2 || true
+  return "$exit_code"
+}
+
+trap diagnose_failure ERR
 trap cleanup EXIT
 
 "${compose[@]}" config --quiet

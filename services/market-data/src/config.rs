@@ -191,3 +191,183 @@ where
             reason: error.to_string(),
         })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Mutex, MutexGuard};
+
+    use super::*;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    const VARIABLES: &[&str] = &[
+        "ALPACA_API_KEY",
+        "ALPACA_CRYPTO_WS_URL",
+        "ALPACA_SECRET_KEY",
+        "ALPACA_STOCK_WS_URL",
+        "AWS_REGION",
+        "DATABASE_URL",
+        "KAFKA_BOOTSTRAP_SERVERS",
+        "KAFKA_GROUP_ID",
+        "KAFKA_SASL_MECHANISM",
+        "KAFKA_SASL_PASSWORD",
+        "KAFKA_SASL_USERNAME",
+        "KAFKA_SECURITY_PROTOCOL",
+        "KAFKA_SSL_CA_LOCATION",
+        "KAFKA_TRANSACTIONAL_ID",
+        "MARKET_ALLOWED_ORIGINS",
+        "MARKET_BIND_ADDR",
+        "MARKET_HEARTBEAT_SECONDS",
+        "MARKET_INGESTION_ENABLED",
+        "MARKET_JWKS_URL",
+        "MARKET_JWT_AUDIENCE",
+        "MARKET_JWT_HS256_SECRET",
+        "MARKET_JWT_ISSUER",
+        "MARKET_MAX_STREAMS_GLOBAL",
+        "MARKET_MAX_STREAMS_PER_USER",
+        "MARKET_REPLAY_BUFFER",
+        "MARKET_RETENTION_DAYS",
+        "MARKET_STALE_AFTER_SECONDS",
+        "MARKET_STREAM_BUFFER",
+        "MARKET_SYMBOLS",
+    ];
+
+    struct CleanEnvironment {
+        _lock: MutexGuard<'static, ()>,
+    }
+
+    impl CleanEnvironment {
+        fn new() -> Self {
+            let lock = ENV_LOCK.lock().expect("environment lock should be available");
+            for name in VARIABLES {
+                // SAFETY: every environment-mutating test in this module holds ENV_LOCK.
+                unsafe { env::remove_var(name) };
+            }
+            Self { _lock: lock }
+        }
+
+        fn set(&self, name: &str, value: &str) {
+            // SAFETY: this guard holds ENV_LOCK for its full lifetime.
+            unsafe { env::set_var(name, value) };
+        }
+    }
+
+    impl Drop for CleanEnvironment {
+        fn drop(&mut self) {
+            for name in VARIABLES {
+                // SAFETY: this guard still holds ENV_LOCK while restoring the process environment.
+                unsafe { env::remove_var(name) };
+            }
+        }
+    }
+
+    fn required_environment() -> CleanEnvironment {
+        let environment = CleanEnvironment::new();
+        environment.set("DATABASE_URL", "postgres://localhost/indus");
+        environment.set("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
+        environment.set("MARKET_JWT_ISSUER", "https://issuer.example");
+        environment.set("MARKET_JWT_AUDIENCE", "indus-market-data");
+        environment.set("MARKET_JWT_HS256_SECRET", "a-development-secret-longer-than-32-bytes");
+        environment.set("MARKET_INGESTION_ENABLED", "false");
+        environment
+    }
+
+    #[test]
+    fn loads_safe_defaults_when_optional_settings_are_absent() {
+        let _environment = required_environment();
+
+        let config = Config::from_env().expect("the minimum complete configuration should load");
+
+        assert_eq!(config.bind_addr, "0.0.0.0:8081".parse().unwrap());
+        assert_eq!(config.kafka.transactional_id, "indus-market-data-producer");
+        assert_eq!(config.kafka.group_id, "indus-market-data-writer-v1");
+        assert_eq!(config.kafka.security_protocol, "PLAINTEXT");
+        assert_eq!(config.alpaca.symbols, ["AAPL", "BTC/USD"]);
+        assert_eq!(config.stream.stale_after, Duration::from_secs(30));
+        assert_eq!(config.stream.heartbeat, Duration::from_secs(15));
+        assert_eq!(config.stream.buffer_capacity, 256);
+        assert_eq!(config.stream.replay_capacity, 512);
+        assert_eq!(config.stream.max_per_user, 5);
+        assert_eq!(config.stream.max_global, 2_000);
+        assert_eq!(config.retention_days, 90);
+        assert_eq!(config.allowed_origins, ["http://127.0.0.1:14173"]);
+    }
+
+    #[test]
+    fn loads_explicit_transport_stream_and_provider_settings() {
+        let environment = required_environment();
+        environment.set("MARKET_BIND_ADDR", "127.0.0.1:9090");
+        environment.set("MARKET_SYMBOLS", " MSFT, ETH/USD, ");
+        environment.set("MARKET_ALLOWED_ORIGINS", "https://one.example, https://two.example");
+        environment.set("MARKET_STALE_AFTER_SECONDS", "45");
+        environment.set("MARKET_HEARTBEAT_SECONDS", "10");
+        environment.set("MARKET_STREAM_BUFFER", "64");
+        environment.set("MARKET_REPLAY_BUFFER", "128");
+        environment.set("MARKET_MAX_STREAMS_PER_USER", "3");
+        environment.set("MARKET_MAX_STREAMS_GLOBAL", "100");
+        environment.set("MARKET_RETENTION_DAYS", "30");
+        environment.set("KAFKA_SECURITY_PROTOCOL", "SASL_SSL");
+        environment.set("KAFKA_SASL_MECHANISM", "AWS_MSK_IAM");
+        environment.set("AWS_REGION", "us-east-1");
+        environment.set("ALPACA_STOCK_WS_URL", "wss://stocks.example");
+        environment.set("ALPACA_CRYPTO_WS_URL", "wss://crypto.example");
+
+        let config = Config::from_env().expect("explicit configuration should load");
+
+        assert_eq!(config.bind_addr, "127.0.0.1:9090".parse().unwrap());
+        assert_eq!(config.alpaca.symbols, ["MSFT", "ETH/USD"]);
+        assert_eq!(config.allowed_origins.len(), 2);
+        assert_eq!(config.stream.stale_after, Duration::from_secs(45));
+        assert_eq!(config.stream.max_global, 100);
+        assert_eq!(config.retention_days, 30);
+        assert_eq!(config.kafka.sasl_mechanism.as_deref(), Some("AWS_MSK_IAM"));
+        assert_eq!(config.kafka.aws_region.as_deref(), Some("us-east-1"));
+        assert_eq!(config.alpaca.stock_ws_url, "wss://stocks.example");
+    }
+
+    #[test]
+    fn rejects_ambiguous_auth_missing_provider_credentials_and_invalid_values() {
+        let environment = required_environment();
+        environment.set("MARKET_JWKS_URL", "https://issuer.example/jwks.json");
+        assert!(matches!(Config::from_env(), Err(ConfigError::AuthMode)));
+
+        environment.set("MARKET_JWKS_URL", "");
+        environment.set("MARKET_INGESTION_ENABLED", "true");
+        assert!(matches!(Config::from_env(), Err(ConfigError::AlpacaCredentials)));
+
+        environment.set("ALPACA_API_KEY", "key");
+        environment.set("ALPACA_SECRET_KEY", "secret");
+        environment.set("MARKET_SYMBOLS", " , ");
+        assert!(matches!(
+            Config::from_env(),
+            Err(ConfigError::Invalid { name: "MARKET_SYMBOLS", .. })
+        ));
+
+        environment.set("MARKET_SYMBOLS", "AAPL");
+        environment.set("MARKET_STREAM_BUFFER", "not-a-number");
+        assert!(matches!(
+            Config::from_env(),
+            Err(ConfigError::Invalid { name: "MARKET_STREAM_BUFFER", .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_missing_required_values_and_invalid_addresses() {
+        let environment = CleanEnvironment::new();
+        environment.set("MARKET_JWT_HS256_SECRET", "a-development-secret-longer-than-32-bytes");
+        environment.set("MARKET_INGESTION_ENABLED", "false");
+        assert!(matches!(
+            Config::from_env(),
+            Err(ConfigError::Missing("DATABASE_URL"))
+        ));
+
+        environment.set("DATABASE_URL", "postgres://localhost/indus");
+        environment.set("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
+        environment.set("MARKET_JWT_ISSUER", "https://issuer.example");
+        environment.set("MARKET_JWT_AUDIENCE", "indus-market-data");
+        environment.set("MARKET_BIND_ADDR", "invalid");
+        assert!(matches!(
+            Config::from_env(),
+            Err(ConfigError::Invalid { name: "MARKET_BIND_ADDR", .. })
+        ));
+    }
+}

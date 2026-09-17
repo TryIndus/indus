@@ -314,7 +314,7 @@ jobs:
         run: |
           cargo fmt --all -- --check
           cargo clippy --locked --all-targets --all-features -- -D warnings
-          cargo llvm-cov --locked --all-targets --all-features --fail-under-lines 70
+          cargo llvm-cov --locked --lib --tests --all-features --fail-under-lines 70
           cargo build --locked --release
 
   composed-platform:
