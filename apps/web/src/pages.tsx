@@ -9,8 +9,8 @@ import { EmptyState, ErrorState, LoadingState, PageHeader } from './components/S
 import { LivePriceCard } from './components/LivePrice'
 
 export function AuthPage() {
-	const { auth } = useAppContext(); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
-	const signIn = async () => { setBusy(true); setError(''); try { await auth.signIn() } catch (cause) { setError(cause instanceof Error ? cause.message : 'Sign in failed.'); setBusy(false) } }
+	const { auth } = useAppContext(); const navigate = useNavigate(); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
+	const signIn = async () => { setBusy(true); setError(''); try { await auth.signIn(); if (await auth.getUser()) await navigate({ to: '/dashboard', replace: true }) } catch (cause) { setError(cause instanceof Error ? cause.message : 'Sign in failed.'); setBusy(false) } }
 	return <main className="grid min-h-screen place-items-center p-5"><section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950/80 p-7 shadow-2xl"><p className="eyebrow">Financial intelligence</p><h1 className="mt-3 text-3xl font-semibold">Welcome to Indus</h1><p className="muted mt-2">Research markets with evidence, context, and clear controls.</p><div className="mt-7 space-y-4">{error && <p role="alert" className="rounded-lg border border-rose-900 bg-rose-950/40 p-3 text-sm text-rose-200">{error}</p>}<button type="button" onClick={signIn} disabled={busy} className="w-full rounded-lg bg-sky-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60">{busy ? 'Opening secure sign in…' : 'Continue to secure sign in'}</button></div><p className="muted mt-6 flex items-center gap-2 text-xs"><ShieldCheck size={15} />Sign in and account recovery are handled by Amazon Cognito.</p></section></main>
 }
 

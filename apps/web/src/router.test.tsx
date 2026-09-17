@@ -187,6 +187,7 @@ describe('application routing', () => {
     const router = await renderPath('/auth', false)
     fireEvent.click(screen.getByRole('button', { name: 'Continue to secure sign in' }))
     await waitFor(() => expect(router.options.context.auth.signIn).toHaveBeenCalled())
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
 
     cleanupView()
     const callbackRouter = await renderPath('/auth/callback', false)
