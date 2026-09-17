@@ -1,3 +1,4 @@
+{{- if .Values.platform.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -24,6 +25,7 @@ spec:
     retry: { limit: 3, backoff: { duration: 10s, factor: 2, maxDuration: 3m } }
   revisionHistoryLimit: 10
 ---
+{{- end }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

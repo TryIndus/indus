@@ -1,0 +1,135 @@
+name: Deploy infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Terraform operation
+        required: true
+        type: choice
+        options: [plan, apply, tear-up, tear-down, destroy]
+      confirmation:
+        description: Required for staging tear-down or destroy
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-infrastructure-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  target:
+    name: Validate branch and operation
+    runs-on: ubuntu-24.04
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
+    steps:
+      - id: target
+        env:
+          OPERATION: ${{ inputs.operation }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF_NAME" in
+            staging) environment=staging ;;
+            main) environment=production ;;
+            *) echo "Infrastructure deployments must run from staging or main." >&2; exit 1 ;;
+          esac
+          case "$OPERATION" in
+            plan|apply|tear-up|tear-down|destroy) ;;
+            *) echo "Unsupported infrastructure operation." >&2; exit 1 ;;
+          esac
+          if [[ "$OPERATION" == tear-up || "$OPERATION" == tear-down || "$OPERATION" == destroy ]]; then
+            [[ "$environment" == staging ]] || { echo "Staging lifecycle operations must run from staging." >&2; exit 1; }
+          fi
+          if [[ "$OPERATION" == tear-down ]]; then
+            [[ "$CONFIRMATION" == tear-down-staging ]] || { echo "Use confirmation tear-down-staging." >&2; exit 1; }
+          fi
+          if [[ "$OPERATION" == destroy ]]; then
+            [[ "$environment" == staging ]] || { echo "Production destroy is not implemented." >&2; exit 1; }
+            [[ "$CONFIRMATION" == destroy-staging ]] || { echo "Use confirmation destroy-staging." >&2; exit 1; }
+          fi
+          echo "environment=$environment" >> "$GITHUB_OUTPUT"
+
+  terraform:
+    name: ${{ inputs.operation }} ${{ needs.target.outputs.environment }} infrastructure
+    needs: target
+    environment: ${{ needs.target.outputs.environment }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.14.2
+
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ vars.AWS_TERRAFORM_REGION }}
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          role-session-name: indus-infrastructure-${{ github.run_id }}
+
+      - name: Restore environment configuration
+        env:
+          BACKEND_CONFIG_B64: ${{ secrets.TF_BACKEND_CONFIG_B64 }}
+          TFVARS_B64: ${{ secrets.TF_VARS_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$BACKEND_CONFIG_B64"
+          test -n "$TFVARS_B64"
+          environment="${{ needs.target.outputs.environment }}"
+          printf '%s' "$BACKEND_CONFIG_B64" | base64 --decode > "infra/terraform/environments/$environment/backend.hcl"
+          printf '%s' "$TFVARS_B64" | base64 --decode > "infra/terraform/environments/$environment/terraform.tfvars"
+
+      - name: Plan
+        env:
+          OPERATION: ${{ inputs.operation }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          environment="${{ needs.target.outputs.environment }}"
+          terraform -chdir="infra/terraform/environments/$environment" init -input=false -backend-config=backend.hcl
+          if [[ "$OPERATION" == destroy ]]; then
+            terraform -chdir="infra/terraform/environments/$environment" plan -destroy -input=false -out=approved.tfplan
+          elif [[ "$OPERATION" == tear-down ]]; then
+            # Keep the Aurora cluster volume and credentials; remove only its compute.
+            targets=(
+              -target=module.environment.aws_cloudfront_distribution.this
+              -target=module.environment.aws_route53_record.application
+              -target=module.environment.aws_route53_record.legacy
+              -target=module.environment.aws_route53_record.origin
+              -target=module.environment.aws_lb_listener_rule.cloudfront_origin
+              -target=module.environment.aws_lb_listener.https
+              -target=module.environment.aws_lb_target_group.legacy_next
+              -target=module.environment.aws_lb.this
+              -target=module.environment.aws_security_group_rule.cluster_from_alb
+              -target=module.environment.aws_security_group_rule.proxy_from_cluster
+              -target=module.environment.aws_eks_addon.this
+              -target=module.environment.aws_eks_node_group.system
+              -target=module.environment.aws_eks_access_policy_association.cluster_admin
+              -target=module.environment.aws_eks_access_entry.cluster_admin
+              -target=module.environment.aws_eks_cluster.this
+              -target=module.environment.aws_db_proxy_target.data
+              -target=module.environment.aws_db_proxy_default_target_group.data
+              -target=module.environment.aws_db_proxy.data
+              -target=module.environment.aws_rds_cluster_instance.data
+              -target=module.environment.aws_nat_gateway.primary
+              -target=module.environment.aws_eip.nat
+            )
+            terraform -chdir="infra/terraform/environments/$environment" plan -destroy -input=false -out=approved.tfplan "${targets[@]}"
+          else
+            terraform -chdir="infra/terraform/environments/$environment" plan -input=false -out=approved.tfplan
+          fi
+
+      - name: Apply saved plan
+        if: inputs.operation == 'apply' || inputs.operation == 'tear-up' || inputs.operation == 'tear-down' || inputs.operation == 'destroy'
+        shell: bash
+        run: terraform -chdir=infra/terraform/environments/${{ needs.target.outputs.environment }} apply -input=false approved.tfplan

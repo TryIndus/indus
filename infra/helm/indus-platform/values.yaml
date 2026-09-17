@@ -1,16 +1,16 @@
-environment: development
+environment: staging
 aws:
-  region: ca-central-1
+  region: us-east-1
   vpcCidr: 10.20.0.0/16
-  prometheusRemoteWriteUrl: https://aps-workspaces.ca-central-1.amazonaws.com/workspaces/replace-me/api/v1/remote_write
+  prometheusRemoteWriteUrl: https://aps-workspaces.us-east-1.amazonaws.com/workspaces/replace-me/api/v1/remote_write
   webBucket: replace-me
   cloudfrontDistributionId: replace-me
   targetGroups:
-    platformApi: arn:aws:elasticloadbalancing:ca-central-1:000000000000:targetgroup/replace-api/0000000000000000
-    marketData: arn:aws:elasticloadbalancing:ca-central-1:000000000000:targetgroup/replace-stream/0000000000000000
+    platformApi: arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/replace-api/0000000000000000
+    marketData: arn:aws:elasticloadbalancing:us-east-1:000000000000:targetgroup/replace-stream/0000000000000000
 
 identity:
-  issuer: https://cognito-idp.ca-central-1.amazonaws.com/replace-me
+  issuer: https://cognito-idp.us-east-1.amazonaws.com/replace-me
   audience: replace-me
 
 images:
@@ -30,22 +30,22 @@ roles:
   webPublisher: arn:aws:iam::000000000000:role/replace-web-publisher
 
 secrets:
-  platformApi: arn:aws:secretsmanager:ca-central-1:000000000000:secret:replace-platform-api
-  marketData: arn:aws:secretsmanager:ca-central-1:000000000000:secret:replace-market-data
-  researchWorker: arn:aws:secretsmanager:ca-central-1:000000000000:secret:replace-research-worker
-  databaseMigration: arn:aws:secretsmanager:ca-central-1:000000000000:secret:replace-database-migration
+  platformApi: arn:aws:secretsmanager:us-east-1:000000000000:secret:replace-platform-api
+  marketData: arn:aws:secretsmanager:us-east-1:000000000000:secret:replace-market-data
+  researchWorker: arn:aws:secretsmanager:us-east-1:000000000000:secret:replace-research-worker
+  databaseMigration: arn:aws:secretsmanager:us-east-1:000000000000:secret:replace-database-migration
 
 config:
-  rdsProxyEndpoint: replace.proxy.ca-central-1.rds.amazonaws.com
+  rdsProxyEndpoint: replace.proxy.us-east-1.rds.amazonaws.com
   redisEndpoint: replace.serverless.cac1.cache.amazonaws.com
   redisPort: 6379
-  redisCacheName: indus-development
-  redisUser: indus-development-app
-  mskBootstrapBrokers: replace.kafka-serverless.ca-central-1.amazonaws.com:9098
+  redisCacheName: indus-staging
+  redisUser: indus-staging-app
+  mskBootstrapBrokers: replace.kafka-serverless.us-east-1.amazonaws.com:9098
   artifactBucket: replace-artifacts
   rawEventsBucket: replace-raw-events
   temporalAddress: replace.tmprl.cloud:7233
-  temporalNamespace: development.indus
+  temporalNamespace: staging.indus
 
 platformApi:
   replicas: 2

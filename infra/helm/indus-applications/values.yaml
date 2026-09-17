@@ -1,10 +1,16 @@
-environment: development
+environment: replace-me
 repository: https://github.com/TryIndus/indus.git
 revision: main
 clusterName: replace-me
 vpcId: vpc-replace-me
-awsRegion: ca-central-1
+awsRegion: replace-me
 roles:
   loadBalancer: arn:aws:iam::000000000000:role/replace-load-balancer
-  otelCollector: arn:aws:iam::000000000000:role/replace-otel
-prometheusRemoteWriteUrl: https://aps-workspaces.ca-central-1.amazonaws.com/workspaces/replace-me/api/v1/remote_write
+legacyNext:
+  enabled: true
+  imageRepository: replace-with-ecr-repository
+  serviceAccountRoleArn: arn:aws:iam::000000000000:role/replace-legacy-next
+  runtimeSecretArn: arn:aws:secretsmanager:replace-me:000000000000:secret:replace-legacy-next
+  targetGroupArn: arn:aws:elasticloadbalancing:replace-me:000000000000:targetgroup/replace/0000000000000000
+platform:
+  enabled: false

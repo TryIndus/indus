@@ -1,9 +1,10 @@
-shared_account_id = "111111111111"
-environment_account_ids = {
-  development = "222222222222"
-  staging     = "333333333333"
-  production  = "444444444444"
-}
+project_account_id = "111111111111"
+
+# Populate after the account administrator creates these execution roles.
+# terraform_execution_role_arns = {
+#   staging    = "arn:aws:iam::111111111111:role/indus-staging-terraform"
+#   production = "arn:aws:iam::111111111111:role/indus-production-terraform"
+# }
 
 tags = {
   CostCenter = "engineering"

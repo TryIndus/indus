@@ -1,36 +1,36 @@
 environment: staging
 aws:
-  region: ca-central-1
+  region: us-east-1
   vpcCidr: 10.30.0.0/16
-  webBucket: indus-staging-web-333333333333
+  webBucket: indus-staging-web-111111111111
   cloudfrontDistributionId: replace-staging
   targetGroups:
-    platformApi: arn:aws:elasticloadbalancing:ca-central-1:333333333333:targetgroup/replace-api/0000000000000000
-    marketData: arn:aws:elasticloadbalancing:ca-central-1:333333333333:targetgroup/replace-stream/0000000000000000
-identity: { issuer: "https://cognito-idp.ca-central-1.amazonaws.com/replace-staging", audience: replace-staging }
+    platformApi: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/replace-api/0000000000000000
+    marketData: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/replace-stream/0000000000000000
+identity: { issuer: "https://cognito-idp.us-east-1.amazonaws.com/replace-staging", audience: replace-staging }
 roles:
-  platformApi: arn:aws:iam::333333333333:role/indus-staging-platform-api
-  sidekiq: arn:aws:iam::333333333333:role/indus-staging-sidekiq
-  platformOutbox: arn:aws:iam::333333333333:role/indus-staging-platform-outbox
-  reportsConsumer: arn:aws:iam::333333333333:role/indus-staging-reports-consumer
-  marketData: arn:aws:iam::333333333333:role/indus-staging-market-data
-  researchWorker: arn:aws:iam::333333333333:role/indus-staging-research-worker
-  databaseMigrator: arn:aws:iam::333333333333:role/indus-staging-database-migrator
-  webPublisher: arn:aws:iam::333333333333:role/indus-staging-web-publisher
+  platformApi: arn:aws:iam::111111111111:role/indus-staging-platform-api
+  sidekiq: arn:aws:iam::111111111111:role/indus-staging-sidekiq
+  platformOutbox: arn:aws:iam::111111111111:role/indus-staging-platform-outbox
+  reportsConsumer: arn:aws:iam::111111111111:role/indus-staging-reports-consumer
+  marketData: arn:aws:iam::111111111111:role/indus-staging-market-data
+  researchWorker: arn:aws:iam::111111111111:role/indus-staging-research-worker
+  databaseMigrator: arn:aws:iam::111111111111:role/indus-staging-database-migrator
+  webPublisher: arn:aws:iam::111111111111:role/indus-staging-web-publisher
 secrets:
-  platformApi: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/platform-api
-  marketData: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/market-data
-  researchWorker: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/research-worker
-  databaseMigration: arn:aws:secretsmanager:ca-central-1:333333333333:secret:indus-staging/database-migration
+  platformApi: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-staging/platform-api
+  marketData: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-staging/market-data
+  researchWorker: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-staging/research-worker
+  databaseMigration: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-staging/database-migration
 config:
-  rdsProxyEndpoint: replace-staging.proxy.ca-central-1.rds.amazonaws.com
+  rdsProxyEndpoint: replace-staging.proxy.us-east-1.rds.amazonaws.com
   redisEndpoint: replace-staging.serverless.cac1.cache.amazonaws.com
   redisPort: 6379
   redisCacheName: indus-staging
   redisUser: indus-staging-app
-  mskBootstrapBrokers: replace-staging.kafka-serverless.ca-central-1.amazonaws.com:9098
-  artifactBucket: indus-staging-artifacts-333333333333
-  rawEventsBucket: indus-staging-raw-events-333333333333
+  mskBootstrapBrokers: replace-staging.kafka-serverless.us-east-1.amazonaws.com:9098
+  artifactBucket: indus-staging-artifacts-111111111111
+  rawEventsBucket: indus-staging-raw-events-111111111111
   temporalAddress: replace.tmprl.cloud:7233
   temporalNamespace: staging.indus
 images:

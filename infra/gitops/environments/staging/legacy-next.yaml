@@ -1,0 +1,7 @@
+imageDigest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+replicas: 1
+minReplicas: 1
+maxReplicas: 2
+resources:
+  requests: { cpu: 250m, memory: 512Mi }
+  limits: { cpu: "1", memory: 1Gi }

@@ -77,7 +77,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: application
-          image: {{ .Values.image | quote }}
+          image: {{ printf "%s@%s" .Values.imageRepository .Values.imageDigest | quote }}
           imagePullPolicy: IfNotPresent
           ports:
             - { name: http, containerPort: 3000, protocol: TCP }

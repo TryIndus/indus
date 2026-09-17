@@ -1,8 +1,15 @@
 environment: staging
+revision: staging
 clusterName: indus-staging
 vpcId: vpc-replace-staging
-awsRegion: ca-central-1
+awsRegion: replace-me
 roles:
-  loadBalancer: arn:aws:iam::333333333333:role/indus-staging-load-balancer
-  otelCollector: arn:aws:iam::333333333333:role/indus-staging-otel-collector
-prometheusRemoteWriteUrl: https://aps-workspaces.ca-central-1.amazonaws.com/workspaces/replace-staging/api/v1/remote_write
+  loadBalancer: arn:aws:iam::000000000000:role/replace-load-balancer
+legacyNext:
+  enabled: true
+  imageRepository: replace-with-ecr-repository
+  serviceAccountRoleArn: arn:aws:iam::000000000000:role/replace-legacy-next
+  runtimeSecretArn: arn:aws:secretsmanager:replace-me:000000000000:secret:replace-legacy-next
+  targetGroupArn: arn:aws:elasticloadbalancing:replace-me:000000000000:targetgroup/replace/0000000000000000
+platform:
+  enabled: false

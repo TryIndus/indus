@@ -6,7 +6,8 @@ locals {
     ManagedBy   = "Terraform"
     Repository  = var.github_repository
   })
-  repositories = toset(["platform-api", "market-data", "research-worker", "web"])
+  repositories = toset(["legacy-next", "platform-api", "market-data", "research-worker", "web"])
+  environments = toset(["staging", "production"])
 }
 
 resource "aws_kms_key" "shared" {
@@ -22,7 +23,7 @@ resource "aws_kms_alias" "shared" {
 }
 
 resource "aws_s3_bucket" "state" {
-  bucket = "indus-terraform-state-${var.shared_account_id}"
+  bucket = "indus-terraform-state-${var.project_account_id}"
   tags   = merge(local.common_tags, { DataClass = "terraform-state" })
 }
 
@@ -136,31 +137,6 @@ resource "aws_ecr_lifecycle_policy" "this" {
   })
 }
 
-data "aws_iam_policy_document" "ecr_pull" {
-  for_each = aws_ecr_repository.this
-
-  statement {
-    sid = "EnvironmentPull"
-    actions = [
-      "ecr:BatchCheckLayerAvailability",
-      "ecr:BatchGetImage",
-      "ecr:BatchGetImage",
-      "ecr:GetDownloadUrlForLayer",
-    ]
-    principals {
-      type        = "AWS"
-      identifiers = [for account_id in values(var.environment_account_ids) : "arn:${data.aws_partition.current.partition}:iam::${account_id}:root"]
-    }
-  }
-}
-
-resource "aws_ecr_repository_policy" "pull" {
-  for_each = aws_ecr_repository.this
-
-  repository = each.value.name
-  policy     = data.aws_iam_policy_document.ecr_pull[each.key].json
-}
-
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
@@ -183,7 +159,10 @@ data "aws_iam_policy_document" "github_build_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:refs/heads/main"]
+      values = [
+        "repo:${var.github_repository}:environment:staging",
+        "repo:${var.github_repository}:environment:production",
+      ]
     }
   }
 }
@@ -203,7 +182,9 @@ data "aws_iam_policy_document" "github_build" {
   statement {
     actions = [
       "ecr:BatchCheckLayerAvailability",
+      "ecr:BatchGetImage",
       "ecr:CompleteLayerUpload",
+      "ecr:DescribeImages",
       "ecr:GetDownloadUrlForLayer",
       "ecr:InitiateLayerUpload",
       "ecr:PutImage",
@@ -235,7 +216,6 @@ data "aws_iam_policy_document" "github_promotion_assume" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repository}:environment:development",
         "repo:${var.github_repository}:environment:staging",
         "repo:${var.github_repository}:environment:production",
       ]
@@ -259,6 +239,7 @@ data "aws_iam_policy_document" "github_promotion" {
     actions = [
       "ecr:BatchCheckLayerAvailability",
       "ecr:BatchGetImage",
+      "ecr:DescribeImages",
       "ecr:GetDownloadUrlForLayer",
     ]
     resources = values(aws_ecr_repository.this)[*].arn
@@ -272,13 +253,25 @@ resource "aws_iam_role_policy" "github_promotion" {
 }
 
 data "aws_iam_policy_document" "state_assume" {
-  for_each = var.environment_account_ids
+  for_each = local.environments
+
+  dynamic "statement" {
+    for_each = lookup(var.terraform_execution_role_arns, each.key, null) == null ? [] : [var.terraform_execution_role_arns[each.key]]
+    content {
+      sid     = "EnvironmentAutomation"
+      actions = ["sts:AssumeRole"]
+      principals {
+        type        = "AWS"
+        identifiers = [statement.value]
+      }
+    }
+  }
 
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "AWS"
-      identifiers = ["arn:${data.aws_partition.current.partition}:iam::${each.value}:root"]
+      identifiers = ["arn:${data.aws_partition.current.partition}:iam::${var.project_account_id}:root"]
     }
     condition {
       test     = "Bool"
@@ -289,7 +282,7 @@ data "aws_iam_policy_document" "state_assume" {
 }
 
 resource "aws_iam_role" "state" {
-  for_each = var.environment_account_ids
+  for_each = local.environments
 
   name               = "indus-${each.key}-terraform-state"
   assume_role_policy = data.aws_iam_policy_document.state_assume[each.key].json
@@ -297,7 +290,7 @@ resource "aws_iam_role" "state" {
 }
 
 data "aws_iam_policy_document" "state" {
-  for_each = var.environment_account_ids
+  for_each = local.environments
 
   statement {
     actions   = ["s3:ListBucket"]
@@ -319,7 +312,7 @@ data "aws_iam_policy_document" "state" {
 }
 
 resource "aws_iam_role_policy" "state" {
-  for_each = var.environment_account_ids
+  for_each = local.environments
 
   name   = "state-${each.key}"
   role   = aws_iam_role.state[each.key].id

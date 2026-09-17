@@ -3,25 +3,29 @@ variable "aws_region" {
   default = "us-east-1"
 }
 
-variable "shared_account_id" {
+variable "project_account_id" {
   type        = string
-  description = "AWS account ID that owns shared state and image repositories."
-}
-
-variable "environment_account_ids" {
-  type        = map(string)
-  description = "Environment account IDs keyed by development, staging, and production."
-
-  validation {
-    condition     = length(setsubtract(toset(["development", "staging", "production"]), toset(keys(var.environment_account_ids)))) == 0
-    error_message = "All three environment account IDs are required."
-  }
+  description = "Dedicated Indus member account ID that owns shared services and both environments."
 }
 
 variable "github_repository" {
   type        = string
   description = "GitHub owner/repository bound into OIDC subject conditions."
   default     = "TryIndus/indus"
+}
+
+variable "terraform_execution_role_arns" {
+  type        = map(string)
+  description = "Pre-provisioned environment Actions roles allowed to assume their shared state role without MFA."
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for environment, arn in var.terraform_execution_role_arns :
+      contains(["staging", "production"], environment) && can(regex("^arn:aws:iam::${var.project_account_id}:role/.+$", arn))
+    ])
+    error_message = "Use staging or production keys and role ARNs from the dedicated Indus account."
+  }
 }
 
 variable "tags" {

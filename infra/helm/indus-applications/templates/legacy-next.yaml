@@ -1,0 +1,33 @@
+{{- if .Values.legacyNext.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: indus-legacy-next
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: indus
+  sources:
+    - repoURL: {{ .Values.repository | quote }}
+      targetRevision: {{ .Values.revision | quote }}
+      path: infra/helm/indus-legacy-next
+      helm:
+        releaseName: indus-legacy-next
+        valueFiles:
+          - $values/infra/gitops/environments/{{ .Values.environment }}/legacy-next.yaml
+        valuesObject:
+          imageRepository: {{ .Values.legacyNext.imageRepository | quote }}
+          serviceAccountRoleArn: {{ .Values.legacyNext.serviceAccountRoleArn | quote }}
+          runtimeSecretArn: {{ .Values.legacyNext.runtimeSecretArn | quote }}
+          targetGroupArn: {{ .Values.legacyNext.targetGroupArn | quote }}
+          awsRegion: {{ .Values.awsRegion | quote }}
+    - repoURL: {{ .Values.repository | quote }}
+      targetRevision: {{ .Values.revision | quote }}
+      ref: values
+  destination: { server: "https://kubernetes.default.svc", namespace: indus }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true, allowEmpty: false }
+    syncOptions: [CreateNamespace=false, PruneLast=true, ServerSideApply=true]
+    retry: { limit: 3, backoff: { duration: 10s, factor: 2, maxDuration: 3m } }
+  revisionHistoryLimit: 10
+{{- end }}

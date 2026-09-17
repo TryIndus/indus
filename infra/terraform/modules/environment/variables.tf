@@ -1,168 +1,143 @@
 variable "project" {
-  type        = string
-  description = "Short project identifier used in names and tags."
-  default     = "indus"
+  type = string
 }
 
 variable "environment" {
-  type        = string
-  description = "Deployment environment."
+  type = string
 
   validation {
-    condition     = contains(["development", "staging", "production"], var.environment)
-    error_message = "environment must be development, staging, or production."
+    condition     = contains(["staging", "production"], var.environment)
+    error_message = "Environment must be staging or production."
   }
 }
 
 variable "aws_region" {
-  type        = string
-  description = "Primary AWS region."
-}
-
-variable "vpc_cidr" {
-  type        = string
-  description = "Environment-exclusive RFC1918 /16 network."
+  type = string
 
   validation {
-    condition     = can(cidrnetmask(var.vpc_cidr)) && tonumber(split("/", var.vpc_cidr)[1]) <= 20
-    error_message = "vpc_cidr must be a valid network with enough space for isolated subnets."
+    condition     = var.aws_region == "us-east-1"
+    error_message = "aws_region must be us-east-1."
   }
 }
 
-variable "availability_zone_count" {
-  type        = number
-  description = "Number of availability zones. Production must use at least three."
-  default     = 3
-
-  validation {
-    condition     = var.availability_zone_count >= 2 && var.availability_zone_count <= 4
-    error_message = "availability_zone_count must be between two and four."
-  }
+variable "account_id" {
+  type = string
 }
 
-variable "single_nat_gateway" {
-  type        = bool
-  description = "Use one NAT gateway for cost-sensitive non-production environments."
-  default     = false
-}
-
-variable "cluster_version" {
-  type        = string
-  description = "Supported EKS minor version."
-  default     = "1.33"
-}
-
-variable "cluster_public_access_cidrs" {
-  type        = list(string)
-  description = "Explicit CIDRs allowed to use the EKS public endpoint; empty disables it."
+variable "cluster_admin_principal_arns" {
+  type        = set(string)
+  description = "Additional human operator principals allowed to assume the MFA-protected EKS administrator role."
   default     = []
 }
 
-variable "node_instance_types" {
+variable "cluster_public_access_cidrs" {
+  type        = set(string)
+  description = "Operator CIDRs allowed to reach the public EKS API endpoint."
+
+  validation {
+    condition     = length(var.cluster_public_access_cidrs) > 0 && alltrue([for cidr in var.cluster_public_access_cidrs : can(cidrnetmask(cidr)) && cidr != "0.0.0.0/0" && cidr != "::/0"])
+    error_message = "Provide at least one restricted operator CIDR; unrestricted internet CIDRs are forbidden."
+  }
+}
+
+variable "monthly_budget_usd" {
+  type        = number
+  description = "Monthly cost budget for this environment in US dollars."
+
+  validation {
+    condition     = var.monthly_budget_usd > 0
+    error_message = "monthly_budget_usd must be positive."
+  }
+}
+
+variable "enable_account_cost_anomaly_monitor" {
+  type        = bool
+  description = "Whether this environment owns the account-wide cost anomaly monitor."
+  default     = false
+}
+
+variable "cost_anomaly_threshold_usd" {
+  type        = number
+  description = "Absolute cost impact that triggers an immediate anomaly alert."
+  default     = 10
+
+  validation {
+    condition     = var.cost_anomaly_threshold_usd > 0
+    error_message = "cost_anomaly_threshold_usd must be positive."
+  }
+}
+
+variable "legacy_next_secret_name" {
+  type        = string
+  description = "Private name for the legacy Next.js runtime secret."
+
+  validation {
+    condition     = length(trimspace(var.legacy_next_secret_name)) > 0
+    error_message = "legacy_next_secret_name must not be empty."
+  }
+}
+
+variable "vpc_cidr" {
+  type = string
+}
+
+variable "domain_name" {
+  type = string
+}
+
+variable "route53_zone_name" {
+  type = string
+}
+
+variable "legacy_origin_hostname" {
+  type        = string
+  description = "Existing Vercel hostname used only by the weighted rollback record."
+}
+
+variable "aws_traffic_weight" {
+  type        = number
+  description = "Route 53 weight for CloudFront; set to 0 until the AWS origin is ready."
+
+  validation {
+    condition     = var.aws_traffic_weight >= 0 && var.aws_traffic_weight <= 255
+    error_message = "Route 53 weighted-record values must be between 0 and 255."
+  }
+}
+
+variable "alert_email_addresses" {
+  type    = set(string)
+  default = []
+}
+
+variable "cognito_callback_urls" {
   type        = list(string)
-  description = "On-demand EKS worker instance types."
-  default     = ["m7i.large"]
+  description = "Exact OAuth callback URLs reserved for the replacement application."
+  default     = []
 }
 
-variable "node_min_size" {
-  type    = number
-  default = 2
-}
-
-variable "node_desired_size" {
-  type    = number
-  default = 3
-}
-
-variable "node_max_size" {
-  type    = number
-  default = 8
+variable "cognito_logout_urls" {
+  type        = list(string)
+  description = "Exact Cognito logout URLs reserved for the replacement application."
+  default     = []
 }
 
 variable "database_min_acu" {
   type        = number
-  description = "Aurora Serverless v2 minimum capacity."
+  description = "Aurora Serverless v2 minimum ACU for the application data store."
   default     = 0.5
 }
 
 variable "database_max_acu" {
   type        = number
-  description = "Aurora Serverless v2 maximum capacity."
-  default     = 8
-}
-
-variable "database_instance_count" {
-  type        = number
-  description = "Aurora writer plus readers. Production must use at least two instances."
-  default     = 2
-}
-
-variable "domain_name" {
-  type        = string
-  description = "Public environment hostname, for example staging.indus.example."
-}
-
-variable "route53_zone_name" {
-  type        = string
-  description = "Existing public Route 53 hosted-zone name."
-}
-
-variable "legacy_origin_hostname" {
-  type        = string
-  description = "Legacy hostname retained as a weighted DNS target during cutover; null outside the rollback window."
-  default     = null
-}
-
-variable "replacement_traffic_weight" {
-  type        = number
-  description = "Replacement percentage expressed as a Route 53 weight from 0 through 100."
-  default     = 100
-
-  validation {
-    condition     = var.replacement_traffic_weight >= 0 && var.replacement_traffic_weight <= 100
-    error_message = "replacement_traffic_weight must be between 0 and 100."
-  }
-}
-
-variable "edge_runtime" {
-  type        = string
-  description = "Public workload selected at the edge. legacy-next serves the current application; replacement is reserved for the final cutover."
-  default     = "legacy-next"
-
-  validation {
-    condition     = contains(["legacy-next", "replacement"], var.edge_runtime)
-    error_message = "edge_runtime must be legacy-next or replacement."
-  }
-}
-
-variable "cognito_callback_urls" {
-  type        = list(string)
-  description = "Exact OAuth callback URLs."
-}
-
-variable "cognito_logout_urls" {
-  type        = list(string)
-  description = "Exact OAuth logout URLs."
-}
-
-variable "alert_email_endpoints" {
-  type        = set(string)
-  description = "Email endpoints that confirm SNS alert subscriptions out of band."
-  default     = []
-}
-
-variable "shared_ecr_repository_arns" {
-  type        = map(string)
-  description = "Immutable shared-services ECR repository ARNs keyed by platform-api, market-data, research-worker, and web."
+  description = "Aurora Serverless v2 maximum ACU for the application data store."
+  default     = 4
 }
 
 variable "shared_ecr_repository_urls" {
-  type        = map(string)
-  description = "Immutable shared-services ECR repository URLs keyed by workload."
+  type = map(string)
 }
 
 variable "tags" {
-  type        = map(string)
-  description = "Additional governance tags."
-  default     = {}
+  type    = map(string)
+  default = {}
 }

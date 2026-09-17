@@ -1,4 +1,4 @@
-name: AWS foundation verification
+name: AWS platform verification
 
 on:
   pull_request:
@@ -7,17 +7,23 @@ on:
       - .dockerignore
       - next.config.ts
       - infra/**
+      - scripts/deploy/**
       - docs/runbooks/aws-legacy-next.md
       - .github/workflows/aws-foundation.yml
+      - .github/workflows/deploy-application.yml
+      - .github/workflows/deploy-infrastructure.yml
   push:
-    branches: [main]
+    branches: [staging, main]
     paths:
       - Dockerfile
       - .dockerignore
       - next.config.ts
       - infra/**
+      - scripts/deploy/**
       - docs/runbooks/aws-legacy-next.md
       - .github/workflows/aws-foundation.yml
+      - .github/workflows/deploy-application.yml
+      - .github/workflows/deploy-infrastructure.yml
   workflow_dispatch:
 
 permissions:
@@ -32,15 +38,26 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Validate GitHub Actions workflows
+        run: |
+          docker run --rm --volume "$PWD:/repo:ro" --workdir /repo \
+            rhysd/actionlint@sha256:6f03470d0152251d7f07f7c4dc019dbe7024c72cd952f839544c7798843efa8f \
+            -color
+
+      - name: Check infrastructure lifecycle behavior
+        run: |
+          ruby scripts/deploy/test-infrastructure.rb
+          ruby scripts/deploy/test-application.rb
+
       - name: Validate Terraform formatting and environments
         shell: bash
         run: |
           set -euo pipefail
           image='hashicorp/terraform@sha256:6bbb82d575aa7bd4f0a2c6e3a0838ab9590426c08a71d7a2783643f01004d356'
           docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" fmt -check -recursive infra/terraform
-          for environment in development staging production; do
+          for directory in bootstrap/shared environments/staging environments/production; do
             docker run --rm --entrypoint /bin/sh --env TF_DATA_DIR=/tmp/terraform-data \
-              --volume "$PWD:/workspace" --workdir "/workspace/infra/terraform/environments/$environment" "$image" \
+              --volume "$PWD:/workspace" --workdir "/workspace/infra/terraform/$directory" "$image" \
               -ec 'terraform init -backend=false -input=false && terraform validate'
           done
 
@@ -54,6 +71,25 @@ jobs:
             docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" template indus "$chart" >/dev/null
           done
 
+          for environment in staging production; do
+            docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" \
+              template indus infra/helm/indus-applications \
+              -f "infra/helm/indus-applications/values-$environment.yaml" \
+              | ruby scripts/deploy/test-gitops.rb "$environment"
+          done
+
+      - name: Test private GitOps bootstrap rendering
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture='{"cluster":{"name":"cluster-test","vpc_id":"vpc-test"},"workload_role_arns":{"aws-load-balancer-controller":"role-load-balancer-test","legacy-next":"role-application-test"},"shared_ecr_repository_urls":{"legacy-next":"repository-test"},"secret_arns":{"legacy_next":"secret-test"},"edge":{"legacy_next_target_group_arn":"target-group-test"}}'
+          for environment in staging production; do
+            TERRAFORM_OUTPUT_JSON="$fixture" AWS_REGION=region-test \
+              ./scripts/deploy/render-gitops-bootstrap.sh "$environment" \
+              | jq -e '.kind == "Application" and .spec.source.helm.valuesObject.vpcId == "vpc-test" and .spec.source.helm.valuesObject.legacyNext.runtimeSecretArn == "secret-test"' \
+              >/dev/null
+          done
+
       - name: Build the current application container
         run: |
           docker build \
@@ -61,3 +97,12 @@ jobs:
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=ci-public-anon-key \
             --tag indus-legacy-next:ci \
             .
+
+      - name: Scan the current application container
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: indus-legacy-next:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH

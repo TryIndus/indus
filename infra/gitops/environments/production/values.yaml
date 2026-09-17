@@ -1,36 +1,36 @@
 environment: production
 aws:
-  region: ca-central-1
+  region: us-east-1
   vpcCidr: 10.40.0.0/16
-  webBucket: indus-production-web-444444444444
+  webBucket: indus-production-web-111111111111
   cloudfrontDistributionId: replace-production
   targetGroups:
-    platformApi: arn:aws:elasticloadbalancing:ca-central-1:444444444444:targetgroup/replace-api/0000000000000000
-    marketData: arn:aws:elasticloadbalancing:ca-central-1:444444444444:targetgroup/replace-stream/0000000000000000
-identity: { issuer: "https://cognito-idp.ca-central-1.amazonaws.com/replace-production", audience: replace-production }
+    platformApi: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/replace-api/0000000000000000
+    marketData: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/replace-stream/0000000000000000
+identity: { issuer: "https://cognito-idp.us-east-1.amazonaws.com/replace-production", audience: replace-production }
 roles:
-  platformApi: arn:aws:iam::444444444444:role/indus-production-platform-api
-  sidekiq: arn:aws:iam::444444444444:role/indus-production-sidekiq
-  platformOutbox: arn:aws:iam::444444444444:role/indus-production-platform-outbox
-  reportsConsumer: arn:aws:iam::444444444444:role/indus-production-reports-consumer
-  marketData: arn:aws:iam::444444444444:role/indus-production-market-data
-  researchWorker: arn:aws:iam::444444444444:role/indus-production-research-worker
-  databaseMigrator: arn:aws:iam::444444444444:role/indus-production-database-migrator
-  webPublisher: arn:aws:iam::444444444444:role/indus-production-web-publisher
+  platformApi: arn:aws:iam::111111111111:role/indus-production-platform-api
+  sidekiq: arn:aws:iam::111111111111:role/indus-production-sidekiq
+  platformOutbox: arn:aws:iam::111111111111:role/indus-production-platform-outbox
+  reportsConsumer: arn:aws:iam::111111111111:role/indus-production-reports-consumer
+  marketData: arn:aws:iam::111111111111:role/indus-production-market-data
+  researchWorker: arn:aws:iam::111111111111:role/indus-production-research-worker
+  databaseMigrator: arn:aws:iam::111111111111:role/indus-production-database-migrator
+  webPublisher: arn:aws:iam::111111111111:role/indus-production-web-publisher
 secrets:
-  platformApi: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/platform-api
-  marketData: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/market-data
-  researchWorker: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/research-worker
-  databaseMigration: arn:aws:secretsmanager:ca-central-1:444444444444:secret:indus-production/database-migration
+  platformApi: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-production/platform-api
+  marketData: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-production/market-data
+  researchWorker: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-production/research-worker
+  databaseMigration: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-production/database-migration
 config:
-  rdsProxyEndpoint: replace-production.proxy.ca-central-1.rds.amazonaws.com
+  rdsProxyEndpoint: replace-production.proxy.us-east-1.rds.amazonaws.com
   redisEndpoint: replace-production.serverless.cac1.cache.amazonaws.com
   redisPort: 6379
   redisCacheName: indus-production
   redisUser: indus-production-app
-  mskBootstrapBrokers: replace-production.kafka-serverless.ca-central-1.amazonaws.com:9098
-  artifactBucket: indus-production-artifacts-444444444444
-  rawEventsBucket: indus-production-raw-events-444444444444
+  mskBootstrapBrokers: replace-production.kafka-serverless.us-east-1.amazonaws.com:9098
+  artifactBucket: indus-production-artifacts-111111111111
+  rawEventsBucket: indus-production-raw-events-111111111111
   temporalAddress: replace.tmprl.cloud:7233
   temporalNamespace: production.indus
 images:
