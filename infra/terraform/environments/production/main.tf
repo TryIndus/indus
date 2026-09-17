@@ -14,10 +14,31 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.7"
+    }
   }
 }
 
 variable "account_id" {
+  type = string
+}
+
+variable "cluster_admin_principal_arns" {
+  type    = set(string)
+  default = []
+}
+
+variable "cluster_public_access_cidrs" {
+  type = set(string)
+}
+
+variable "monthly_budget_usd" {
+  type = number
+}
+
+variable "legacy_next_secret_name" {
   type = string
 }
 
@@ -97,22 +118,27 @@ provider "aws" {
 module "environment" {
   source = "../../modules/environment"
 
-  project                    = "indus"
-  environment                = "production"
-  account_id                 = var.account_id
-  aws_region                 = var.aws_region
-  vpc_cidr                   = var.vpc_cidr
-  domain_name                = var.domain_name
-  route53_zone_name          = var.route53_zone_name
-  legacy_origin_hostname     = var.legacy_origin_hostname
-  aws_traffic_weight         = var.aws_traffic_weight
-  shared_ecr_repository_urls = var.shared_ecr_repository_urls
-  alert_email_addresses      = var.alert_email_addresses
-  cognito_callback_urls      = var.cognito_callback_urls
-  cognito_logout_urls        = var.cognito_logout_urls
-  database_min_acu           = var.database_min_acu
-  database_max_acu           = var.database_max_acu
-  tags                       = var.tags
+  project                             = "indus"
+  environment                         = "production"
+  account_id                          = var.account_id
+  cluster_admin_principal_arns        = var.cluster_admin_principal_arns
+  cluster_public_access_cidrs         = var.cluster_public_access_cidrs
+  monthly_budget_usd                  = var.monthly_budget_usd
+  legacy_next_secret_name             = var.legacy_next_secret_name
+  enable_account_cost_anomaly_monitor = true
+  aws_region                          = var.aws_region
+  vpc_cidr                            = var.vpc_cidr
+  domain_name                         = var.domain_name
+  route53_zone_name                   = var.route53_zone_name
+  legacy_origin_hostname              = var.legacy_origin_hostname
+  aws_traffic_weight                  = var.aws_traffic_weight
+  shared_ecr_repository_urls          = var.shared_ecr_repository_urls
+  alert_email_addresses               = var.alert_email_addresses
+  cognito_callback_urls               = var.cognito_callback_urls
+  cognito_logout_urls                 = var.cognito_logout_urls
+  database_min_acu                    = var.database_min_acu
+  database_max_acu                    = var.database_max_acu
+  tags                                = var.tags
 }
 
 output "environment" {

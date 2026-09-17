@@ -34,6 +34,9 @@ resource "aws_cognito_user_pool_client" "web" {
   allowed_oauth_scopes                 = ["email", "openid", "profile"]
   callback_urls                        = var.cognito_callback_urls
   logout_urls                          = var.cognito_logout_urls
+  access_token_validity                = 60
+  id_token_validity                    = 60
+  refresh_token_validity               = 30
 
   token_validity_units {
     access_token  = "minutes"

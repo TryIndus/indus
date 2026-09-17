@@ -34,6 +34,7 @@ resource "aws_eks_cluster" "this" {
   vpc_config {
     endpoint_private_access = true
     endpoint_public_access  = true
+    public_access_cidrs     = var.cluster_public_access_cidrs
     subnet_ids              = values(aws_subnet.private)[*].id
   }
 
@@ -119,8 +120,11 @@ data "aws_iam_policy_document" "cluster_admin_assume" {
     effect = "Allow"
 
     principals {
-      type        = "AWS"
-      identifiers = ["arn:${data.aws_partition.current.partition}:iam::${var.account_id}:root"]
+      type = "AWS"
+      identifiers = setunion(
+        ["arn:${data.aws_partition.current.partition}:iam::${var.account_id}:root"],
+        var.cluster_admin_principal_arns,
+      )
     }
 
     actions = ["sts:AssumeRole"]

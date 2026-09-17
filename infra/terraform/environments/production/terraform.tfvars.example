@@ -1,4 +1,8 @@
 account_id        = "111111111111"
+cluster_admin_principal_arns = ["arn:aws:iam::222222222222:user/operator"]
+cluster_public_access_cidrs   = ["203.0.113.10/32"]
+monthly_budget_usd            = 300
+legacy_next_secret_name       = "replace-with-private-secret-name"
 aws_region        = "us-east-1"
 vpc_cidr          = "10.40.0.0/16"
 domain_name       = "app.indus.example.com"
