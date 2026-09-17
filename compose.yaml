@@ -101,6 +101,8 @@ services:
     image: indus-platform-api:local
     build:
       context: ./apps/platform-api
+      args:
+        BUNDLE_WITHOUT: ""
     environment:
       DATABASE_URL: postgres://indus:indus-local-password@postgres:5432/indus_development
       REDIS_URL: redis://redis:6379/0

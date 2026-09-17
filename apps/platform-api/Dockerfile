@@ -11,6 +11,8 @@
 ARG RUBY_VERSION=3.4.10
 FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
 
+ARG BUNDLE_WITHOUT="development:test"
+
 # Rails app lives here
 WORKDIR /rails
 
@@ -24,7 +26,7 @@ RUN apt-get update -qq && \
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
     BUNDLE_PATH="/usr/local/bundle" \
-    BUNDLE_WITHOUT="development:test" \
+    BUNDLE_WITHOUT="${BUNDLE_WITHOUT}" \
     LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 
 # Throw-away build stage to reduce size of final image

@@ -118,7 +118,11 @@ mod tests {
         assert_eq!(health.last_upstream_event(), None);
 
         health.record_upstream_event();
-        assert!(health.last_upstream_event().is_some_and(|timestamp| timestamp > 0));
+        assert!(
+            health
+                .last_upstream_event()
+                .is_some_and(|timestamp| timestamp > 0)
+        );
 
         health.mark_shutting_down();
         assert!(!health.is_live());

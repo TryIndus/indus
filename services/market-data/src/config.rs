@@ -237,7 +237,9 @@ mod tests {
 
     impl CleanEnvironment {
         fn new() -> Self {
-            let lock = ENV_LOCK.lock().expect("environment lock should be available");
+            let lock = ENV_LOCK
+                .lock()
+                .expect("environment lock should be available");
             for name in VARIABLES {
                 // SAFETY: every environment-mutating test in this module holds ENV_LOCK.
                 unsafe { env::remove_var(name) };
@@ -266,7 +268,10 @@ mod tests {
         environment.set("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
         environment.set("MARKET_JWT_ISSUER", "https://issuer.example");
         environment.set("MARKET_JWT_AUDIENCE", "indus-market-data");
-        environment.set("MARKET_JWT_HS256_SECRET", "a-development-secret-longer-than-32-bytes");
+        environment.set(
+            "MARKET_JWT_HS256_SECRET",
+            "a-development-secret-longer-than-32-bytes",
+        );
         environment.set("MARKET_INGESTION_ENABLED", "false");
         environment
     }
@@ -297,7 +302,10 @@ mod tests {
         let environment = required_environment();
         environment.set("MARKET_BIND_ADDR", "127.0.0.1:9090");
         environment.set("MARKET_SYMBOLS", " MSFT, ETH/USD, ");
-        environment.set("MARKET_ALLOWED_ORIGINS", "https://one.example, https://two.example");
+        environment.set(
+            "MARKET_ALLOWED_ORIGINS",
+            "https://one.example, https://two.example",
+        );
         environment.set("MARKET_STALE_AFTER_SECONDS", "45");
         environment.set("MARKET_HEARTBEAT_SECONDS", "10");
         environment.set("MARKET_STREAM_BUFFER", "64");
@@ -332,28 +340,40 @@ mod tests {
 
         environment.set("MARKET_JWKS_URL", "");
         environment.set("MARKET_INGESTION_ENABLED", "true");
-        assert!(matches!(Config::from_env(), Err(ConfigError::AlpacaCredentials)));
+        assert!(matches!(
+            Config::from_env(),
+            Err(ConfigError::AlpacaCredentials)
+        ));
 
         environment.set("ALPACA_API_KEY", "key");
         environment.set("ALPACA_SECRET_KEY", "secret");
         environment.set("MARKET_SYMBOLS", " , ");
         assert!(matches!(
             Config::from_env(),
-            Err(ConfigError::Invalid { name: "MARKET_SYMBOLS", .. })
+            Err(ConfigError::Invalid {
+                name: "MARKET_SYMBOLS",
+                ..
+            })
         ));
 
         environment.set("MARKET_SYMBOLS", "AAPL");
         environment.set("MARKET_STREAM_BUFFER", "not-a-number");
         assert!(matches!(
             Config::from_env(),
-            Err(ConfigError::Invalid { name: "MARKET_STREAM_BUFFER", .. })
+            Err(ConfigError::Invalid {
+                name: "MARKET_STREAM_BUFFER",
+                ..
+            })
         ));
     }
 
     #[test]
     fn rejects_missing_required_values_and_invalid_addresses() {
         let environment = CleanEnvironment::new();
-        environment.set("MARKET_JWT_HS256_SECRET", "a-development-secret-longer-than-32-bytes");
+        environment.set(
+            "MARKET_JWT_HS256_SECRET",
+            "a-development-secret-longer-than-32-bytes",
+        );
         environment.set("MARKET_INGESTION_ENABLED", "false");
         assert!(matches!(
             Config::from_env(),
@@ -367,7 +387,10 @@ mod tests {
         environment.set("MARKET_BIND_ADDR", "invalid");
         assert!(matches!(
             Config::from_env(),
-            Err(ConfigError::Invalid { name: "MARKET_BIND_ADDR", .. })
+            Err(ConfigError::Invalid {
+                name: "MARKET_BIND_ADDR",
+                ..
+            })
         ));
     }
 }
