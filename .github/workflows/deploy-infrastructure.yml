@@ -106,6 +106,7 @@ jobs:
               -target=module.environment.aws_route53_record.application
               -target=module.environment.aws_route53_record.legacy
               -target=module.environment.aws_route53_record.origin
+              -target=module.environment.aws_lb_listener_rule.cloudfront_origin
               -target=module.environment.aws_lb_listener.https
               -target=module.environment.aws_lb_target_group.legacy_next
               -target=module.environment.aws_lb.this

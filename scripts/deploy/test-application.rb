@@ -31,7 +31,7 @@ _, _, status = Open3.capture3(
 raise "Failed verification dispatch must fail the deployment" if status.success?
 
 digest_update = steps.find { |step| step["name"] == "Update the branch GitOps digest" }.fetch("run")
-unless digest_update.include?("IMAGE_DIGEST") && digest_update.include?("/^imageDigest: /")
+unless digest_update.include?("IMAGE_DIGEST") && digest_update.include?("/^imageDigest: /") && digest_update.include?("grep -Fqx")
   raise "Deployment must update only the tracked immutable image digest"
 end
 puts "Passed built-in token and deployment verification dispatch checks."

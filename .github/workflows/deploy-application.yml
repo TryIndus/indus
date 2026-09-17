@@ -127,6 +127,7 @@ jobs:
           set -euo pipefail
           values="infra/gitops/environments/${{ needs.target.outputs.environment }}/legacy-next.yaml"
           awk -v digest="$IMAGE_DIGEST" '/^imageDigest: / { print "imageDigest: " digest; next } { print }' "$values" > "$values.next"
+          grep -Fqx "imageDigest: $IMAGE_DIGEST" "$values.next"
           mv "$values.next" "$values"
 
       - name: Open GitOps digest pull request
