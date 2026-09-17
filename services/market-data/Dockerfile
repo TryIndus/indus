@@ -13,6 +13,7 @@ RUN cargo build --locked --release
 FROM debian:bookworm-slim
 
 RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
     && apt-get install --yes --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --no-create-home indus
