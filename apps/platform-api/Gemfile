@@ -14,6 +14,7 @@ gem "temporalio", "~> 1.6"
 gem "aws-sdk-s3", "~> 1.228"
 gem "aws-msk-iam-sasl-signer", "~> 0.1.1"
 gem "rack-cors", "~> 3.0"
+gem "resolv", "~> 0.7.2"
 gem "opentelemetry-exporter-otlp", "~> 0.31"
 gem "opentelemetry-instrumentation-net_http", "~> 0.26"
 gem "opentelemetry-instrumentation-rails", "~> 0.38"
@@ -29,9 +30,6 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
-
-# Add HTTP asset caching/compression and X-Sendfile acceleration to Puma [https://github.com/basecamp/thruster/]
-gem "thruster", require: false
 
 # Use Rack CORS for handling Cross-Origin Resource Sharing (CORS), making cross-origin Ajax possible
 # gem "rack-cors"

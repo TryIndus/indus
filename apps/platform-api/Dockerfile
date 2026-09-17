@@ -18,8 +18,10 @@ WORKDIR /rails
 
 # Install base packages
 RUN apt-get update -qq && \
+    apt-get upgrade --no-install-recommends -y && \
     apt-get install --no-install-recommends -y curl libjemalloc2 postgresql-client && \
     ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
+    rm -f /usr/local/lib/ruby/gems/3.4.0/specifications/default/resolv-0.7.1.gemspec && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 # Set production environment variables and enable jemalloc for reduced memory usage and latency.
