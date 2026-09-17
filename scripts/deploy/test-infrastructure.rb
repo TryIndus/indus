@@ -40,7 +40,7 @@ plan = "terraform() { printf '%s\\n' \"$*\"; }\n" + plan
   case operation
   when "tear-down"
     raise "Expected targeted destroy" unless commands.last.include?("plan -destroy")
-    %w[aws_rds_cluster_instance.data aws_db_proxy.data aws_eks_cluster.this aws_nat_gateway.primary].each do |resource|
+    %w[aws_rds_cluster_instance.data aws_db_proxy.data aws_eks_cluster.this aws_nat_gateway.primary aws_lb_listener_rule.cloudfront_origin].each do |resource|
       raise "Runtime resource was retained: #{resource}" unless commands.last.include?("-target=module.environment.#{resource}")
     end
     %w[aws_rds_cluster.data aws_backup_selection.primary aws_s3_bucket.data aws_cognito_user_pool.this aws_kms_key.data].each do |resource|

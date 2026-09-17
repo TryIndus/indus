@@ -15,6 +15,12 @@ spec:
         releaseName: indus-legacy-next
         valueFiles:
           - $values/infra/gitops/environments/{{ .Values.environment }}/legacy-next.yaml
+        valuesObject:
+          imageRepository: {{ .Values.legacyNext.imageRepository | quote }}
+          serviceAccountRoleArn: {{ .Values.legacyNext.serviceAccountRoleArn | quote }}
+          runtimeSecretArn: {{ .Values.legacyNext.runtimeSecretArn | quote }}
+          targetGroupArn: {{ .Values.legacyNext.targetGroupArn | quote }}
+          awsRegion: {{ .Values.awsRegion | quote }}
     - repoURL: {{ .Values.repository | quote }}
       targetRevision: {{ .Values.revision | quote }}
       ref: values

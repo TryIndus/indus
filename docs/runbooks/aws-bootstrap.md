@@ -64,6 +64,16 @@ for production. Staging is optional developer infrastructure. Before production
 traffic cutover, verify deployment, authentication, provider, and rollback behavior. Restrict
 EKS API access to the approved operator network before cluster bootstrap.
 
+Set `cluster_public_access_cidrs` in the ignored environment `terraform.tfvars`
+to the operator network's `/32` or approved VPN CIDR. The module rejects
+internet-wide CIDRs. Set `monthly_budget_usd` to the reviewed monthly threshold;
+the budget and runtime alarms publish to the environment alert topic.
+Activate the `Environment` user-defined cost allocation tag in Billing before
+relying on environment-filtered budget totals; AWS may take up to 24 hours to
+make a newly activated tag available. The production stack owns the single
+account-wide Cost Anomaly Detection monitor and publishes immediate alerts to
+the production alert topic.
+
 ## 3. Supply the one runtime secret
 
 Terraform creates one empty Secrets Manager container named `legacy-next` per
@@ -81,11 +91,10 @@ workload role can read only this secret.
 
 ## 4. Bootstrap GitOps
 
-Replace account-specific placeholders in
-`infra/helm/indus-applications/values-<environment>.yaml` and
-`infra/gitops/environments/<environment>/legacy-next.yaml` with Terraform
-outputs. Leave the zero digest until the deployment workflow opens its first
-deployment PR.
+Keep account-specific identifiers out of tracked GitOps values. Render the root
+Argo CD application directly from private Terraform outputs and pipe it to the
+matching cluster. Leave the zero digest until the deployment workflow opens its
+first deployment PR.
 
 ```bash
 aws eks update-kubeconfig --region us-east-1 --name indus-staging
@@ -94,13 +103,14 @@ helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update argo
 helm upgrade --install argocd argo/argo-cd \
   --version 10.9.1 --namespace argocd --wait --timeout 10m
-kubectl apply -f infra/gitops/bootstrap/staging.yaml
+AWS_REGION=us-east-1 ./scripts/deploy/render-gitops-bootstrap.sh staging | \
+  kubectl apply -f -
 ```
 
 Verify the add-on and policy applications are healthy before deployment. The
-application cannot become healthy until its placeholder image and account
-values have been replaced. Only the current
-Next.js workload and required add-ons run in Phase 1.
+application cannot become healthy until the deployment workflow replaces its
+placeholder image digest. Only the current Next.js workload and required
+add-ons run in Phase 1.
 
 ## 5. Configure branch deployment
 

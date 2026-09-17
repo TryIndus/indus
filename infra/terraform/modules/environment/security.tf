@@ -1,5 +1,5 @@
 resource "aws_secretsmanager_secret" "legacy_next" {
-  name                    = "${local.name}/legacy-next"
+  name                    = var.legacy_next_secret_name
   recovery_window_in_days = 7
 
   tags = local.common_tags

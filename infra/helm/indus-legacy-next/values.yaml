@@ -1,8 +1,9 @@
-image: replace-with-immutable-image-digest
+imageRepository: replace-with-ecr-repository
+imageDigest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 serviceAccountRoleArn: replace-with-legacy-next-workload-role
 runtimeSecretArn: replace-with-legacy-next-secret-arn
 targetGroupArn: replace-with-legacy-next-target-group-arn
-awsRegion: us-east-1
+awsRegion: replace-with-aws-region
 replicas: 1
 minReplicas: 1
 maxReplicas: 2

@@ -65,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: hashicorp/setup-terraform@d4998ee65f164d6c8958387c2ee8910df98f4c08 # v3.1.0
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: 1.14.2
 
@@ -106,6 +106,7 @@ jobs:
               -target=module.environment.aws_route53_record.application
               -target=module.environment.aws_route53_record.legacy
               -target=module.environment.aws_route53_record.origin
+              -target=module.environment.aws_lb_listener_rule.cloudfront_origin
               -target=module.environment.aws_lb_listener.https
               -target=module.environment.aws_lb_target_group.legacy_next
               -target=module.environment.aws_lb.this

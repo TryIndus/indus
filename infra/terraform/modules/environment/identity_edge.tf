@@ -35,6 +35,11 @@ data "aws_ec2_managed_prefix_list" "cloudfront" {
   name = "com.amazonaws.global.cloudfront.origin-facing"
 }
 
+resource "random_password" "cloudfront_origin" {
+  length  = 48
+  special = false
+}
+
 resource "aws_security_group" "alb" {
   name        = "${local.name}-alb"
   description = "Allow CloudFront origin-facing traffic only."
@@ -95,7 +100,7 @@ resource "aws_lb_target_group" "legacy_next" {
     healthy_threshold   = 2
     interval            = 30
     matcher             = "200-399"
-    path                = "/"
+    path                = "/api/health?mode=ready"
     timeout             = 5
     unhealthy_threshold = 2
   }
@@ -111,8 +116,30 @@ resource "aws_lb_listener" "https" {
   certificate_arn   = aws_acm_certificate_validation.application.certificate_arn
 
   default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Forbidden"
+      status_code  = "403"
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "cloudfront_origin" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 100
+
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.legacy_next.arn
+  }
+
+  condition {
+    http_header {
+      http_header_name = "X-Indus-Origin-Verify"
+      values           = [random_password.cloudfront_origin.result]
+    }
   }
 }
 
@@ -151,6 +178,11 @@ resource "aws_cloudfront_distribution" "this" {
     custom_header {
       name  = "X-Forwarded-Host"
       value = var.domain_name
+    }
+
+    custom_header {
+      name  = "X-Indus-Origin-Verify"
+      value = random_password.cloudfront_origin.result
     }
 
     custom_origin_config {

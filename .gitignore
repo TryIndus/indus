@@ -53,3 +53,6 @@ next-env.d.ts
 *.tfplan
 **/backend.hcl
 **/terraform.tfvars
+
+# local AWS follow-up notes
+AWS_TODO.md

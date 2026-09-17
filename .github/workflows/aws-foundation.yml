@@ -78,6 +78,18 @@ jobs:
               | ruby scripts/deploy/test-gitops.rb "$environment"
           done
 
+      - name: Test private GitOps bootstrap rendering
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture='{"cluster":{"name":"cluster-test","vpc_id":"vpc-test"},"workload_role_arns":{"aws-load-balancer-controller":"role-load-balancer-test","legacy-next":"role-application-test"},"shared_ecr_repository_urls":{"legacy-next":"repository-test"},"secret_arns":{"legacy_next":"secret-test"},"edge":{"legacy_next_target_group_arn":"target-group-test"}}'
+          for environment in staging production; do
+            TERRAFORM_OUTPUT_JSON="$fixture" AWS_REGION=region-test \
+              ./scripts/deploy/render-gitops-bootstrap.sh "$environment" \
+              | jq -e '.kind == "Application" and .spec.source.helm.valuesObject.vpcId == "vpc-test" and .spec.source.helm.valuesObject.legacyNext.runtimeSecretArn == "secret-test"' \
+              >/dev/null
+          done
+
       - name: Build the current application container
         run: |
           docker build \

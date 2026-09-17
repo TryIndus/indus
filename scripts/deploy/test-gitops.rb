@@ -26,4 +26,11 @@ provider = applications.find { |app| app.dig("metadata", "name") == "secrets-sto
 unless provider.dig("spec", "source", "helm", "valuesObject", "secrets-store-csi-driver", "install") == false
   raise "The AWS provider must not install a second CSI driver"
 end
+
+legacy = applications.find { |app| app.dig("metadata", "name") == "indus-legacy-next" }
+raise "Legacy application missing" unless legacy
+private_values = legacy.dig("spec", "sources", 0, "helm", "valuesObject")
+%w[imageRepository serviceAccountRoleArn runtimeSecretArn targetGroupArn awsRegion].each do |key|
+  raise "Legacy application is missing private #{key} injection" unless private_values.key?(key)
+end
 puts "Passed #{environment} rendered GitOps regression checks."
