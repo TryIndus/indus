@@ -1,8 +1,4 @@
-image: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/legacy-next@sha256:0000000000000000000000000000000000000000000000000000000000000000
-serviceAccountRoleArn: arn:aws:iam::111111111111:role/indus-production-legacy-next
-runtimeSecretArn: arn:aws:secretsmanager:us-east-1:111111111111:secret:indus-production/legacy-next
-targetGroupArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/replace-legacy-next/0000000000000000
-awsRegion: us-east-1
+imageDigest: sha256:0000000000000000000000000000000000000000000000000000000000000000
 replicas: 1
 minReplicas: 1
 maxReplicas: 2

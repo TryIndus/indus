@@ -119,13 +119,14 @@ jobs:
           cosign sign --yes "$image"
           cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$image"
           echo "IMAGE=$image" >> "$GITHUB_ENV"
+          echo "IMAGE_DIGEST=$digest" >> "$GITHUB_ENV"
 
       - name: Update the branch GitOps digest
         shell: bash
         run: |
           set -euo pipefail
           values="infra/gitops/environments/${{ needs.target.outputs.environment }}/legacy-next.yaml"
-          awk -v image="$IMAGE" '/^image: / { print "image: " image; next } { print }' "$values" > "$values.next"
+          awk -v digest="$IMAGE_DIGEST" '/^imageDigest: / { print "imageDigest: " digest; next } { print }' "$values" > "$values.next"
           mv "$values.next" "$values"
 
       - name: Open GitOps digest pull request
