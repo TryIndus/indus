@@ -6,7 +6,6 @@ RSpec.describe Reports::EventConsumer do
       display_name: "Consumer")
   end
   let(:report) { user.reports.create!(symbol: "AAPL", title: "AAPL research report") }
-  let(:temporal) { instance_double(Reports::TemporalClient, start_report: :started) }
   let(:message_class) { Struct.new(:payload) }
   let(:consumer_class) do
     Class.new do
@@ -31,9 +30,10 @@ RSpec.describe Reports::EventConsumer do
     message = message_class.new(JSON.generate(queued_payload))
     consumer = consumer_class.new([ message, message ])
 
-    described_class.new(consumer: consumer, temporal: temporal).run
+    allow(ResearchReportJob).to receive(:perform_later)
+    described_class.new(consumer: consumer).run
 
-    expect(temporal).to have_received(:start_report).once.with(hash_including(
+    expect(ResearchReportJob).to have_received(:perform_later).once.with(hash_including(
       "report_id" => report.id, "workflow_id" => "report-#{report.id}"))
     expect(ConsumedEvent.count).to eq(1)
     expect(consumer.stored).to eq([ message, message ])
@@ -47,21 +47,21 @@ RSpec.describe Reports::EventConsumer do
     messages = [ message_class.new("not-json"), message_class.new(JSON.generate(unsupported)) ]
     consumer = consumer_class.new(messages)
 
-    described_class.new(consumer: consumer, temporal: temporal).run
+    allow(ResearchReportJob).to receive(:perform_later)
+    described_class.new(consumer: consumer).run
 
-    expect(temporal).not_to have_received(:start_report)
+    expect(ResearchReportJob).not_to have_received(:perform_later)
     expect(ConsumedEvent.count).to eq(0)
     expect(consumer.stored).to eq(messages)
     expect(consumer.commits.length).to eq(2)
     expect(consumer).to be_closed
   end
 
-  it "leaves the offset and receipt uncommitted when workflow startup fails" do
-    allow(temporal).to receive(:start_report).and_raise("temporal unavailable")
+  it "leaves the offset and receipt uncommitted when job enqueueing fails" do
+    allow(ResearchReportJob).to receive(:perform_later).and_raise("queue unavailable")
     consumer = consumer_class.new([ message_class.new(JSON.generate(queued_payload)) ])
 
-    expect { described_class.new(consumer: consumer, temporal: temporal).run }
-      .to raise_error("temporal unavailable")
+    expect { described_class.new(consumer: consumer).run }.to raise_error("queue unavailable")
 
     expect(ConsumedEvent.count).to eq(0)
     expect(report.reload.workflow_id).to be_nil

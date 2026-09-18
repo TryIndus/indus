@@ -2,7 +2,7 @@ require "net/http"
 
 module Models
   class GeminiAdapter
-    DEFAULT_MODEL = "gemini-2.5-flash".freeze
+    DEFAULT_MODEL = "gemini-3.8-flash".freeze
 
     def self.from_env
       new(api_key: ENV.fetch("GEMINI_API_KEY"), model: ENV.fetch("GEMINI_MODEL", DEFAULT_MODEL))
@@ -19,7 +19,8 @@ module Models
     def generate(prompt:, purpose:, response_schema: nil)
       uri = URI("https://generativelanguage.googleapis.com/v1beta/models/#{@model}:generateContent")
       request = Net::HTTP::Post.new(uri, { "Content-Type" => "application/json", "x-goog-api-key" => @api_key })
-      generation_config = { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: "application/json" }
+      generation_config = { maxOutputTokens: 2048, responseMimeType: "application/json",
+        thinkingConfig: { thinkingLevel: "low" } }
       generation_config[:responseSchema] = response_schema if response_schema
       request.body = { system_instruction: { parts: [ { text: system_instruction(purpose) } ] },
         contents: [ { role: "user", parts: [ { text: prompt } ] } ],

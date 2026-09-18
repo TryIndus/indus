@@ -43,9 +43,6 @@ spec:
             - secretRef: { name: platform-api-runtime }
           env:
             - { name: PORT, value: "3000" }
-            - { name: TEMPORAL_AUTH_MODE, value: "api_key" }
-            - { name: TEMPORAL_ADDRESS, value: {{ .Values.config.temporalAddress | quote }} }
-            - { name: TEMPORAL_NAMESPACE, value: {{ .Values.config.temporalNamespace | quote }} }
             - { name: COGNITO_JWT_ISSUER, value: {{ .Values.identity.issuer | quote }} }
             - { name: COGNITO_CLIENT_ID, value: {{ .Values.identity.audience | quote }} }
             - { name: COGNITO_USERINFO_URL, value: {{ .Values.identity.userInfoUrl | quote }} }

@@ -1,7 +1,6 @@
 {{- $workers := list
   (dict "name" "platform-outbox" "serviceAccount" "platform-outbox" "command" "./bin/outbox-publisher" "secret" "platform-api-runtime" "provider" "platform-api" "replicas" .Values.platformOutbox.replicas "resources" .Values.platformOutbox.resources)
   (dict "name" "reports-consumer" "serviceAccount" "reports-consumer" "command" "./bin/reports-consumer" "secret" "platform-api-runtime" "provider" "platform-api" "replicas" .Values.reportsConsumer.replicas "resources" .Values.reportsConsumer.resources)
-  (dict "name" "research-worker" "serviceAccount" "research-worker" "command" "./bin/research-worker" "secret" "research-worker-runtime" "provider" "research-worker" "replicas" .Values.researchWorker.replicas "resources" .Values.researchWorker.resources)
 -}}
 {{- range $worker := $workers }}
 ---
@@ -50,9 +49,6 @@ spec:
             - { name: KAFKA_AUTH_MODE, value: "msk_iam" }
             - { name: KAFKA_SECURITY_PROTOCOL, value: "SASL_SSL" }
             - { name: KAFKA_SASL_MECHANISM, value: "AWS_MSK_IAM" }
-            - { name: TEMPORAL_ADDRESS, value: {{ $.Values.config.temporalAddress | quote }} }
-            - { name: TEMPORAL_AUTH_MODE, value: "api_key" }
-            - { name: TEMPORAL_NAMESPACE, value: {{ $.Values.config.temporalNamespace | quote }} }
             - { name: REPORT_ARTIFACT_BUCKET, value: {{ $.Values.config.artifactBucket | quote }} }
             - { name: AWS_REGION, value: {{ $.Values.aws.region | quote }} }
             - { name: OTEL_SERVICE_NAME, value: {{ $worker.name | quote }} }

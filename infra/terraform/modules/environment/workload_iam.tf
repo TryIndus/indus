@@ -193,7 +193,7 @@ data "aws_iam_policy_document" "artifact_access" {
 }
 
 resource "aws_iam_role_policy" "artifact_access" {
-  for_each = toset(["platform-api", "research-worker"])
+  for_each = toset(["platform-api", "research-worker", "sidekiq"])
   name     = "artifacts"
   role     = aws_iam_role.workload[each.key].id
   policy   = data.aws_iam_policy_document.artifact_access.json

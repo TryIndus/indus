@@ -7,12 +7,11 @@ module Reports
         consumer_group: ENV.fetch("REPORTS_KAFKA_CONSUMER_GROUP", "indus-report-workflow-starter-v1"))
       consumer = Events::KafkaConfig.consumer(config)
       consumer.subscribe("reports.lifecycle.v1")
-      new(consumer: consumer, temporal: TemporalClient.from_env)
+      new(consumer: consumer)
     end
 
-    def initialize(consumer:, temporal:)
+    def initialize(consumer:)
       @consumer = consumer
-      @temporal = temporal
       @receipts = Events::IdempotentConsumer.new(name: "report-workflow-starter-v1")
     end
 
@@ -41,7 +40,7 @@ module Reports
 
       workflow_id = payload.fetch("workflow_id")
       report.update!(workflow_id: workflow_id) if report.workflow_id.nil?
-      @temporal.start_report({ "report_id" => report.id, "workflow_id" => workflow_id,
+      ResearchReportJob.perform_later({ "report_id" => report.id, "workflow_id" => workflow_id,
         "correlation_id" => payload.dig("envelope", "correlation_id"), "focus" => payload["focus"] })
     end
   end
