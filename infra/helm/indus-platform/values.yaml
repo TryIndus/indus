@@ -12,6 +12,7 @@ aws:
 identity:
   issuer: https://cognito-idp.us-east-1.amazonaws.com/replace-me
   audience: replace-me
+  userInfoUrl: https://replace-me.auth.us-east-1.amazoncognito.com/oauth2/userInfo
 
 images:
   platformApi: 000000000000.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api@sha256:0000000000000000000000000000000000000000000000000000000000000000

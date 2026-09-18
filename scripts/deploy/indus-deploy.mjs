@@ -13,7 +13,7 @@ function run(commandName, args, options = {}) {
 }
 
 if (command !== "deploy" || !["app", "infra"].includes(component)) {
-	fail("Usage: indus deploy app staging | production or indus deploy infra staging | production plan | apply | tear-up | tear-down | destroy [--confirm]");
+	fail("Usage: indus deploy app staging [--replacement] | production or indus deploy infra staging | production plan | apply | tear-up | tear-down | destroy [--confirm]");
 }
 
 if (! ["staging", "production"].includes(operation)) {
@@ -29,6 +29,10 @@ if (currentBranch !== branch) {
 run("gh", ["auth", "status"]);
 
 if (component === "app") {
+	if (confirmation === "--replacement") {
+		run("gh", ["workflow", "run", "deploy-application.yml", "--ref", branch, "-f", "runtime=replacement"], { stdio: "inherit" });
+		process.exit(0);
+	}
 	if (confirmation !== undefined) {
 		fail("Application deployment does not accept an operation.");
 	}

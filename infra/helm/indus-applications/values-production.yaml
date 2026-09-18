@@ -13,3 +13,4 @@ legacyNext:
   targetGroupArn: arn:aws:elasticloadbalancing:replace-me:000000000000:targetgroup/replace/0000000000000000
 platform:
   enabled: false
+  values: {}

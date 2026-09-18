@@ -2,6 +2,12 @@ name: Deploy application
 
 on:
   workflow_dispatch:
+    inputs:
+      runtime:
+        description: Application runtime
+        type: choice
+        default: legacy
+        options: [legacy, replacement]
 
 concurrency:
   group: deploy-application-${{ github.ref_name }}
@@ -33,6 +39,7 @@ jobs:
           esac
 
   deploy:
+    if: inputs.runtime != 'replacement'
     name: Build and publish ${{ needs.target.outputs.environment }} application
     needs: target
     environment: ${{ needs.target.outputs.environment }}
@@ -153,5 +160,165 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$DEPLOYMENT_BRANCH"
+          gh workflow run verification.yml --ref "$DEPLOYMENT_BRANCH"
+          gh workflow run aws-foundation.yml --ref "$DEPLOYMENT_BRANCH"
+
+  replacement:
+    name: Publish ${{ needs.target.outputs.environment }} replacement images
+    if: inputs.runtime == 'replacement'
+    needs: target
+    environment: ${{ needs.target.outputs.environment }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+      id-token: write
+    env:
+      WEB_ORIGIN: ${{ vars.WEB_ORIGIN }}
+      COGNITO_AUTHORITY: ${{ vars.COGNITO_AUTHORITY }}
+      COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate public build configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$WEB_ORIGIN" =~ ^https://[a-z0-9.-]+$ ]]
+          [[ "$COGNITO_AUTHORITY" =~ ^https://cognito-idp\.us-east-1\.amazonaws\.com/us-east-1_[A-Za-z0-9]+$ ]]
+          [[ "$COGNITO_CLIENT_ID" =~ ^[a-z0-9]+$ ]]
+          test -n "$AWS_REGION"
+      - name: Configure short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_BUILD_ROLE_ARN }}
+          role-session-name: indus-${{ needs.target.outputs.environment }}-replacement-${{ github.run_id }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+      - name: Build replacement images
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ needs.target.outputs.environment }}-$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          prefix="$ECR_REGISTRY/indus"
+          docker build --tag "$prefix/platform-api:$tag" apps/platform-api
+          docker tag "$prefix/platform-api:$tag" "$prefix/research-worker:$tag"
+          docker build --tag "$prefix/market-data:$tag" services/market-data
+          docker build --file infra/images/web-publisher/Dockerfile --tag "$prefix/web:$tag" \
+            --build-arg "VITE_API_URL=$WEB_ORIGIN/api" \
+            --build-arg "VITE_MARKET_STREAM_URL=$WEB_ORIGIN/stream" \
+            --build-arg "VITE_COGNITO_AUTHORITY=$COGNITO_AUTHORITY" \
+            --build-arg "VITE_COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" \
+            --build-arg "VITE_COGNITO_REDIRECT_URI=$WEB_ORIGIN/auth/callback" \
+            --build-arg "VITE_COGNITO_LOGOUT_URI=$WEB_ORIGIN" .
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+      - name: Scan platform-api
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/indus/platform-api:${{ env.RELEASE_TAG }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Generate platform-api SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/indus/platform-api:${{ env.RELEASE_TAG }}
+          format: spdx-json
+          output-file: platform-api.spdx.json
+          artifact-name: ${{ needs.target.outputs.environment }}-platform-api-${{ github.sha }}.spdx.json
+      - name: Scan market-data
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/indus/market-data:${{ env.RELEASE_TAG }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Generate market-data SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/indus/market-data:${{ env.RELEASE_TAG }}
+          format: spdx-json
+          output-file: market-data.spdx.json
+          artifact-name: ${{ needs.target.outputs.environment }}-market-data-${{ github.sha }}.spdx.json
+      - name: Scan research-worker
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/indus/research-worker:${{ env.RELEASE_TAG }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Generate research-worker SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/indus/research-worker:${{ env.RELEASE_TAG }}
+          format: spdx-json
+          output-file: research-worker.spdx.json
+          artifact-name: ${{ needs.target.outputs.environment }}-research-worker-${{ github.sha }}.spdx.json
+      - name: Scan web
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/indus/web:${{ env.RELEASE_TAG }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Generate web SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/indus/web:${{ env.RELEASE_TAG }}
+          format: spdx-json
+          output-file: web.spdx.json
+          artifact-name: ${{ needs.target.outputs.environment }}-web-${{ github.sha }}.spdx.json
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Publish and sign images
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in platform-api market-data research-worker web; do
+            tagged="$ECR_REGISTRY/indus/$name:$RELEASE_TAG"
+            docker push "$tagged"
+            digest="$(aws ecr describe-images --repository-name "indus/$name" \
+              --image-ids "imageTag=$RELEASE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            image="$ECR_REGISTRY/indus/$name@$digest"
+            cosign sign --yes "$image"
+            cosign attest --yes --type spdxjson --predicate "$name.spdx.json" "$image"
+            printf '%s\n' "$image" > "$name.image"
+          done
+      - name: Update image references
+        run: node scripts/deploy/update-staging-images.mjs
+      - name: Open deployment PR
+        id: platform-pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ github.token }}
+          add-paths: infra/gitops/environments/${{ needs.target.outputs.environment }}/values.yaml
+          base: ${{ github.ref_name }}
+          branch: deploy/replacement-${{ needs.target.outputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+          commit-message: Update ${{ needs.target.outputs.environment }} replacement image digests
+          title: Update ${{ needs.target.outputs.environment }} replacement image digests
+          body: |
+            Publishes scanned, signed replacement images built from `${{ github.ref_name }}`.
+            Scope: ${{ needs.target.outputs.environment }} image references only; platform activation is separate.
+            Verification: image scans, SBOMs, signatures, and dispatched PR checks.
+            Migration impact: no migration runs during publishing.
+            Rollback: restore the previous verified image references.
+            Deferred: infrastructure readiness, runtime configuration, and acceptance.
+      - name: Verify deployment PR
+        if: steps.platform-pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYMENT_BRANCH: deploy/replacement-${{ needs.target.outputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
           gh workflow run verification.yml --ref "$DEPLOYMENT_BRANCH"
           gh workflow run aws-foundation.yml --ref "$DEPLOYMENT_BRANCH"

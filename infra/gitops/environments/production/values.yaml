@@ -7,7 +7,10 @@ aws:
   targetGroups:
     platformApi: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/replace-api/0000000000000000
     marketData: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/replace-stream/0000000000000000
-identity: { issuer: "https://cognito-idp.us-east-1.amazonaws.com/replace-production", audience: replace-production }
+identity:
+  issuer: https://cognito-idp.us-east-1.amazonaws.com/replace-production
+  audience: replace-production
+  userInfoUrl: https://replace-production.auth.us-east-1.amazoncognito.com/oauth2/userInfo
 roles:
   platformApi: arn:aws:iam::111111111111:role/indus-production-platform-api
   sidekiq: arn:aws:iam::111111111111:role/indus-production-sidekiq

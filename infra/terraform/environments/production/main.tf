@@ -97,6 +97,21 @@ variable "database_max_acu" {
   default = 4
 }
 
+variable "replacement_platform_enabled" {
+  type    = bool
+  default = false
+}
+
+variable "temporal_address" {
+  type    = string
+  default = ""
+}
+
+variable "temporal_namespace" {
+  type    = string
+  default = ""
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
@@ -138,6 +153,9 @@ module "environment" {
   cognito_logout_urls                 = var.cognito_logout_urls
   database_min_acu                    = var.database_min_acu
   database_max_acu                    = var.database_max_acu
+  replacement_platform_enabled        = var.replacement_platform_enabled
+  temporal_address                    = var.temporal_address
+  temporal_namespace                  = var.temporal_namespace
   tags                                = var.tags
 }
 
