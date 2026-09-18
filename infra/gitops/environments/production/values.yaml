@@ -37,11 +37,11 @@ config:
   temporalAddress: replace.tmprl.cloud:7233
   temporalNamespace: production.indus
 images:
-  platformApi: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api@sha256:33cae7dbe3c07a3e392bbf965849dc8ba2f5f63cbea3b706643dafbe6f60c1d6
-  marketData: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/market-data@sha256:fa616e68d248f0fb0fc75559f3f4c745d750b9a0f27ef61b1ebb93dddb84efc8
-  researchWorker: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker@sha256:33cae7dbe3c07a3e392bbf965849dc8ba2f5f63cbea3b706643dafbe6f60c1d6
-  web: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/web@sha256:95c367739c70130239f387584f728736afdefc8a85d9d428ba5184c7911b700e
-webPublisher: { releaseId: "ff13314b49ddacfacd3d1567096781e958dfca79" }
+  platformApi: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api@sha256:4cd714393c590416da728b9bd5851486f37678c84c2a9e3b64f3d42ef8cd3fa1
+  marketData: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/market-data@sha256:17b5d6bf15e075355e391d75c8fa15052bae4a2ce6257eb48caf024864deaab5
+  researchWorker: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker@sha256:4cd714393c590416da728b9bd5851486f37678c84c2a9e3b64f3d42ef8cd3fa1
+  web: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/web@sha256:6327b179aea13557eff869b5796a117cc916f6e658d5e7ebb18939c6be39bb63
+webPublisher: { releaseId: "a220fddb8e299572b5ed6030311235fe0c4bfdb2" }
 platformApi: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
 sidekiq: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
 marketData: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
