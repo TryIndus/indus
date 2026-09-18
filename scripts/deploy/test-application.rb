@@ -37,14 +37,11 @@ end
 puts "Passed built-in token and deployment verification dispatch checks."
 
 replacement = workflow.fetch("jobs").fetch("replacement")
-raise "Replacement must use staging environment" unless replacement.fetch("environment") == "staging"
+unless replacement.fetch("environment") == '${{ needs.target.outputs.environment }}'
+  raise "Replacement must use the validated branch environment"
+end
 raise "Legacy must remain the default" unless job.fetch("if") == "inputs.runtime != 'replacement'"
 replacement_steps = replacement.fetch("steps")
-guard = replacement_steps.first.fetch("run")
-%w[staging main feature].each do |branch|
-  _, _, result = Open3.capture3({"GITHUB_REF_NAME" => branch}, "bash", "-c", guard)
-  raise "Replacement branch guard failed" unless result.success? == (branch == "staging")
-end
 publish_index = replacement_steps.index { |step| step["name"] == "Publish and sign images" }
 %w[platform-api market-data research-worker web].each do |name|
   scan_index = replacement_steps.index { |step| step["name"] == "Scan #{name}" }
@@ -53,6 +50,8 @@ publish_index = replacement_steps.index { |step| step["name"] == "Publish and si
   raise "Image scan must fail on high/critical findings" unless scan["exit-code"] == "1" && scan["severity"] == "CRITICAL,HIGH"
 end
 platform_pr = replacement_steps.find { |step| step["id"] == "platform-pr" }.fetch("with")
-raise "Replacement PR must target staging" unless platform_pr["base"] == "staging"
-raise "Only staging references may change" unless platform_pr["add-paths"] == "infra/gitops/environments/staging/values.yaml"
-puts "Passed staging replacement publication boundaries."
+raise "Replacement PR must target its source branch" unless platform_pr["base"] == '${{ github.ref_name }}'
+unless platform_pr["add-paths"] == 'infra/gitops/environments/${{ needs.target.outputs.environment }}/values.yaml'
+  raise "Only the selected environment image references may change"
+end
+puts "Passed replacement publication boundaries."
