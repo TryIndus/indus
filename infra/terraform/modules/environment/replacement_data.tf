@@ -51,10 +51,16 @@ resource "aws_elasticache_user" "disabled_default" {
   engine        = "valkey"
 
   authentication_mode {
-    type = "no-password-required"
+    type      = "password"
+    passwords = [random_password.disabled_default_redis.result]
   }
 
   tags = local.common_tags
+}
+
+resource "random_password" "disabled_default_redis" {
+  length  = 40
+  special = false
 }
 
 resource "aws_elasticache_user_group" "application" {
