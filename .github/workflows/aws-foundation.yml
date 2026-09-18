@@ -48,6 +48,7 @@ jobs:
         run: |
           ruby scripts/deploy/test-infrastructure.rb
           ruby scripts/deploy/test-application.rb
+          node --test scripts/deploy/test-staging-images.mjs
 
       - name: Validate Terraform formatting and environments
         shell: bash

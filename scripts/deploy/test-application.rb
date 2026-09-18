@@ -35,3 +35,24 @@ unless digest_update.include?("IMAGE_DIGEST") && digest_update.include?("/^image
   raise "Deployment must update only the tracked immutable image digest"
 end
 puts "Passed built-in token and deployment verification dispatch checks."
+
+replacement = workflow.fetch("jobs").fetch("replacement")
+raise "Replacement must use staging environment" unless replacement.fetch("environment") == "staging"
+raise "Legacy must remain the default" unless job.fetch("if") == "inputs.runtime != 'replacement'"
+replacement_steps = replacement.fetch("steps")
+guard = replacement_steps.first.fetch("run")
+%w[staging main feature].each do |branch|
+  _, _, result = Open3.capture3({"GITHUB_REF_NAME" => branch}, "bash", "-c", guard)
+  raise "Replacement branch guard failed" unless result.success? == (branch == "staging")
+end
+publish_index = replacement_steps.index { |step| step["name"] == "Publish and sign images" }
+%w[platform-api market-data research-worker web].each do |name|
+  scan_index = replacement_steps.index { |step| step["name"] == "Scan #{name}" }
+  raise "Every image must be scanned before publication" unless scan_index && scan_index < publish_index
+  scan = replacement_steps[scan_index].fetch("with")
+  raise "Image scan must fail on high/critical findings" unless scan["exit-code"] == "1" && scan["severity"] == "CRITICAL,HIGH"
+end
+platform_pr = replacement_steps.find { |step| step["id"] == "platform-pr" }.fetch("with")
+raise "Replacement PR must target staging" unless platform_pr["base"] == "staging"
+raise "Only staging references may change" unless platform_pr["add-paths"] == "infra/gitops/environments/staging/values.yaml"
+puts "Passed staging replacement publication boundaries."
