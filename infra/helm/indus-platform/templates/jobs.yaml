@@ -31,7 +31,6 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef: { name: database-migration-runtime, key: DATABASE_URL }
-            - { name: PGOPTIONS, value: "-c role=indus_platform_owner -c search_path=public,pg_catalog" }
             - { name: SECRET_KEY_BASE_DUMMY, value: "1" }
             - { name: AWS_REGION, value: {{ .Values.aws.region | quote }} }
           resources:
@@ -87,7 +86,6 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef: { name: database-migration-runtime, key: DATABASE_URL }
-            - { name: PGOPTIONS, value: "-c role=indus_market_owner -c search_path=market_data,pg_catalog" }
           resources:
             requests: { cpu: 100m, memory: 128Mi }
             limits: { cpu: 500m, memory: 256Mi }
