@@ -2,7 +2,7 @@ import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect
 import type { RouterHistory } from '@tanstack/react-router'
 import type { AppContext } from './lib/context'
 import { AppShell } from './components/AppShell'
-import { AuthCallbackPage, AuthPage, CompanyPage, CryptoPage, DashboardPage, FavoritesPage, LandingPage, PortfoliosPage, ReportsPage, SearchPage, SettingsPage } from './pages'
+import { AuthCallbackPage, AuthPage, CompanyPage, CryptoPage, DashboardPage, FavoritesPage, PortfoliosPage, ReportsPage, SearchPage, SettingsPage } from './pages'
 
 const rootRoute = createRootRouteWithContext<AppContext>()({ component: Outlet, notFoundComponent: () => <main className="grid min-h-screen place-items-center p-6 text-center"><div><p className="eyebrow">404</p><h1 className="mt-2 text-3xl font-semibold">Page not found</h1><a href="/dashboard" className="mt-5 inline-block text-sky-300">Return to dashboard</a></div></main> })
 const authRoute = createRoute({ getParentRoute: () => rootRoute, path: '/auth', component: AuthPage, beforeLoad: async ({ context }) => { if (await context.auth.getUser()) throw redirect({ to: '/dashboard' }) } })
@@ -16,7 +16,7 @@ const favorites = createRoute({ getParentRoute: () => protectedRoute, path: '/fa
 const portfolios = createRoute({ getParentRoute: () => protectedRoute, path: '/portfolios', component: PortfoliosPage })
 const reports = createRoute({ getParentRoute: () => protectedRoute, path: '/reports', component: ReportsPage })
 const settings = createRoute({ getParentRoute: () => protectedRoute, path: '/settings', component: SettingsPage })
-const index = createRoute({ getParentRoute: () => rootRoute, path: '/', component: LandingPage })
+const index = createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: () => { throw redirect({ to: '/dashboard' }) } })
 const routeTree = rootRoute.addChildren([index, authRoute, authCallbackRoute, protectedRoute.addChildren([dashboard, search, company, crypto, favorites, portfolios, reports, settings])])
 
 export function makeRouter(context: AppContext, history?: RouterHistory) { return createRouter({ routeTree, context, history, defaultPreload: 'intent', scrollRestoration: true }) }
