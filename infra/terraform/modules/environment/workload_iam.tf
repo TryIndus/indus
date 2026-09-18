@@ -154,6 +154,10 @@ data "aws_iam_policy_document" "kafka" {
     actions   = ["kafka-cluster:AlterGroup", "kafka-cluster:DescribeGroup"]
     resources = ["${replace(aws_msk_serverless_cluster.events.arn, ":cluster/", ":group/")}/*"]
   }
+  statement {
+    actions   = ["kafka-cluster:AlterTransactionalId", "kafka-cluster:DescribeTransactionalId"]
+    resources = ["${replace(aws_msk_serverless_cluster.events.arn, ":cluster/", ":transactional-id/")}/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "kafka" {
