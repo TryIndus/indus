@@ -51,6 +51,7 @@ spec:
             - { name: KAFKA_SECURITY_PROTOCOL, value: "SASL_SSL" }
             - { name: KAFKA_SASL_MECHANISM, value: "AWS_MSK_IAM" }
             - { name: TEMPORAL_ADDRESS, value: {{ $.Values.config.temporalAddress | quote }} }
+            - { name: TEMPORAL_AUTH_MODE, value: "api_key" }
             - { name: TEMPORAL_NAMESPACE, value: {{ $.Values.config.temporalNamespace | quote }} }
             - { name: REPORT_ARTIFACT_BUCKET, value: {{ $.Values.config.artifactBucket | quote }} }
             - { name: AWS_REGION, value: {{ $.Values.aws.region | quote }} }

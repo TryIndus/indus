@@ -49,3 +49,16 @@ Prefer restarting the reports consumer and allowing its committed group offset t
 - Model provider: verify bounded credentials and quota, then allow the workflow retry policy to proceed. Never paste private prompts or provider payloads into incident logs.
 
 Rollback uses the traffic and reconciliation controls in the deployment runbook; database migrations and user writes require forward-only repair.
+## Temporal connection configuration
+
+Deployed API and report workers use `TEMPORAL_AUTH_MODE=api_key`, an explicit
+`TEMPORAL_ADDRESS` and `TEMPORAL_NAMESPACE`, and `TEMPORAL_API_KEY` from the
+platform-api or research-worker runtime secret. API-key connections always use
+TLS. Missing configuration fails before a connection is opened. Supply the key
+to both runtime secrets before synchronizing this chart; report consumers use
+the platform-api secret to start workflows and the API uses it for cancellation.
+
+Local Compose uses the default `local` mode with no API key. Cloud endpoints and
+credentials are rejected in local mode. Both API calls and research workers use
+the same connection factory. See the [Temporal Ruby SDK connection guide](https://ruby.temporal.io/)
+for the upstream TLS and API-key contract.

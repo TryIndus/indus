@@ -2,8 +2,7 @@
 require_relative "../config/environment"
 require "temporalio/worker"
 
-client = Temporalio::Client.connect(ENV.fetch("TEMPORAL_ADDRESS", "temporal:7233"),
-  ENV.fetch("TEMPORAL_NAMESPACE", "default"))
+client = Reports::TemporalConnection.connect
 worker = Temporalio::Worker.new(client: client, task_queue: Reports::TemporalClient::TASK_QUEUE,
   workflows: [ Reports::ResearchWorkflow ], activities: [ Reports::StartReportActivity,
     Reports::LoadReportEvidenceActivity, Reports::GenerateReportActivity, Reports::PersistReportActivity,
