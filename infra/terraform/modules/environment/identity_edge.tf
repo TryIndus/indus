@@ -389,9 +389,10 @@ resource "aws_s3_bucket_policy" "web" {
 }
 
 resource "aws_route53_record" "application" {
-  zone_id = data.aws_route53_zone.public.zone_id
-  name    = var.domain_name
-  type    = "A"
+  zone_id         = data.aws_route53_zone.public.zone_id
+  name            = var.domain_name
+  type            = "A"
+  allow_overwrite = true
 
   alias {
     evaluate_target_health = false
