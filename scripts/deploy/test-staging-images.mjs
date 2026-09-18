@@ -7,13 +7,18 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const script = fileURLToPath(new URL("./update-staging-images.mjs", import.meta.url));
-const fixture = readFileSync(new URL("../../infra/gitops/environments/staging/values.yaml", import.meta.url), "utf8");
+const fixtures = {
+	staging: readFileSync(new URL("../../infra/gitops/environments/staging/values.yaml", import.meta.url), "utf8"),
+	production: readFileSync(new URL("../../infra/gitops/environments/production/values.yaml", import.meta.url), "utf8"),
+};
 for (const scenario of ["valid", "production", "malformed", "mixed-registry", "missing-reference"]) {
 	test(scenario, () => {
 		const directory = mkdtempSync(join(tmpdir(), "indus-images-"));
 		try {
-			const target = join(directory, "infra/gitops/environments/staging/values.yaml");
-			mkdirSync(join(directory, "infra/gitops/environments/staging"), { recursive: true });
+			const environment = scenario === "production" ? "production" : "staging";
+			const fixture = fixtures[environment];
+			const target = join(directory, `infra/gitops/environments/${environment}/values.yaml`);
+			mkdirSync(join(directory, `infra/gitops/environments/${environment}`), { recursive: true });
 			const original = scenario === "missing-reference" ? fixture.replace(/^  web: .*$/m, "") : fixture;
 			writeFileSync(target, original);
 			for (const repository of ["platform-api", "market-data", "research-worker", "web"]) {
@@ -23,7 +28,7 @@ for (const scenario of ["valid", "production", "malformed", "mixed-registry", "m
 			}
 			const result = spawnSync(process.execPath, [script], { cwd: directory, env: { ...process.env, GITHUB_REF_NAME: scenario === "production" ? "main" : "staging", GITHUB_SHA: "b".repeat(40) } });
 			const updated = readFileSync(target, "utf8");
-			if (scenario === "valid") {
+			if (["valid", "production"].includes(scenario)) {
 				assert.equal(result.status, 0, result.stderr.toString());
 				assert.equal((updated.match(/sha256:aaaaaaaa/g) ?? []).length, 4);
 				assert.ok(updated.includes(`releaseId: "${"b".repeat(40)}"`));

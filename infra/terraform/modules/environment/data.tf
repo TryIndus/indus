@@ -195,7 +195,7 @@ resource "aws_db_proxy_target" "data" {
 }
 
 locals {
-  data_buckets = toset(["artifacts", "audit", "exports"])
+  data_buckets = toset(["artifacts", "audit", "exports", "raw-events", "web"])
 }
 
 resource "aws_s3_bucket" "data" {
@@ -236,8 +236,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.data.arn
-      sse_algorithm     = "aws:kms"
+      kms_master_key_id = each.key == "web" ? null : aws_kms_key.data.arn
+      sse_algorithm     = each.key == "web" ? "AES256" : "aws:kms"
     }
   }
 }

@@ -1,13 +1,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
-if (process.env.GITHUB_REF_NAME !== "staging") {
-	throw new Error("Replacement image updates require staging.");
-}
+const environments = { staging: "staging", main: "production" };
+const environment = environments[process.env.GITHUB_REF_NAME];
+if (!environment) throw new Error("Replacement image updates require staging or main.");
 const revision = process.env.GITHUB_SHA;
 if (!/^[a-f0-9]{40}$/.test(revision ?? "")) {
 	throw new Error("A full source revision is required.");
 }
-const file = "infra/gitops/environments/staging/values.yaml";
+const file = `infra/gitops/environments/${environment}/values.yaml`;
 let values = readFileSync(file, "utf8");
 let registry;
 for (const [key, repository] of Object.entries({
