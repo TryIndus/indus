@@ -317,10 +317,8 @@ test("@authenticated settings route renders for the current tenant", async ({ pa
 
 test("@authenticated stock search stays focused on search and results", async ({ page }) => {
 	await page.goto("/search");
-	const form = page
-		.locator("form")
-		.filter({ has: page.getByPlaceholder("Type any stock symbol...") });
-	await expect(form).toBeVisible();
+	await expect(page.getByPlaceholder("Type any stock symbol...")).toBeVisible();
+	await expect(page.getByRole("button", { name: "Search", exact: true })).toBeVisible();
 	await expect(page.getByText("Search Tips:")).toHaveCount(0);
 	await expect(page.getByRole("heading", { name: "Browse by Category" })).toBeVisible();
 });

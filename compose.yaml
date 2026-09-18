@@ -1,0 +1,142 @@
+name: indus
+
+services:
+  postgres:
+    image: postgres:17.10-alpine
+    environment:
+      POSTGRES_DB: indus_development
+      POSTGRES_PASSWORD: indus-local-password
+      POSTGRES_USER: indus
+    ports:
+      - "127.0.0.1:15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U indus -d indus_development"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8.2.5-alpine
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    ports:
+      - "127.0.0.1:16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - redis-data:/data
+
+  redpanda:
+    profiles: ["distributed"]
+    image: docker.redpanda.com/redpandadata/redpanda:v25.2.1
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://127.0.0.1:19092
+    ports:
+      - "127.0.0.1:19092:19092"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--exit-when-healthy"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  redpanda-init:
+    profiles: ["distributed"]
+    image: docker.redpanda.com/redpandadata/redpanda:v25.2.1
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - >-
+        for topic in market.bars.v1 market.quotes.v1; do
+          rpk topic describe "$${topic}" --brokers redpanda:9092 >/dev/null 2>&1 ||
+          rpk topic create "$${topic}" --brokers redpanda:9092;
+        done
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  market-data:
+    profiles: ["distributed"]
+    image: indus-market-data:local
+    build:
+      context: ./services/market-data
+    environment:
+      MARKET_BIND_ADDR: 0.0.0.0:8081
+      DATABASE_URL: postgres://indus:indus-local-password@postgres:5432/indus_development
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      KAFKA_TRANSACTIONAL_ID: indus-market-data-local
+      KAFKA_GROUP_ID: indus-market-data-writer-v1
+      KAFKA_SECURITY_PROTOCOL: PLAINTEXT
+      MARKET_JWT_ISSUER: http://127.0.0.1:54321/auth/v1
+      MARKET_JWT_AUDIENCE: authenticated
+      MARKET_JWT_HS256_SECRET: ${MARKET_JWT_HS256_SECRET:-indus-disposable-local-stream-secret}
+      MARKET_INGESTION_ENABLED: "false"
+      MARKET_ALLOWED_ORIGINS: http://127.0.0.1:14173
+    ports:
+      - "127.0.0.1:18081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8081/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda-init:
+        condition: service_completed_successfully
+
+  platform-api:
+    profiles: ["application"]
+    image: indus-platform-api:local
+    build:
+      context: ./apps/platform-api
+      args:
+        BUNDLE_WITHOUT: ""
+    environment:
+      DATABASE_URL: postgres://indus:indus-local-password@postgres:5432/indus_development
+      REDIS_URL: redis://redis:6379/0
+      RAILS_ENV: development
+      CORS_ORIGINS: http://127.0.0.1:14173
+      COGNITO_JWT_ISSUER: ${COGNITO_JWT_ISSUER:-}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
+      COGNITO_USERINFO_URL: ${COGNITO_USERINFO_URL:-}
+    ports:
+      - "127.0.0.1:13000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    profiles: ["application"]
+    image: indus-web:local
+    build:
+      context: ./apps/web
+      args:
+        VITE_API_URL: http://127.0.0.1:13000
+        VITE_MARKET_STREAM_URL: http://127.0.0.1:18081
+        VITE_COGNITO_AUTHORITY: ${VITE_COGNITO_AUTHORITY:-}
+        VITE_COGNITO_CLIENT_ID: ${VITE_COGNITO_CLIENT_ID:-}
+        VITE_COGNITO_REDIRECT_URI: ${VITE_COGNITO_REDIRECT_URI:-http://127.0.0.1:14173/auth/callback}
+        VITE_COGNITO_LOGOUT_URI: ${VITE_COGNITO_LOGOUT_URI:-http://127.0.0.1:14173/auth}
+    ports:
+      - "127.0.0.1:14173:4173"
+    depends_on:
+      platform-api:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  redis-data:
