@@ -2,7 +2,7 @@ require "aws-sdk-core"
 require "aws-sigv4"
 require "uri"
 
-class ElastiCacheIamToken
+class ElasticacheIamToken
   def initialize(cache_name:, user_id:, region:, credentials_provider: Aws::CredentialProviderChain.new.resolve)
     @cache_name = cache_name.downcase
     @user_id = user_id

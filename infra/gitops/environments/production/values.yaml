@@ -42,9 +42,9 @@ images:
   researchWorker: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker@sha256:33cae7dbe3c07a3e392bbf965849dc8ba2f5f63cbea3b706643dafbe6f60c1d6
   web: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/web@sha256:95c367739c70130239f387584f728736afdefc8a85d9d428ba5184c7911b700e
 webPublisher: { releaseId: "ff13314b49ddacfacd3d1567096781e958dfca79" }
-platformApi: { replicas: 4, minReplicas: 4, maxReplicas: 30 }
-sidekiq: { replicas: 3, minReplicas: 3, maxReplicas: 20 }
-marketData: { replicas: 4, minReplicas: 4, maxReplicas: 30 }
-researchWorker: { replicas: 3, minReplicas: 3, maxReplicas: 20 }
-platformOutbox: { replicas: 3 }
-reportsConsumer: { replicas: 3 }
+platformApi: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
+sidekiq: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
+marketData: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
+researchWorker: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
+platformOutbox: { replicas: 1 }
+reportsConsumer: { replicas: 1 }
