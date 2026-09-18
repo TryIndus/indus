@@ -22,7 +22,7 @@
         }
       }
     },
-    "identity": { "type": "object", "required": ["issuer", "audience"] },
+    "identity": { "type": "object", "required": ["issuer", "audience", "userInfoUrl"] },
     "images": {
       "type": "object",
       "additionalProperties": { "type": "string", "pattern": "@sha256:[a-f0-9]{64}$" },

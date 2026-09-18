@@ -76,6 +76,10 @@ jobs:
               template indus infra/helm/indus-applications \
               -f "infra/helm/indus-applications/values-$environment.yaml" \
               | ruby scripts/deploy/test-gitops.rb "$environment"
+            docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" \
+              template indus infra/helm/indus-platform \
+              -f "infra/gitops/environments/$environment/values.yaml" \
+              | ruby scripts/deploy/test-platform-chart.rb
           done
 
       - name: Test private GitOps bootstrap rendering

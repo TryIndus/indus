@@ -4,9 +4,24 @@ WORKDIR /app
 COPY apps/web/package.json apps/web/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY apps/web/ ./
-RUN bun run build
+ARG VITE_API_URL
+ARG VITE_MARKET_STREAM_URL
+ARG VITE_COGNITO_AUTHORITY
+ARG VITE_COGNITO_CLIENT_ID
+ARG VITE_COGNITO_REDIRECT_URI
+ARG VITE_COGNITO_LOGOUT_URI
+RUN VITE_API_URL="${VITE_API_URL}" \
+    VITE_MARKET_STREAM_URL="${VITE_MARKET_STREAM_URL}" \
+    VITE_COGNITO_AUTHORITY="${VITE_COGNITO_AUTHORITY}" \
+    VITE_COGNITO_CLIENT_ID="${VITE_COGNITO_CLIENT_ID}" \
+    VITE_COGNITO_REDIRECT_URI="${VITE_COGNITO_REDIRECT_URI}" \
+    VITE_COGNITO_LOGOUT_URI="${VITE_COGNITO_LOGOUT_URI}" \
+    bun run build
 
-FROM public.ecr.aws/aws-cli/aws-cli:2.28.16
+FROM public.ecr.aws/aws-cli/aws-cli:2.36.48
+
+RUN dnf upgrade --refresh --releasever=latest -y \
+    && dnf clean all
 
 COPY --from=build --chown=1000:1000 /app/dist /dist
 COPY --chmod=0555 infra/images/web-publisher/publish.sh /usr/local/bin/publish-web

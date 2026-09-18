@@ -97,6 +97,10 @@ bun run test:local
 
 ## Pull request verification
 
+Replacement platform checks enforce React coverage (80% statements, 65% branches, 75% functions, and 85% lines), Rails application coverage (80% lines and 65% branches), and Rust coverage (70% lines). Rails also runs RuboCop, Brakeman, and Bundler Audit; Rust runs formatting, Clippy, database and Kafka integration tests, and a release build.
+
+`scripts/test-replacement-platform.sh` starts disposable Compose services, checks application readiness, and verifies PostgreSQL, Redis, and Kafka persistence across dependency restarts. It removes its isolated volumes on exit. Run it only with Docker available and the Compose development ports free. CI additionally scans production Rails, market-data, and web-publisher images for fixable high and critical vulnerabilities. Helm assertions verify workload security settings and rendered resources for both environments. These checks do not exercise live AWS services or authorize a production traffic cutover.
+
 GitHub Actions runs the same locked Bun toolchain used locally. The core job installs from `bun.lock`, runs Biome, type-checking, unit coverage, the production build, and a production dependency audit with non-secret test configuration. Separate jobs replay every migration and database security assertion against an isolated PostgreSQL container, exercise public HTTP contracts, verify public and authenticated accessibility, run the product in Chromium, Firefox, WebKit, and mobile Chromium, and enforce production-mode performance budgets. They never receive deployed Supabase, Alpaca, Gemini, Vercel, or AWS credentials.
 
 The stable `Required verification` job aggregates the required layers as they are introduced. Configure branch protection against that job only after its first successful run on GitHub, so the repository never depends on a check name that has not been registered.

@@ -209,7 +209,7 @@ main
             └── Phase 4 PR: data, identity, and replacement-platform cutover
 ```
 
-Each child PR targets the branch immediately below it and declares that dependency. Merge the stack from Phase 1 through Phase 4, retargeting each child to `main` after its parent merges and rerunning its complete verification before merge. Each phase must leave its branch internally coherent, documented, and reversible. Phase 1 retires Vercel as the production runtime while preserving the current Next.js and Supabase behavior. The replacement platform remains dormant until the Phase 4 traffic cutover and rollback window complete.
+Each child PR initially targets the branch immediately below it and declares that dependency. Phases 1 through 3 are incorporated before Phase 4. Phase 4 targets `staging` so the assembled replacement platform can be verified without making staging a required path for ordinary feature work. Moving the accepted cutover changes from `staging` to production requires a separate, explicit review into `main`; it is a release action, not a fifth implementation phase. Each phase must leave its branch internally coherent, documented, and reversible. Phase 1 retires Vercel as the production runtime while preserving the current Next.js and Supabase behavior. The replacement platform remains dormant until the production cutover and rollback window complete.
 
 | Phase | Single-PR outcome | Production posture |
 |---|---|---|
@@ -252,7 +252,7 @@ Acceptance criteria:
 - Establish the monorepo layout, pinned containerized toolchains, and documented local orchestration while preserving the root Next.js application.
 - Publish OpenAPI and event contracts and generate a typed React client deterministically.
 - Implement the Rails API with PostgreSQL, Active Record migrations, Pundit authorization, RSpec, idempotency, audit records, transactional outbox, Sidekiq, structured logging, and OpenTelemetry.
-- Implement authentication behind a provider boundary that supports current Supabase sessions during development and Cognito JWTs at the later cutover.
+- Implement Cognito hosted sign-in with authorization code and PKCE in the React application. The Rails API accepts only Cognito access tokens issued to its configured public client and retrieves verified profile attributes from Cognito.
 - Preserve Yahoo Finance behavior behind a fundamentals-provider interface and verify compatibility with fixtures and shadow comparisons.
 - Implement the React/Vite application for authentication, dashboard, search, company, crypto, favorites, portfolios, reports, and settings without changing production traffic.
 - Implement the provider-neutral `ModelGateway`, Gemini REST adapter, versioned prompts, structured outputs, allowlisted tools, quotas, and golden evaluations. Use the Phase 1 Secrets Manager and workload-identity boundary only when a replacement workload is deployed to a non-production AWS environment.
@@ -287,7 +287,7 @@ Acceptance criteria:
 
 - Provision replacement-managed stateful services only through the Phase 1 Terraform foundation: Aurora PostgreSQL, RDS Proxy, ElastiCache, MSK, S3, Cognito, and the managed observability integrations. The existing AWS deployment, edge, secret, image, and GitOps controls are not reimplemented here.
 - Deploy the already-built replacement workloads to staging, exercise SLO dashboards, alerts, backup restoration, disaster recovery, capacity, security, and image rollback.
-- Configure Cognito and rehearse identity and data migration before the production window.
+- Use Cognito as the replacement application's only runtime identity provider and rehearse identity and data migration before the production window.
 - Freeze incompatible changes, execute final synchronization, reconcile data, and shift traffic gradually with explicit abort thresholds.
 - Observe the target platform through the rollback window before deliberately retiring the AWS-hosted legacy Next.js application, Supabase, compatibility routes, legacy credentials, and redundant data copies.
 
@@ -296,7 +296,7 @@ Acceptance criteria:
 - A clean environment can be bootstrapped from versioned code without long-lived AWS credentials in GitHub.
 - Restore, rollback, migration, and cutover rehearsals meet documented recovery objectives.
 - No unresolved critical security finding remains and alerts map to user-visible failure modes.
-- Production error rate, latency, data integrity, stream health, and workflow completion remain within their objectives at full traffic.
+- Staging error rate, latency, data integrity, stream health, and workflow completion remain within their acceptance objectives before a production release is proposed.
 - The AWS-hosted legacy application is removed only after backups and the rollback window are verified.
 
 ## Verification Strategy
