@@ -37,11 +37,11 @@ config:
   temporalAddress: replace.tmprl.cloud:7233
   temporalNamespace: production.indus
 images:
-  platformApi: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api@sha256:0000000000000000000000000000000000000000000000000000000000000000
-  marketData: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/market-data@sha256:0000000000000000000000000000000000000000000000000000000000000000
-  researchWorker: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000
-  web: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/web@sha256:0000000000000000000000000000000000000000000000000000000000000000
-webPublisher: { releaseId: "0000000000000000000000000000000000000000" }
+  platformApi: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api@sha256:33cae7dbe3c07a3e392bbf965849dc8ba2f5f63cbea3b706643dafbe6f60c1d6
+  marketData: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/market-data@sha256:fa616e68d248f0fb0fc75559f3f4c745d750b9a0f27ef61b1ebb93dddb84efc8
+  researchWorker: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker@sha256:33cae7dbe3c07a3e392bbf965849dc8ba2f5f63cbea3b706643dafbe6f60c1d6
+  web: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/web@sha256:95c367739c70130239f387584f728736afdefc8a85d9d428ba5184c7911b700e
+webPublisher: { releaseId: "ff13314b49ddacfacd3d1567096781e958dfca79" }
 platformApi: { replicas: 4, minReplicas: 4, maxReplicas: 30 }
 sidekiq: { replicas: 3, minReplicas: 3, maxReplicas: 20 }
 marketData: { replicas: 4, minReplicas: 4, maxReplicas: 30 }
