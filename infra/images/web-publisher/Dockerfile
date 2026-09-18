@@ -18,7 +18,10 @@ RUN VITE_API_URL="${VITE_API_URL}" \
     VITE_COGNITO_LOGOUT_URI="${VITE_COGNITO_LOGOUT_URI}" \
     bun run build
 
-FROM public.ecr.aws/aws-cli/aws-cli:2.28.16
+FROM public.ecr.aws/aws-cli/aws-cli:2.36.48
+
+RUN dnf upgrade --refresh --releasever=latest -y \
+    && dnf clean all
 
 COPY --from=build --chown=1000:1000 /app/dist /dist
 COPY --chmod=0555 infra/images/web-publisher/publish.sh /usr/local/bin/publish-web
