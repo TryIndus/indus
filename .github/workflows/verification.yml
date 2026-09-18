@@ -331,10 +331,13 @@ jobs:
       - name: Build static web publisher image
         run: docker build --file infra/images/web-publisher/Dockerfile --tag indus-web-publisher:ci .
 
+      - name: Build production Rails image for scanning
+        run: docker build --tag indus-platform-api:production apps/platform-api
+
       - name: Scan Rails API image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: indus-platform-api:local
+          image-ref: indus-platform-api:production
           format: table
           exit-code: "1"
           ignore-unfixed: true
