@@ -29,7 +29,7 @@ if (currentBranch !== branch) {
 run("gh", ["auth", "status"]);
 
 if (component === "app") {
-	if (confirmation === "--replacement" && operation === "staging") {
+	if (confirmation === "--replacement") {
 		run("gh", ["workflow", "run", "deploy-application.yml", "--ref", branch, "-f", "runtime=replacement"], { stdio: "inherit" });
 		process.exit(0);
 	}
