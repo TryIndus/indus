@@ -19,7 +19,7 @@ module Events
         raise
       end
 
-      def refresh_token(client_name)
+      def refresh_token(client_name, _oauthbearer_config = nil)
         token = AwsMskIamSaslSigner::MSKTokenProvider.new(region: ENV.fetch("AWS_REGION")).generate_auth_token
         client = @lock.synchronize { @clients.fetch(client_name) }
         client.oauthbearer_set_token(token: token.token, lifetime_ms: token.expiration_time_ms,
