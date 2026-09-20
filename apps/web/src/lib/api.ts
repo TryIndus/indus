@@ -12,9 +12,10 @@ export interface ApiClient {
 }
 
 export function createApiClient(baseUrl: string, token: () => Promise<string | null>): ApiClient {
+  const resolvePath = (path: string) => new URL(path.replace(/^\/+/, ''), `${baseUrl.replace(/\/+$/, '')}/`)
   const request = async <T>(path: string, schema: ZodType<T>, options: RequestInit = {}) => {
     const accessToken = await token()
-    const response = await fetch(new URL(path, baseUrl), {
+    const response = await fetch(resolvePath(path), {
       ...options,
       headers: { Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...options.headers },
     })

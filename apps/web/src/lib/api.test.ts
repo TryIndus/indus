@@ -13,6 +13,15 @@ describe('Rails API client', () => {
     expect(fetchMock).toHaveBeenCalledWith(new URL('https://api.example.test/v1/value'), expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer access-token' }) }))
   })
 
+  it('preserves the deployment API path prefix', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ value: 42 }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await createApiClient('https://tryindus.ca/api', async () => 'access-token').get('/v1/value', z.object({ value: z.number() }))
+
+    expect(fetchMock).toHaveBeenCalledWith(new URL('https://tryindus.ca/api/v1/value'), expect.any(Object))
+  })
+
   it('does not send an authorization header for anonymous requests', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
