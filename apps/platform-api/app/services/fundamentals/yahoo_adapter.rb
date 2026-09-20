@@ -3,7 +3,7 @@ require "timeout"
 
 module Fundamentals
   class YahooAdapter < FundamentalsProvider
-    ENDPOINT = "https://query1.finance.yahoo.com/v7/finance/quote".freeze
+    ENDPOINT = "https://query1.finance.yahoo.com/v7/finance/spark".freeze
     MAX_BATCH_SIZE = 25
     DEFAULT_TIMEOUT = 10
 
@@ -24,7 +24,7 @@ module Fundamentals
       raise Error, "fundamentals provider deadline exceeded" unless timeout.positive?
 
       uri = URI(ENDPOINT)
-      uri.query = URI.encode_www_form(symbols: normalized.join(","))
+      uri.query = URI.encode_www_form(symbols: normalized.join(","), range: "1d", interval: "1d")
       request = Net::HTTP::Get.new(uri, { "Accept" => "application/json", "User-Agent" => "Indus/1.0" })
       response = Timeout.timeout(timeout) do
         @transport.start(uri.host, uri.port, use_ssl: true, open_timeout: [ 3, timeout ].min,
@@ -34,17 +34,20 @@ module Fundamentals
       end
       raise Error, "fundamentals provider unavailable" unless response.is_a?(Net::HTTPSuccess)
 
-      quotes = JSON.parse(response.body).dig("quoteResponse", "result")
+      quotes = JSON.parse(response.body).dig("spark", "result")
       raise Error, "fundamentals provider returned invalid data" unless quotes.is_a?(Array)
 
       as_of = Time.current
       quotes.filter_map do |quote|
         symbol = quote["symbol"].to_s.upcase
         next unless normalized.include?(symbol)
+        meta = quote.dig("response", 0, "meta")
+        next unless meta.is_a?(Hash)
 
         [ symbol, FundamentalsSnapshot.new(symbol: symbol, as_of: as_of,
-          metrics: quote.slice("marketCap", "trailingPE", "forwardPE", "epsTrailingTwelveMonths", "regularMarketPrice",
-            "regularMarketChangePercent", "shortName"), source_reference: "yahoo:quote:#{symbol}") ]
+          metrics: meta.slice("regularMarketPrice", "regularMarketChangePercent", "regularMarketDayHigh",
+            "regularMarketDayLow", "regularMarketVolume", "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "shortName"),
+          source_reference: "yahoo:spark:#{symbol}") ]
       end.to_h
     rescue ArgumentError, JSON::ParserError, SocketError, SystemCallError, Timeout::Error => error
       raise Error, "fundamentals provider failed: #{error.class}"
