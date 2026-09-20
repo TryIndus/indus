@@ -1,4 +1,5 @@
 import { UserManager, WebStorageStateStore, type User } from 'oidc-client-ts'
+import { AuthenticationDetails, CognitoUser, CognitoUserAttribute, CognitoUserPool, type CognitoUserSession } from 'amazon-cognito-identity-js'
 
 export interface AuthUser {
   id: string
@@ -11,12 +12,24 @@ export interface AuthAdapter {
   completeSignIn(): Promise<void>
   signOut(): Promise<boolean>
   accessToken(): Promise<string | null>
+  passwordSignIn?(email: string, password: string): Promise<void>
+  signUp?(email: string, password: string, firstName: string, lastName: string): Promise<'confirmed' | 'confirmation-required'>
+  confirmSignUp?(email: string, code: string): Promise<void>
+  requestPasswordReset?(email: string): Promise<void>
+  confirmPasswordReset?(email: string, code: string, password: string): Promise<void>
 }
 
 class CognitoAuthAdapter implements AuthAdapter {
   private readonly manager: UserManager
+  private readonly pool: CognitoUserPool
 
-  constructor(manager: UserManager) { this.manager = manager }
+  constructor(manager: UserManager, pool: CognitoUserPool) { this.manager = manager; this.pool = pool }
+
+  private passwordSession(): Promise<CognitoUserSession | null> {
+    const user = this.pool.getCurrentUser()
+    if (!user) return Promise.resolve(null)
+    return new Promise(resolve => user.getSession((error: Error | null, session: CognitoUserSession | null) => resolve(error || !session?.isValid() ? null : session)))
+  }
 
   private async activeUser(): Promise<User | null> {
     let user = await this.manager.getUser()
@@ -32,14 +45,54 @@ class CognitoAuthAdapter implements AuthAdapter {
   }
 
   async getUser() {
+    const session = await this.passwordSession()
+    if (session) {
+      const payload = session.getIdToken().payload as { sub?: string; email?: string }
+      return { id: payload.sub ?? '', email: payload.email }
+    }
     const user = await this.activeUser()
     return user ? { id: user.profile.sub, email: user.profile.email } : null
   }
 
   async signIn() { await this.manager.signinRedirect() }
   async completeSignIn() { await this.manager.signinRedirectCallback() }
-  async signOut() { await this.manager.signoutRedirect(); return true }
-  async accessToken() { return (await this.activeUser())?.access_token ?? null }
+  async signOut() {
+    const passwordUser = this.pool.getCurrentUser()
+    if (passwordUser) { passwordUser.signOut(); await this.manager.removeUser(); return false }
+    await this.manager.signoutRedirect(); return true
+  }
+  async accessToken() { return (await this.passwordSession())?.getAccessToken().getJwtToken() ?? (await this.activeUser())?.access_token ?? null }
+
+  async passwordSignIn(email: string, password: string) {
+    const user = new CognitoUser({ Username: email.trim().toLowerCase(), Pool: this.pool })
+    const authentication = new AuthenticationDetails({ Username: email.trim().toLowerCase(), Password: password })
+    await new Promise<void>((resolve, reject) => user.authenticateUser(authentication, {
+      onSuccess: () => resolve(), onFailure: reject,
+      newPasswordRequired: () => reject(new Error('A new password is required. Use account recovery to continue.')),
+      mfaRequired: () => reject(new Error('This account requires an MFA challenge that is not yet supported in this form.')),
+      totpRequired: () => reject(new Error('This account requires an authenticator code that is not yet supported in this form.')),
+    }))
+  }
+
+  async signUp(email: string, password: string, firstName: string, lastName: string) {
+    const attributes = [new CognitoUserAttribute({ Name: 'given_name', Value: firstName }), new CognitoUserAttribute({ Name: 'family_name', Value: lastName }), new CognitoUserAttribute({ Name: 'name', Value: `${firstName} ${lastName}`.trim() })]
+    return new Promise<'confirmed' | 'confirmation-required'>((resolve, reject) => this.pool.signUp(email.trim().toLowerCase(), password, attributes, [], (error, result) => error ? reject(error) : resolve(result?.userConfirmed ? 'confirmed' : 'confirmation-required')))
+  }
+
+  async confirmSignUp(email: string, code: string) {
+    const user = new CognitoUser({ Username: email.trim().toLowerCase(), Pool: this.pool })
+    await new Promise<void>((resolve, reject) => user.confirmRegistration(code.trim(), true, error => error ? reject(error) : resolve()))
+  }
+
+  async requestPasswordReset(email: string) {
+    const user = new CognitoUser({ Username: email.trim().toLowerCase(), Pool: this.pool })
+    await new Promise<void>((resolve, reject) => user.forgotPassword({ onSuccess: () => resolve(), onFailure: reject, inputVerificationCode: () => resolve() }))
+  }
+
+  async confirmPasswordReset(email: string, code: string, password: string) {
+    const user = new CognitoUser({ Username: email.trim().toLowerCase(), Pool: this.pool })
+    await new Promise<void>((resolve, reject) => user.confirmPassword(code.trim(), password, { onSuccess: () => resolve(), onFailure: reject }))
+  }
 }
 
 class UnconfiguredAuthAdapter implements AuthAdapter {
@@ -69,6 +122,8 @@ export function createAuthAdapter(): AuthAdapter {
   if (!authority || !clientId || !globalThis.window) return new UnconfiguredAuthAdapter()
 
   const origin = window.location.origin
+  const userPoolId = new URL(authority).pathname.replace(/^\//, '')
+  const pool = new CognitoUserPool({ UserPoolId: userPoolId, ClientId: clientId })
   return new CognitoAuthAdapter(new UserManager({
     authority,
     client_id: clientId,
@@ -79,5 +134,5 @@ export function createAuthAdapter(): AuthAdapter {
     userStore: new WebStorageStateStore({ store: window.sessionStorage }),
     stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
     automaticSilentRenew: false,
-  }))
+  }), pool)
 }

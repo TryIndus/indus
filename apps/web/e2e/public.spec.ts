@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 test('protected routes fail closed to sign in', async ({ page }) => {
   await page.goto('/reports')
   await expect(page).toHaveURL(/\/auth(?:\?.*)?$/)
-  await expect(page.getByRole('heading', { name: 'Welcome to Indus' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Continue your research.' })).toBeVisible()
 })
 
 test('signs in and signs out through the browser auth adapter', async ({ page }) => {
@@ -14,16 +14,16 @@ test('signs in and signs out through the browser auth adapter', async ({ page })
   }))
 
   await page.goto('/auth')
-  await page.getByRole('button', { name: 'Continue to secure sign in' }).click()
+  await page.getByRole('button', { name: 'Continue with Google or SSO' }).click()
 
   await expect(page).toHaveURL(/\/dashboard$/)
-  await expect(page.getByRole('heading', { name: 'Good morning' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Company research' })).toBeVisible()
   const menu = page.getByRole('button', { name: 'Open navigation' })
   if (await menu.isVisible()) await menu.click()
   await page.getByRole('button', { name: 'Sign out' }).click()
 
   await expect(page).toHaveURL(/\/auth$/)
-  await expect(page.getByRole('heading', { name: 'Welcome to Indus' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Continue your research.' })).toBeVisible()
   expect(await page.evaluate(() => localStorage.getItem('indus:e2e-auth'))).toBeNull()
 
   await page.goto('/reports')
@@ -39,6 +39,6 @@ test('sign-in surface has no serious accessibility violations', async ({ page })
 test('sign-in shell stays within its local performance budget', async ({ page }) => {
   const started = Date.now()
   await page.goto('/auth')
-  await expect(page.getByRole('button', { name: 'Continue to secure sign in' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continue with Google or SSO' })).toBeVisible()
   expect(Date.now() - started).toBeLessThan(3_000)
 })

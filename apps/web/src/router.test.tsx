@@ -45,13 +45,13 @@ async function renderPath(path: string, authenticated: boolean, resolve?: (path:
 describe('application routing', () => {
   it('redirects an anonymous user away from protected pages', async () => {
     const router = await renderPath('/reports', false)
-    expect(router.state.location.pathname).toBe('/auth')
-    expect(await screen.findByRole('heading', { name: 'Welcome to Indus' })).toBeVisible()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/auth'))
+    expect(await screen.findByRole('heading', { name: 'Continue your research.' })).toBeVisible()
   })
 
   it('renders the authenticated dashboard with an empty watchlist state', async () => {
     await renderPath('/dashboard', true)
-    expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Company research' })).toBeVisible()
     expect(await screen.findByText('No instruments yet')).toBeVisible()
   })
 
@@ -180,18 +180,18 @@ describe('application routing', () => {
     const router = await renderPath('/auth', true)
 
     expect(router.state.location.pathname).toBe('/dashboard')
-    expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Company research' })).toBeVisible()
   })
 
   it('starts hosted sign-in and completes the callback lifecycle', async () => {
     const router = await renderPath('/auth', false)
-    fireEvent.click(screen.getByRole('button', { name: 'Continue to secure sign in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with Google or SSO' }))
     await waitFor(() => expect(router.options.context.auth.signIn).toHaveBeenCalled())
     await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
 
     cleanupView()
     const callbackRouter = await renderPath('/auth/callback', false)
-    expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Company research' })).toBeVisible()
     expect(callbackRouter.state.location.pathname).toBe('/dashboard')
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await waitFor(() => expect(callbackRouter.state.location.pathname).toBe('/auth'))
