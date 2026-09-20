@@ -14,7 +14,9 @@ test('signs in and signs out through the browser auth adapter', async ({ page })
   }))
 
   await page.goto('/auth')
-  await page.getByRole('button', { name: 'Continue with Google or SSO' }).click()
+  await page.getByLabel('Email').fill('investor@example.test')
+  await page.locator('input[autocomplete="current-password"]').fill('Password123!Secure')
+  await page.getByRole('button', { name: 'Sign in' }).click()
 
   await expect(page).toHaveURL(/\/dashboard$/)
   await expect(page.getByRole('heading', { name: 'Company research' })).toBeVisible()
@@ -39,6 +41,6 @@ test('sign-in surface has no serious accessibility violations', async ({ page })
 test('sign-in shell stays within its local performance budget', async ({ page }) => {
   const started = Date.now()
   await page.goto('/auth')
-  await expect(page.getByRole('button', { name: 'Continue with Google or SSO' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
   expect(Date.now() - started).toBeLessThan(3_000)
 })

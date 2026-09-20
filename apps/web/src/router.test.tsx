@@ -21,10 +21,13 @@ function context(authenticated: boolean, resolve: (path: string) => unknown | Pr
   return {
     auth: {
       getUser: vi.fn(async () => authState ? { id: 'user-1', email: 'user@example.test' } : null),
-      signIn: vi.fn(async () => { authState = true }),
-      completeSignIn: vi.fn(async () => { authState = true }),
       signOut: vi.fn(async () => { authState = false; return false }),
       accessToken: vi.fn(async () => null),
+      passwordSignIn: vi.fn(async () => { authState = true }),
+      signUp: vi.fn(async () => 'confirmation-required' as const),
+      confirmSignUp: vi.fn(async () => {}),
+      requestPasswordReset: vi.fn(async () => {}),
+      confirmPasswordReset: vi.fn(async () => {}),
     },
     api: {
       get: async (path, schema) => schema.parse(await resolve(path)),
@@ -69,9 +72,9 @@ describe('application routing', () => {
     const router = await renderPath('/auth', false, undefined, undefined, { getUser, passwordSignIn, signUp, confirmSignUp, requestPasswordReset, confirmPasswordReset })
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'Password123!Secure' } })
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    await waitFor(() => expect(passwordSignIn).toHaveBeenCalledWith('user@example.test', 'password123'))
+    await waitFor(() => expect(passwordSignIn).toHaveBeenCalledWith('user@example.test', 'Password123!Secure'))
     await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
 
     cleanupView()
@@ -80,7 +83,7 @@ describe('application routing', () => {
     fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Avery' } })
     fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Investor' } })
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'Password123!Secure' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     expect(await screen.findByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
     fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
@@ -92,9 +95,9 @@ describe('application routing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send recovery code' }))
     expect(await screen.findByRole('button', { name: 'Set new password' })).toBeVisible()
     fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '654321' } })
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'newpassword123' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'NewPassword123!Secure' } })
     fireEvent.click(screen.getByRole('button', { name: 'Set new password' }))
-    await waitFor(() => expect(confirmPasswordReset).toHaveBeenCalledWith('user@example.test', '654321', 'newpassword123'))
+    await waitFor(() => expect(confirmPasswordReset).toHaveBeenCalledWith('user@example.test', '654321', 'NewPassword123!Secure'))
   })
 
   it('renders the authenticated dashboard with an empty watchlist state', async () => {
@@ -231,18 +234,11 @@ describe('application routing', () => {
     expect(await screen.findByRole('heading', { name: 'Company research' })).toBeVisible()
   })
 
-  it('starts hosted sign-in and completes the callback lifecycle', async () => {
-    const router = await renderPath('/auth', false)
-    fireEvent.click(screen.getByRole('button', { name: 'Continue with Google or SSO' }))
-    await waitFor(() => expect(router.options.context.auth.signIn).toHaveBeenCalled())
-    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
-
-    cleanupView()
-    const callbackRouter = await renderPath('/auth/callback', false)
-    expect(await screen.findByRole('heading', { name: 'Company research' })).toBeVisible()
-    expect(callbackRouter.state.location.pathname).toBe('/dashboard')
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    await waitFor(() => expect(callbackRouter.state.location.pathname).toBe('/auth'))
+  it('offers Cognito email sign-in without a hosted-provider option', async () => {
+    await renderPath('/auth', false)
+    expect(screen.getByLabelText('Email')).toBeVisible()
+    expect(screen.getByLabelText('Password')).toBeVisible()
+    expect(screen.queryByText(/Google|SSO/i)).not.toBeInTheDocument()
   })
 
   it('renders a stable not-found boundary', async () => {

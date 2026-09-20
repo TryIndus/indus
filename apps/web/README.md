@@ -5,7 +5,7 @@ The Indus browser application is a React 19 and Vite single-page application.
 ## Boundaries
 
 - TanStack Router owns browser navigation and rejects unauthenticated protected-route requests before rendering application content.
-- Amazon Cognito is the identity boundary. The browser uses the OAuth 2.0 authorization-code flow with PKCE through Cognito's hosted sign-in, stores session state in session storage, refreshes access tokens through the OIDC client, and never receives a client secret.
+- Amazon Cognito is the identity boundary. The browser uses Cognito's email/password SRP flow, keeps the refreshable session in Cognito's browser storage, and never receives a client secret.
 - `src/lib/api.ts` is the typed Rails JSON boundary. It attaches the current access token, validates responses, supplies idempotency keys for mutations, and returns bounded errors that do not expose upstream payloads. Its Zod schemas follow the OpenAPI wire format and provide runtime validation; direct imports from the generated TypeScript client are deferred until that generator output is compatible with this application's strict TypeScript settings.
 - `src/lib/market-stream.ts` opens authenticated SSE connections to the market-data service, validates events, resumes from the last event ID, and exposes reconnecting, stale, and unauthorized states explicitly.
 - TanStack Query owns remote server state. Components do not call Rails or market providers directly.
@@ -19,7 +19,7 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-The Rails API must allow the local Vite origin and validate Cognito access tokens issued to the configured public app client. Local Cognito callback and logout URLs must exactly match the values registered on that client.
+The Rails API must allow the local Vite origin and validate Cognito access tokens issued to the configured public app client.
 
 ## Verification
 

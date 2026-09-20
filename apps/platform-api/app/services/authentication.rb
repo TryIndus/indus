@@ -129,17 +129,78 @@ module Authentication
     end
   end
 
+  class CognitoUserLoader
+    class FetchError < StandardError; end
+
+    def initialize(ttl: 60, max_entries: 1_000, clock: Time)
+      @ttl = ttl
+      @max_entries = max_entries
+      @clock = clock
+      @cache = {}
+      @mutex = Mutex.new
+    end
+
+    def call(url, token)
+      cache_key = Digest::SHA256.hexdigest(token)
+      cached = @mutex.synchronize do
+        cached = @cache[cache_key]
+        cached[:value] if cached && cached[:expires_at] > @clock.now
+      end
+      return cached if cached
+
+      value = fetch(url, token)
+      @mutex.synchronize do
+        now = @clock.now
+        @cache.delete_if { |_key, entry| entry[:expires_at] <= now }
+        @cache.shift while @cache.size >= @max_entries
+        @cache[cache_key] = { value: value, expires_at: now + @ttl }
+      end
+      value
+    end
+
+    private
+
+    def fetch(url, token)
+      uri = URI(url)
+      raise FetchError, "Cognito user API URL must use HTTPS" unless uri.is_a?(URI::HTTPS)
+
+      request = Net::HTTP::Post.new(uri.request_uri, {
+        "Accept" => "application/json",
+        "Content-Type" => "application/x-amz-json-1.1",
+        "X-Amz-Target" => "AWSCognitoIdentityProviderService.GetUser"
+      })
+      request.body = { AccessToken: token }.to_json
+      response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 2, read_timeout: 3) do |http|
+        http.request(request)
+      end
+      raise FetchError, "Cognito user API rejected the token" unless response.is_a?(Net::HTTPSuccess)
+
+      attributes = JSON.parse(response.body).fetch("UserAttributes").to_h do |attribute|
+        [ attribute.fetch("Name"), attribute.fetch("Value") ]
+      end
+      attributes["email_verified"] = attributes["email_verified"] == "true"
+      attributes
+    rescue JSON::ParserError, KeyError, SocketError, SystemCallError, Timeout::Error, URI::InvalidURIError => error
+      raise FetchError, "Cognito user API fetch failed: #{error.class}"
+    end
+  end
+
   class CognitoVerifier < TokenVerifier
-    def initialize(client_id:, userinfo_url:, userinfo_loader: UserInfoLoader.new, **verifier_options)
+    def initialize(client_id:, user_api_url:, userinfo_url:, user_loader: CognitoUserLoader.new,
+      userinfo_loader: UserInfoLoader.new, **verifier_options)
       super(**verifier_options)
       @client_id = client_id
+      @user_api_url = user_api_url
       @userinfo_url = userinfo_url
+      @user_loader = user_loader
       @userinfo_loader = userinfo_loader
     end
 
     def self.from_env
       issuer = ENV.fetch("COGNITO_JWT_ISSUER")
+      issuer_uri = URI(issuer)
       new(issuer: issuer, audience: nil, client_id: ENV.fetch("COGNITO_CLIENT_ID"),
+        user_api_url: ENV.fetch("COGNITO_USER_API_URL", "#{issuer_uri.scheme}://#{issuer_uri.host}"),
         userinfo_url: ENV.fetch("COGNITO_USERINFO_URL"), jwks_url: "#{issuer}/.well-known/jwks.json",
         algorithms: [ "RS256" ])
     end
@@ -149,12 +210,16 @@ module Authentication
       raise Unauthorized, "token is not a Cognito access token" unless claims["token_use"] == "access"
       raise Unauthorized, "token client does not match" unless secure_match?(claims["client_id"], @client_id)
 
-      profile = @userinfo_loader.call(@userinfo_url, token)
+      profile = if claims["scope"].to_s.split.include?("openid")
+        @userinfo_loader.call(@userinfo_url, token)
+      else
+        @user_loader.call(@user_api_url, token)
+      end
       raise Unauthorized, "user-info subject does not match" unless secure_match?(profile["sub"], claims["sub"])
       raise Unauthorized, "verified email is required" unless profile["email_verified"] == true
 
       claims.merge("email" => profile.fetch("email"), "name" => profile["name"])
-    rescue KeyError, UserInfoLoader::FetchError => error
+    rescue KeyError, CognitoUserLoader::FetchError, UserInfoLoader::FetchError => error
       raise Unauthorized, error.message
     end
 

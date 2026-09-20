@@ -6,22 +6,39 @@ RSpec.describe Authentication::CognitoVerifier do
   let(:client_id) { "public-web-client" }
   let(:jwks_loader) { ->(_url) { { keys: [ JWT::JWK.new(key.public_key, kid: "primary").export ] } } }
   let(:profile) { { "sub" => "cognito-user", "email" => "user@example.test", "email_verified" => true } }
-  let(:userinfo_loader) { ->(_url, _token) { profile } }
+  let(:user_loader) { instance_double(Authentication::CognitoUserLoader, call: profile) }
+  let(:userinfo_loader) { instance_double(Authentication::UserInfoLoader, call: profile) }
   subject(:verifier) do
     described_class.new(issuer: issuer, audience: nil, algorithms: [ "RS256" ],
       jwks_url: "#{issuer}/.well-known/jwks.json", jwks_loader: jwks_loader,
-      client_id: client_id, userinfo_url: "https://indus.auth.us-east-1.amazoncognito.com/oauth2/userInfo",
-      userinfo_loader: userinfo_loader)
+      client_id: client_id, user_api_url: "https://cognito-idp.us-east-1.amazonaws.com",
+      userinfo_url: "https://indus.auth.us-east-1.amazoncognito.com/oauth2/userInfo",
+      user_loader: user_loader, userinfo_loader: userinfo_loader)
   end
 
   def token(claims = {})
     payload = { iss: issuer, sub: "cognito-user", token_use: "access", client_id: client_id,
+      scope: "aws.cognito.signin.user.admin",
       exp: 5.minutes.from_now.to_i }.merge(claims)
     JWT.encode(payload, key, "RS256", kid: "primary")
   end
 
   it "accepts a Cognito access token and adds verified profile claims" do
     expect(verifier.verify(token)).to include("sub" => "cognito-user", "email" => "user@example.test")
+  end
+
+  it "uses the Cognito user API for a password-authenticated access token" do
+    verifier.verify(token)
+
+    expect(user_loader).to have_received(:call)
+    expect(userinfo_loader).not_to have_received(:call)
+  end
+
+  it "keeps accepting an OAuth access token during rollout" do
+    verifier.verify(token(scope: "openid email profile"))
+
+    expect(userinfo_loader).to have_received(:call)
+    expect(user_loader).not_to have_received(:call)
   end
 
   it "rejects an ID token at the API boundary" do
@@ -32,12 +49,12 @@ RSpec.describe Authentication::CognitoVerifier do
     expect { verifier.verify(token(client_id: "another-client")) }.to raise_error(Authentication::Unauthorized, /client/)
   end
 
-  it "rejects an unverified email from the user-info endpoint" do
+  it "rejects an unverified email from the Cognito profile" do
     profile["email_verified"] = false
     expect { verifier.verify(token) }.to raise_error(Authentication::Unauthorized, /verified email/)
   end
 
-  it "rejects mismatched user-info subjects" do
+  it "rejects mismatched Cognito profile subjects" do
     profile["sub"] = "another-user"
     expect { verifier.verify(token) }.to raise_error(Authentication::Unauthorized, /subject/)
   end

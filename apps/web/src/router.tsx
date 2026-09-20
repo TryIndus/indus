@@ -2,13 +2,12 @@ import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect
 import type { RouterHistory } from '@tanstack/react-router'
 import type { AppContext } from './lib/context'
 import { AppShell } from './components/AppShell'
-import { AuthCallbackPage, CompanyPage, CryptoPage, DashboardPage, FavoritesPage, PortfoliosPage, ReportsPage, SearchPage, SettingsPage } from './pages'
+import { CompanyPage, CryptoPage, DashboardPage, FavoritesPage, PortfoliosPage, ReportsPage, SearchPage, SettingsPage } from './pages'
 import { AuthPage } from './components/AuthPage'
 import { LandingPage } from './components/LandingPage'
 
 const rootRoute = createRootRouteWithContext<AppContext>()({ component: Outlet, notFoundComponent: () => <main className="grid min-h-screen place-items-center p-6 text-center"><div><p className="eyebrow">404</p><h1 className="mt-2 text-3xl font-semibold">Page not found</h1><a href="/dashboard" className="mt-5 inline-block text-primary">Return to dashboard</a></div></main> })
 const authRoute = createRoute({ getParentRoute: () => rootRoute, path: '/auth', component: AuthPage, beforeLoad: async ({ context }) => { if (await context.auth.getUser()) throw redirect({ to: '/dashboard' }) } })
-const authCallbackRoute = createRoute({ getParentRoute: () => rootRoute, path: '/auth/callback', component: AuthCallbackPage })
 const protectedRoute = createRoute({ getParentRoute: () => rootRoute, id: '_protected', component: AppShell, beforeLoad: async ({ context, location }) => { if (!(await context.auth.getUser())) throw redirect({ to: '/auth', search: { redirect: location.href } }) } })
 const dashboard = createRoute({ getParentRoute: () => protectedRoute, path: '/dashboard', component: DashboardPage })
 const search = createRoute({ getParentRoute: () => protectedRoute, path: '/search', component: SearchPage })
@@ -19,7 +18,7 @@ const portfolios = createRoute({ getParentRoute: () => protectedRoute, path: '/p
 const reports = createRoute({ getParentRoute: () => protectedRoute, path: '/reports', component: ReportsPage })
 const settings = createRoute({ getParentRoute: () => protectedRoute, path: '/settings', component: SettingsPage })
 const index = createRoute({ getParentRoute: () => rootRoute, path: '/', component: LandingPage })
-const routeTree = rootRoute.addChildren([index, authRoute, authCallbackRoute, protectedRoute.addChildren([dashboard, search, company, crypto, favorites, portfolios, reports, settings])])
+const routeTree = rootRoute.addChildren([index, authRoute, protectedRoute.addChildren([dashboard, search, company, crypto, favorites, portfolios, reports, settings])])
 
 export function makeRouter(context: AppContext, history?: RouterHistory) { return createRouter({ routeTree, context, history, defaultPreload: 'intent', scrollRestoration: true }) }
 declare module '@tanstack/react-router' { interface Register { router: ReturnType<typeof makeRouter> } }

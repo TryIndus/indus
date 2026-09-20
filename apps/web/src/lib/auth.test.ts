@@ -19,7 +19,7 @@ describe('authentication adapter selection', () => {
     const auth = createAuthAdapter()
     expect(await auth.getUser()).toBeNull()
     expect(await auth.accessToken()).toBeNull()
-    await expect(auth.signIn()).rejects.toThrow('Authentication is not configured')
+    await expect(auth.passwordSignIn('user@example.test', 'Password123!Secure')).rejects.toThrow('Authentication is not configured')
   })
 
   it('requires both the build flag and explicit browser opt-in for test identity', async () => {
@@ -35,7 +35,7 @@ describe('authentication adapter selection', () => {
     vi.stubEnv('VITE_E2E_AUTH', 'true')
     const auth = createAuthAdapter()
 
-    await auth.signIn()
+    await auth.passwordSignIn('investor@example.test', 'Password123!Secure')
     expect(await auth.getUser()).toEqual({ id: 'e2e-user', email: 'investor@example.test' })
     expect(await auth.accessToken()).toBe('e2e-access-token')
 

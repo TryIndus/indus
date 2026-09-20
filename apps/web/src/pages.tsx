@@ -1,18 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { ArrowUpRight, Search as SearchIcon, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { z } from 'zod'
 import { favoritePageSchema, favoriteRequest, favoriteSchema, fundamentalsSchema, instrumentPageSchema, marketSummarySchema, portfolioPageSchema, portfolioRequest, portfolioSchema, reportPageSchema, reportRequest, reportSchema, userSchema, userUpdateRequest, type ReportPage } from './lib/api'
 import { useAppContext } from './app-context'
 import { EmptyState, ErrorState, LoadingState, PageHeader } from './components/States'
 import { LivePriceCard } from './components/LivePrice'
-
-export function AuthCallbackPage() {
-	const { auth } = useAppContext(); const navigate = useNavigate(); const [error, setError] = useState('')
-	useEffect(() => { void auth.completeSignIn().then(() => navigate({ to: '/dashboard', replace: true })).catch(cause => setError(cause instanceof Error ? cause.message : 'Sign in could not be completed.')) }, [auth, navigate])
-	return <main className="grid min-h-screen place-items-center p-5"><section className="card w-full max-w-md text-center">{error ? <><h1 className="text-2xl font-semibold">Sign in failed</h1><p role="alert" className="mt-3 text-rose-300">{error}</p><a href="/auth" className="mt-5 inline-block text-primary">Try again</a></> : <><h1 className="text-2xl font-semibold">Completing sign in</h1><p role="status" className="muted mt-3">Verifying your secure session…</p></>}</section></main>
-}
 
 export function DashboardPage() {
   const { api } = useAppContext(); const summary = useQuery({ queryKey: ['market-summary'], queryFn: ({ signal }) => api.get('/v1/market/summary', marketSummarySchema, signal), retry: 1 })
