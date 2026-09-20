@@ -6,6 +6,7 @@ import { AppContextProvider } from './app-context'
 import type { AppContext } from './lib/context'
 import { unavailableMarketStream } from './lib/market-stream'
 import { makeRouter } from './router'
+import type { AuthAdapter } from './lib/auth'
 
 const now = '2026-08-05T12:00:00.000Z'
 function responseFor(path: string): unknown {
@@ -34,8 +35,9 @@ function context(authenticated: boolean, resolve: (path: string) => unknown | Pr
   }
 }
 
-async function renderPath(path: string, authenticated: boolean, resolve?: (path: string) => unknown | Promise<unknown>, mutate?: (path: string, method: string, body: unknown, idempotencyKey: string) => unknown | Promise<unknown>) {
+async function renderPath(path: string, authenticated: boolean, resolve?: (path: string) => unknown | Promise<unknown>, mutate?: (path: string, method: string, body: unknown, idempotencyKey: string) => unknown | Promise<unknown>, authOverrides?: Partial<AuthAdapter>) {
   const value = context(authenticated, resolve, mutate)
+  Object.assign(value.auth, authOverrides)
   const router = makeRouter(value, createMemoryHistory({ initialEntries: [path] }))
   render(<AppContextProvider value={value}><QueryClientProvider client={value.queryClient}><RouterProvider router={router} /></QueryClientProvider></AppContextProvider>)
   await waitFor(() => expect(router.state.status).toBe('idle'))
@@ -43,10 +45,56 @@ async function renderPath(path: string, authenticated: boolean, resolve?: (path:
 }
 
 describe('application routing', () => {
+  it('renders the PR 17 public landing experience', async () => {
+    await renderPath('/', false)
+    expect(await screen.findByRole('heading', { name: 'Financial intelligence, in context.' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Start researching' })).toHaveAttribute('href', '/auth')
+    expect(screen.getByRole('heading', { name: 'Research a company without switching tools.' })).toBeVisible()
+  })
+
   it('redirects an anonymous user away from protected pages', async () => {
     const router = await renderPath('/reports', false)
     await waitFor(() => expect(router.state.location.pathname).toBe('/auth'))
     expect(await screen.findByRole('heading', { name: 'Continue your research.' })).toBeVisible()
+  })
+
+  it('supports embedded Cognito account and recovery flows', async () => {
+    let passwordAuthenticated = false
+    const passwordSignIn = vi.fn(async () => { passwordAuthenticated = true })
+    const getUser = vi.fn(async () => passwordAuthenticated ? { id: 'user-1', email: 'user@example.test' } : null)
+    const signUp = vi.fn(async () => 'confirmation-required' as const)
+    const confirmSignUp = vi.fn(async () => {})
+    const requestPasswordReset = vi.fn(async () => {})
+    const confirmPasswordReset = vi.fn(async () => {})
+    const router = await renderPath('/auth', false, undefined, undefined, { getUser, passwordSignIn, signUp, confirmSignUp, requestPasswordReset, confirmPasswordReset })
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(passwordSignIn).toHaveBeenCalledWith('user@example.test', 'password123'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
+
+    cleanupView()
+    await renderPath('/auth', false, undefined, undefined, { signUp, confirmSignUp, requestPasswordReset, confirmPasswordReset })
+    fireEvent.click(screen.getByRole('button', { name: 'Create an account' }))
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Avery' } })
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Investor' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm account' }))
+    expect(await screen.findByRole('heading', { name: 'Continue your research.' })).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send recovery code' }))
+    expect(await screen.findByRole('button', { name: 'Set new password' })).toBeVisible()
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '654321' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'newpassword123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }))
+    await waitFor(() => expect(confirmPasswordReset).toHaveBeenCalledWith('user@example.test', '654321', 'newpassword123'))
   })
 
   it('renders the authenticated dashboard with an empty watchlist state', async () => {
