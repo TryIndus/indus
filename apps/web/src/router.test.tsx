@@ -11,6 +11,7 @@ import type { AuthAdapter } from './lib/auth'
 const now = '2026-08-05T12:00:00.000Z'
 function responseFor(path: string): unknown {
   if (path === '/v1/market/summary') return { indices: [], watchlist: [] }
+  if (path.startsWith('/v1/market/history/')) return { symbol: 'AAPL', currency: 'USD', range: '1y', points: [{ timestamp: '2025-08-05T12:00:00.000Z', close: 180 }, { timestamp: now, close: 218.27 }] }
   if (path.startsWith('/v1/fundamentals/')) return { symbol: 'AAPL', as_of: now, source: 'Yahoo Finance', metrics: { regularMarketPrice: 218.27, market_cap: 3_200_000_000_000, net_margin: 0.25 } }
   if (path === '/v1/me') return { id: '00000000-0000-4000-8000-000000000001', email: 'user@example.test', display_name: 'Avery Investor', created_at: now, updated_at: now }
   return { next_cursor: null, items: [] }
@@ -110,12 +111,22 @@ describe('application routing', () => {
     await renderPath('/company/aapl', true)
     expect(await screen.findByRole('heading', { name: 'AAPL' })).toBeVisible()
     expect(screen.getByText('Market Price')).toBeVisible()
-    expect(screen.getAllByText('$218.27')).toHaveLength(2)
+    expect(screen.getAllByText('$218.27')).toHaveLength(3)
     expect(screen.getByText('Market Cap')).toBeVisible()
     expect(screen.getByText(/^\$3\.2/)).toBeVisible()
     expect(screen.getByText('25.0%')).toBeVisible()
     expect(screen.queryByText('market_cap')).not.toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: 'AAPL one-year closing price chart' })).toBeVisible()
+    expect(screen.getByText(/AAPL is trading at \$218\.27/)).toBeVisible()
     expect(screen.getByText(/Source: Yahoo Finance/)).toBeVisible()
+  })
+
+  it('generates a grounded company research brief on demand', async () => {
+    const mutation = vi.fn(() => ({ conversation_id: '00000000-0000-4000-8000-000000000010', message: { role: 'assistant', content: 'Apple has durable cash flow.' }, sources: [{ label: 'yahoo:spark:AAPL', as_of: now }], usage: { input_tokens: 20, output_tokens: 8 } }))
+    await renderPath('/company/AAPL', true, undefined, mutation)
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate brief' }))
+    expect(await screen.findByText('Apple has durable cash flow.')).toBeVisible()
+    expect(mutation).toHaveBeenCalledWith('/v1/chat', 'POST', expect.objectContaining({ symbol: 'AAPL' }), expect.stringMatching(/^[0-9a-f-]{36}$/))
   })
 
   it('renders loading and empty resource states', async () => {

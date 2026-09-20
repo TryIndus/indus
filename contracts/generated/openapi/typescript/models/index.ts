@@ -19,6 +19,8 @@ export * from './Health';
 export * from './InstrumentSearchPage';
 export * from './InstrumentSearchResult';
 export * from './InstrumentType';
+export * from './MarketHistory';
+export * from './MarketHistoryPointsInner';
 export * from './MarketQuote';
 export * from './MarketSummary';
 export * from './MetricExplanation';

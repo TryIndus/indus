@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { favoritePageSchema, fundamentalsSchema, instrumentPageSchema, portfolioPageSchema, reportPageSchema, userSchema } from './api'
+import { favoritePageSchema, fundamentalsSchema, instrumentPageSchema, marketHistorySchema, portfolioPageSchema, reportPageSchema, userSchema } from './api'
 
 const generatedRoot = resolve(process.cwd(), '../../contracts/generated/openapi/typescript')
 const readGenerated = (path: string) => readFileSync(resolve(generatedRoot, path), 'utf8')
@@ -13,12 +13,14 @@ const modelFields: Record<string, string[]> = {
   'models/Portfolio.ts': ['id', 'name', 'base_currency', 'created_at', 'updated_at'],
   'models/Report.ts': ['id', 'symbol', 'portfolio_id', 'title', 'status', 'failure_code', 'created_at', 'updated_at'],
   'models/Fundamentals.ts': ['symbol', 'as_of', 'source', 'metrics'],
+  'models/MarketHistory.ts': ['symbol', 'currency', 'range', 'points'],
   'models/User.ts': ['id', 'email', 'display_name', 'created_at', 'updated_at'],
 }
 
 const endpoints: Record<string, string[]> = {
   'apis/InstrumentsApi.ts': ['`/v1/instruments/search`', "method: 'GET'"],
   'apis/FundamentalsApi.ts': ['`/v1/fundamentals/{symbol}`', "method: 'GET'"],
+  'apis/MarketApi.ts': ['`/v1/market/history/{symbol}`', "method: 'GET'"],
   'apis/FavoritesApi.ts': ['`/v1/favorites`', "method: 'POST'", "headerParameters['Idempotency-Key']"],
   'apis/PortfoliosApi.ts': ['`/v1/portfolios`', "method: 'POST'", "headerParameters['Idempotency-Key']"],
   'apis/ReportsApi.ts': ['`/v1/reports`', "method: 'POST'", "headerParameters['Idempotency-Key']"],
@@ -47,6 +49,7 @@ describe('hand-maintained Rails wire adapter', () => {
     expect(portfolioPageSchema.safeParse({ next_cursor: null, items: [{ id, name: 'Core', base_currency: 'USD', created_at: at, updated_at: at }] }).success).toBe(true)
     expect(reportPageSchema.safeParse({ next_cursor: null, items: [{ id, symbol: 'AAPL', title: 'Apple research', status: 'queued', created_at: at, updated_at: at }] }).success).toBe(true)
     expect(fundamentalsSchema.safeParse({ symbol: 'AAPL', as_of: at, source: 'provider', metrics: {} }).success).toBe(true)
+    expect(marketHistorySchema.safeParse({ symbol: 'AAPL', currency: 'USD', range: '1y', points: [{ timestamp: at, close: 200 }] }).success).toBe(true)
     expect(userSchema.safeParse({ id, email: 'user@example.test', display_name: 'Investor', created_at: at, updated_at: at }).success).toBe(true)
     expect(userSchema.safeParse({ id, email: 'user@example.test', displayName: 'drifted', createdAt: at, updatedAt: at }).success).toBe(false)
   })

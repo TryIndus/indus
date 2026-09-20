@@ -403,6 +403,30 @@ paths:
           $ref: "#/components/responses/TooManyRequests"
         "502":
           $ref: "#/components/responses/BadGateway"
+  /v1/market/history/{symbol}:
+    get:
+      tags: [Market]
+      operationId: getMarketHistory
+      summary: Return one year of daily closing prices for an instrument.
+      parameters:
+        - $ref: "#/components/parameters/SymbolPath"
+      responses:
+        "200":
+          description: A bounded historical price series.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketHistory"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "502":
+          $ref: "#/components/responses/BadGateway"
   /v1/instruments/search:
     get:
       tags: [Instruments]
@@ -1040,6 +1064,33 @@ components:
           maxItems: 100
           items:
             $ref: "#/components/schemas/WatchlistQuote"
+    MarketHistory:
+      type: object
+      additionalProperties: false
+      required: [symbol, currency, range, points]
+      properties:
+        symbol:
+          $ref: "#/components/schemas/Symbol"
+        currency:
+          $ref: "#/components/schemas/CurrencyCode"
+        range:
+          type: string
+          const: 1y
+        points:
+          type: array
+          minItems: 1
+          maxItems: 400
+          items:
+            type: object
+            additionalProperties: false
+            required: [timestamp, close]
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              close:
+                type: number
+                minimum: 0
     MarketQuote:
       type: object
       additionalProperties: false
