@@ -22,7 +22,7 @@ test.beforeEach(async ({ context, page }) => {
 
 test('renders an authenticated dashboard using the Rails contract', async ({ page }) => {
   await page.goto('/dashboard')
-  await expect(page.getByRole('heading', { name: 'Good morning' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Company research' })).toBeVisible()
   await expect(page.getByRole('link', { name: /AAPL/ })).toBeVisible()
 })
 
@@ -64,7 +64,7 @@ test('cancels an active report through the idempotent Rails boundary', async ({ 
 
 test('authenticated dashboard has no serious accessibility violations', async ({ page }) => {
   await page.goto('/dashboard')
-  await expect(page.getByRole('heading', { name: 'Good morning' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Company research' })).toBeVisible()
   const results = await new AxeBuilder({ page }).analyze()
   expect(results.violations.filter(item => ['serious', 'critical'].includes(item.impact ?? ''))).toEqual([])
 })
