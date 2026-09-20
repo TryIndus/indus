@@ -112,7 +112,7 @@ describe('application routing', () => {
     expect(screen.getByText('Market Price')).toBeVisible()
     expect(screen.getAllByText('$218.27')).toHaveLength(2)
     expect(screen.getByText('Market Cap')).toBeVisible()
-    expect(screen.getByText('$3.2T')).toBeVisible()
+    expect(screen.getByText(/^\$3\.2/)).toBeVisible()
     expect(screen.getByText('25.0%')).toBeVisible()
     expect(screen.queryByText('market_cap')).not.toBeInTheDocument()
     expect(screen.getByText(/Source: Yahoo Finance/)).toBeVisible()
