@@ -59,6 +59,17 @@ describe('authentication adapter selection', () => {
     await expect(auth.confirmPasswordReset?.('USER@EXAMPLE.TEST', '654321', 'newpassword123')).resolves.toBeUndefined()
   })
 
+  it('turns an unexpected MFA setup challenge into a bounded sign-in error', async () => {
+    vi.spyOn(CognitoUser.prototype, 'authenticateUser').mockImplementation((_details, callbacks) => {
+      callbacks.mfaSetup?.('MFA_SETUP', {})
+      return undefined as never
+    })
+
+    const auth = configuredAdapter()
+    await expect(auth.passwordSignIn('user@example.test', 'Password123!Secure'))
+      .rejects.toThrow('Multi-factor authentication is still enabled')
+  })
+
   it('reads and clears a valid Cognito password session', async () => {
     const signOut = vi.fn()
     const session = {

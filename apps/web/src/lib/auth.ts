@@ -46,6 +46,10 @@ class CognitoAuthAdapter implements AuthAdapter {
     await new Promise<void>((resolve, reject) => user.authenticateUser(authentication, {
       onSuccess: () => resolve(), onFailure: reject,
       newPasswordRequired: () => reject(new Error('A new password is required. Use account recovery to continue.')),
+      mfaRequired: () => reject(new Error('Multi-factor authentication is still enabled for this account. Please try again after the Cognito configuration is updated.')),
+      totpRequired: () => reject(new Error('Multi-factor authentication is still enabled for this account. Please try again after the Cognito configuration is updated.')),
+      mfaSetup: () => reject(new Error('Multi-factor authentication is still enabled for this account. Please try again after the Cognito configuration is updated.')),
+      selectMFAType: () => reject(new Error('Multi-factor authentication is still enabled for this account. Please try again after the Cognito configuration is updated.')),
     }))
   }
 
