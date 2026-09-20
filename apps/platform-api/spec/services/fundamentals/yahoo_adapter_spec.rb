@@ -2,18 +2,24 @@ require "rails_helper"
 
 RSpec.describe Fundamentals::YahooAdapter do
   class FakeFundamentalsTransport
-    attr_reader :request
+    attr_reader :requests
 
-    def initialize(body:) = @body = body
+    def initialize(body: nil, bodies: nil)
+      @bodies = bodies || [ body ]
+      @requests = []
+    end
+
+    def request = requests.last
 
     def start(*)
       http = Object.new
       owner = self
       http.define_singleton_method(:request) do |request|
-        owner.instance_variable_set(:@request, request)
+        owner.requests << request
         response = Net::HTTPOK.new("1.1", "200", "OK")
         response.instance_variable_set(:@read, true)
-        response.body = owner.instance_variable_get(:@body)
+        bodies = owner.instance_variable_get(:@bodies)
+        response.body = bodies.length > 1 ? bodies.shift : bodies.first
         response
       end
       yield http
@@ -29,6 +35,26 @@ RSpec.describe Fundamentals::YahooAdapter do
     expect(snapshot.to_h).to include(symbol: "AAPL", source_reference: "yahoo:spark:AAPL",
       metrics: include("regularMarketPrice" => 218.27, "shortName" => "Apple Inc."))
     expect(transport.request["User-Agent"]).to eq("Indus/1.0")
+  end
+
+  it "adds income, balance-sheet, cash-flow, valuation, and derived metrics" do
+    quote = { spark: { result: [ { symbol: "AAPL", response: [ { meta: {
+      regularMarketPrice: 218.27, shortName: "Apple Inc."
+    } } ] } ] } }.to_json
+    timeseries = { timeseries: { result: [
+      { trailingMarketCap: [ { reportedValue: { raw: 3_200_000_000_000 } } ] },
+      { trailingTotalRevenue: [ { reportedValue: { raw: 400_000_000_000 } } ] },
+      { trailingNetIncome: [ { reportedValue: { raw: 100_000_000_000 } } ] },
+      { quarterlyCurrentAssets: [ { reportedValue: { raw: 150_000_000_000 } } ] },
+      { quarterlyCurrentLiabilities: [ { reportedValue: { raw: 100_000_000_000 } } ] }
+    ] } }.to_json
+    transport = FakeFundamentalsTransport.new(bodies: [ quote, timeseries ])
+
+    metrics = described_class.new(transport: transport).fetch(symbol: "AAPL").metrics
+
+    expect(metrics).to include("market_cap" => 3_200_000_000_000, "revenue_ttm" => 400_000_000_000,
+      "net_income_ttm" => 100_000_000_000, "net_margin" => 0.25, "current_ratio" => 1.5)
+    expect(transport.requests.length).to eq(2)
   end
 
   it "fetches a bounded symbol batch in one provider request" do

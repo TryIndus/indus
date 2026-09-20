@@ -11,7 +11,7 @@ import type { AuthAdapter } from './lib/auth'
 const now = '2026-08-05T12:00:00.000Z'
 function responseFor(path: string): unknown {
   if (path === '/v1/market/summary') return { indices: [], watchlist: [] }
-  if (path.startsWith('/v1/fundamentals/')) return { symbol: 'AAPL', as_of: now, source: 'Yahoo Finance', metrics: { market_cap: 3_200_000_000_000 } }
+  if (path.startsWith('/v1/fundamentals/')) return { symbol: 'AAPL', as_of: now, source: 'Yahoo Finance', metrics: { regularMarketPrice: 218.27, market_cap: 3_200_000_000_000, net_margin: 0.25 } }
   if (path === '/v1/me') return { id: '00000000-0000-4000-8000-000000000001', email: 'user@example.test', display_name: 'Avery Investor', created_at: now, updated_at: now }
   return { next_cursor: null, items: [] }
 }
@@ -109,6 +109,12 @@ describe('application routing', () => {
   it('normalizes company symbols for display', async () => {
     await renderPath('/company/aapl', true)
     expect(await screen.findByRole('heading', { name: 'AAPL' })).toBeVisible()
+    expect(screen.getByText('Market Price')).toBeVisible()
+    expect(screen.getAllByText('$218.27')).toHaveLength(2)
+    expect(screen.getByText('Market Cap')).toBeVisible()
+    expect(screen.getByText('$3.2T')).toBeVisible()
+    expect(screen.getByText('25.0%')).toBeVisible()
+    expect(screen.queryByText('market_cap')).not.toBeInTheDocument()
     expect(screen.getByText(/Source: Yahoo Finance/)).toBeVisible()
   })
 

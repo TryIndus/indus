@@ -22,7 +22,7 @@ export function SearchPage() {
 export function CompanyPage() {
   const { api } = useAppContext(); const { symbol } = useParams({ from: '/_protected/company/$symbol' }); const normalized = symbol.toUpperCase()
   const fundamentals = useQuery({ queryKey: ['fundamentals', normalized], queryFn: ({ signal }) => api.get(`/v1/fundamentals/${encodeURIComponent(normalized)}`, fundamentalsSchema, signal), retry: 1 })
-  return <><PageHeader eyebrow="Company research" title={normalized}>Fundamentals, valuation, market evidence, and model-assisted explanations.</PageHeader>{fundamentals.isPending ? <LoadingState label="Loading fundamentals" /> : fundamentals.isError ? <ErrorState retry={() => fundamentals.refetch()} /> : <div className="grid gap-4 lg:grid-cols-2"><LivePriceCard symbol={normalized} /><section className="card"><h2 className="font-semibold">Fundamentals</h2>{Object.keys(fundamentals.data.metrics).length === 0 ? <EmptyState title="No metrics available" detail="The provider has not published fundamentals for this instrument." /> : <dl className="mt-4 grid grid-cols-2 gap-4">{Object.entries(fundamentals.data.metrics).map(([label, value]) => <div key={label}><dt className="muted text-xs uppercase tracking-wide">{label.replaceAll('_', ' ')}</dt><dd className="mt-1 font-semibold">{value ?? '—'}</dd></div>)}</dl>}<p className="muted mt-5 text-xs">Source: {fundamentals.data.source} · As of {new Date(fundamentals.data.as_of).toLocaleDateString()}</p></section><section className="card lg:col-span-2"><h2 className="flex items-center gap-2 font-semibold"><Sparkles className="text-primary" size={18} />Research brief</h2><p className="muted mt-3">Generated analysis will cite provider evidence and preserve request boundaries.</p></section></div>}</>
+  return <><PageHeader eyebrow="Company research" title={normalized}>Fundamentals, valuation, market evidence, and model-assisted explanations.</PageHeader>{fundamentals.isPending ? <LoadingState label="Loading fundamentals" /> : fundamentals.isError ? <ErrorState retry={() => fundamentals.refetch()} /> : <div className="grid gap-4 lg:grid-cols-2"><LivePriceCard symbol={normalized} fallbackPrice={numericMetric(fundamentals.data.metrics.regularMarketPrice)} /><section className="card"><h2 className="font-semibold">Fundamentals</h2>{Object.keys(fundamentals.data.metrics).length === 0 ? <EmptyState title="No metrics available" detail="The provider has not published fundamentals for this instrument." /> : <dl className="mt-4 grid grid-cols-2 gap-4">{orderedMetrics(fundamentals.data.metrics).map(([label, value]) => <div key={label}><dt className="muted text-xs uppercase tracking-wide">{metricLabel(label)}</dt><dd className="mt-1 font-semibold">{metricValue(label, value)}</dd></div>)}</dl>}<p className="muted mt-5 text-xs">Source: {fundamentals.data.source} · As of {new Date(fundamentals.data.as_of).toLocaleDateString()}</p></section><section className="card lg:col-span-2"><h2 className="flex items-center gap-2 font-semibold"><Sparkles className="text-primary" size={18} />Research brief</h2><p className="muted mt-3">Generated analysis will cite provider evidence and preserve request boundaries.</p></section></div>}</>
 }
 
 export function CryptoPage() {
@@ -64,4 +64,41 @@ export function SettingsPage() {
 
 function Change({ value }: { value: number }) { return <span className={`ml-2 text-sm ${value >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{value >= 0 ? '+' : ''}{value.toFixed(2)}%</span> }
 function money(value: number) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value) }
+const metricLabels: Record<string, string> = {
+  regularMarketPrice: 'Market Price', regularMarketChangePercent: 'Daily Change', regularMarketDayHigh: 'Day High', regularMarketDayLow: 'Day Low',
+  regularMarketVolume: 'Volume', fiftyTwoWeekHigh: '52-Week High', fiftyTwoWeekLow: '52-Week Low', shortName: 'Company', market_cap: 'Market Cap',
+  trailing_pe_ratio: 'P/E Ratio', revenue_ttm: 'Revenue (TTM)', gross_profit_ttm: 'Gross Profit (TTM)', operating_income_ttm: 'Operating Income (TTM)',
+  net_income_ttm: 'Net Income (TTM)', ebitda_ttm: 'EBITDA (TTM)', diluted_eps_ttm: 'Diluted EPS (TTM)', operating_cash_flow_ttm: 'Operating Cash Flow (TTM)',
+  free_cash_flow_ttm: 'Free Cash Flow (TTM)', total_assets: 'Total Assets', total_debt: 'Total Debt', stockholders_equity: 'Stockholders’ Equity',
+  cash_and_equivalents: 'Cash & Equivalents', current_assets: 'Current Assets', current_liabilities: 'Current Liabilities', gross_margin: 'Gross Margin',
+  operating_margin: 'Operating Margin', net_margin: 'Net Margin', current_ratio: 'Current Ratio', debt_to_equity: 'Debt to Equity',
+}
+const priceMetrics = new Set(['regularMarketPrice', 'regularMarketDayHigh', 'regularMarketDayLow', 'fiftyTwoWeekHigh', 'fiftyTwoWeekLow', 'diluted_eps_ttm'])
+const compactCurrencyMetrics = new Set(['market_cap', 'revenue_ttm', 'gross_profit_ttm', 'operating_income_ttm', 'net_income_ttm', 'ebitda_ttm', 'operating_cash_flow_ttm', 'free_cash_flow_ttm', 'total_assets', 'total_debt', 'stockholders_equity', 'cash_and_equivalents', 'current_assets', 'current_liabilities'])
+const ratioMetrics = new Set(['trailing_pe_ratio', 'current_ratio', 'debt_to_equity'])
+const marginMetrics = new Set(['gross_margin', 'operating_margin', 'net_margin'])
+
+function orderedMetrics(metrics: Record<string, number | string | null>) {
+  const order = Object.keys(metricLabels)
+  return Object.entries(metrics).sort(([left], [right]) => {
+    const leftIndex = order.indexOf(left); const rightIndex = order.indexOf(right)
+    return (leftIndex < 0 ? order.length : leftIndex) - (rightIndex < 0 ? order.length : rightIndex)
+  })
+}
+function numericMetric(value: number | string | null | undefined) { return typeof value === 'number' ? value : undefined }
+function metricLabel(key: string) {
+  if (metricLabels[key]) return metricLabels[key]
+  return key.replaceAll('_', ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/\b\w/g, character => character.toUpperCase())
+}
+function metricValue(key: string, value: number | string | null) {
+  if (value === null) return '—'
+  if (typeof value === 'string') return value
+  if (priceMetrics.has(key)) return money(value)
+  if (compactCurrencyMetrics.has(key)) return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 2 }).format(value)
+  if (key === 'regularMarketVolume') return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+  if (key === 'regularMarketChangePercent') return `${value.toFixed(2)}%`
+  if (marginMetrics.has(key)) return `${(value * 100).toFixed(1)}%`
+  if (ratioMetrics.has(key)) return `${value.toFixed(2)}×`
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)
+}
 const zUndefined = z.undefined()
