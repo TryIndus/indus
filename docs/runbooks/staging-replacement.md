@@ -8,10 +8,10 @@ The default legacy deployment remains available without the flag.
 
 Configure these public GitHub staging Environment variables before dispatch:
 
-- `STAGING_WEB_ORIGIN`: the HTTPS public origin, without a trailing slash.
-- `STAGING_COGNITO_AUTHORITY`: the Cognito user-pool issuer URL
+- `WEB_ORIGIN`: the HTTPS public origin, without a trailing slash.
+- `COGNITO_AUTHORITY`: the Cognito user-pool issuer URL
   (`https://cognito-idp.us-east-1.amazonaws.com/<pool-id>`), used to identify the user pool.
-- `STAGING_COGNITO_CLIENT_ID`: the public web client ID.
+- `COGNITO_CLIENT_ID`: the public web client ID.
 
 Existing repository build-role and region variables are also required.
 These values are public browser configuration; never supply provider keys here.
@@ -27,6 +27,9 @@ images; a failed publication does not update deployment references.
 Before activating the platform, provision its stateful dependencies, workload
 roles, target groups, secrets, and private configuration. Verify a database
 backup and approved rollback point before synchronizing migration jobs.
+The current report path runs through Sidekiq and does not require a Temporal
+Cloud namespace; the compatibility placeholders in the private Terraform
+output are not consumed by the deployed workloads.
 Retain previous verified digests for image rollback and use forward migrations
 or restoration to a new database for data recovery. Production promotion,
 Supabase migration, and legacy retirement require separate approval.
