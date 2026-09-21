@@ -91,6 +91,18 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
       "metrics" => { "regularMarketPrice" => 200.0 })
   end
 
+  it "returns normalized historical closing prices" do
+    snapshot = MarketHistory::Snapshot.new(symbol: "AAPL", currency: "USD",
+      points: [ { timestamp: "2026-08-05T10:00:00Z", close: 200.0 } ])
+    provider = instance_double(MarketHistory::YahooAdapter, fetch: snapshot)
+    allow(MarketHistory::YahooAdapter).to receive(:new).and_return(provider)
+
+    get "/v1/market/history/AAPL", headers: auth
+
+    expect(JSON.parse(response.body)).to eq("symbol" => "AAPL", "currency" => "USD", "range" => "1y",
+      "points" => [ { "timestamp" => "2026-08-05T10:00:00Z", "close" => 200.0 } ])
+  end
+
   it "returns a bounded instrument search page" do
     search = instance_double(Instruments::YahooSearchAdapter,
       search: [ { symbol: "AAPL", name: "Apple Inc.", instrument_type: "equity", exchange: "NMS" } ])

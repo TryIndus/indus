@@ -36,7 +36,7 @@ This is the target architecture, not a description of the current repository. Do
 | Financial data | Alpaca for live and historical market data; a provider boundary for fundamentals with temporary Yahoo Finance compatibility |
 | Models | Application-owned `ModelGateway` with a Google Gemini adapter using the official Gemini REST API |
 | Object storage | Amazon S3 for generated reports, exports, raw events, and audit artifacts |
-| Identity | Amazon Cognito using OAuth 2.0/OIDC, JWTs, MFA, and scoped roles |
+| Identity | Amazon Cognito email/password authentication using SRP, JWTs, and scoped roles |
 | Containers | Amazon EKS, Amazon ECR, Kubernetes, Helm |
 | Delivery | GitHub Actions with AWS OIDC, Argo CD, immutable image promotion |
 | Infrastructure | Terraform with reusable modules and isolated environment state |
@@ -252,7 +252,7 @@ Acceptance criteria:
 - Establish the monorepo layout, pinned containerized toolchains, and documented local orchestration while preserving the root Next.js application.
 - Publish OpenAPI and event contracts and generate a typed React client deterministically.
 - Implement the Rails API with PostgreSQL, Active Record migrations, Pundit authorization, RSpec, idempotency, audit records, transactional outbox, Sidekiq, structured logging, and OpenTelemetry.
-- Implement Cognito hosted sign-in with authorization code and PKCE in the React application. The Rails API accepts only Cognito access tokens issued to its configured public client and retrieves verified profile attributes from Cognito.
+- Implement Cognito email/password sign-in with SRP in the React application. The Rails API accepts only Cognito access tokens issued to its configured public client and retrieves verified profile attributes from Cognito.
 - Preserve Yahoo Finance behavior behind a fundamentals-provider interface and verify compatibility with fixtures and shadow comparisons.
 - Implement the React/Vite application for authentication, dashboard, search, company, crypto, favorites, portfolios, reports, and settings without changing production traffic.
 - Implement the provider-neutral `ModelGateway`, Gemini REST adapter, versioned prompts, structured outputs, allowlisted tools, quotas, and golden evaluations. Use the Phase 1 Secrets Manager and workload-identity boundary only when a replacement workload is deployed to a non-production AWS environment.

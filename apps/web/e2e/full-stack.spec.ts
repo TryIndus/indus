@@ -28,15 +28,17 @@ test.describe('Chromium full-stack journeys', () => {
   test('fails closed, signs in locally, and signs out of protected routes', async ({ page }) => {
     await page.goto('/reports')
     await expect(page).toHaveURL(/\/auth(?:\?.*)?$/)
-    await expect(page.getByRole('heading', { name: 'Welcome to Indus' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Continue your research.' })).toBeVisible()
 
     const summary = page.waitForResponse(response =>
       response.url() === `${apiUrl}/v1/market/summary` && response.request().method() === 'GET')
-    await page.getByRole('button', { name: 'Continue to secure sign in' }).click()
+    await page.getByLabel('Email').fill('investor@example.test')
+    await page.locator('input[autocomplete="current-password"]').fill('Password123!Secure')
+    await page.getByRole('button', { name: 'Sign in' }).click()
 
     expect((await summary).status()).toBe(200)
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(page.getByRole('heading', { name: 'Good morning' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Company research' })).toBeVisible()
     await expect(page.getByText('SPY', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Sign out' }).click()
@@ -70,7 +72,10 @@ test.describe('Chromium full-stack journeys', () => {
     await expect(page.getByRole('link', { name: /TSLA/ })).toBeVisible()
     await page.getByRole('link', { name: /TSLA/ }).click()
     await expect(page.getByRole('heading', { name: 'TSLA' })).toBeVisible()
-    await expect(page.getByText('marketCap')).toBeVisible()
+    await expect(page.getByText('Market Cap')).toBeVisible()
+    await expect(page.getByRole('img', { name: 'TSLA one-year closing price chart' })).toBeVisible()
+    await expect(page.getByText(/TSLA Holdings is trading at/)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Generate brief' })).toBeVisible()
 
     await page.goto('/favorites')
     const deleted = page.waitForResponse(response =>
@@ -139,7 +144,7 @@ test.describe('Chromium full-stack journeys', () => {
 
   test('keeps the compiled sign-in shell within its local load budget', async ({ page }) => {
     await page.goto('/auth')
-    await expect(page.getByRole('button', { name: 'Continue to secure sign in' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
     const loadTime = await page.evaluate(() => {
       const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming
       return navigation.loadEventEnd - navigation.startTime

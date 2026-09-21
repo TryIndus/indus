@@ -48,7 +48,27 @@ if Rails.env.test? && ENV["E2E_TEST_BOUNDARY"] == "true"
       end
     end.new
 
+    history_provider = Class.new do
+      def fetch(symbol:)
+        normalized = symbol.to_s.upcase
+        unless normalized.match?(/\A[A-Z0-9]+(?:[.\/-][A-Z0-9]+)?\z/) && normalized.length <= 20
+          raise FundamentalsProvider::InvalidSymbol
+        end
+
+        MarketHistory::Snapshot.new(
+          symbol: normalized,
+          currency: "USD",
+          points: [
+            { timestamp: "2026-01-02T21:00:00Z", close: 180.0 },
+            { timestamp: "2026-05-01T20:00:00Z", close: 192.5 },
+            { timestamp: "2026-09-01T20:00:00Z", close: 200.0 }
+          ]
+        )
+      end
+    end.new
+
     Authentication.verifier = verifier
     FundamentalsProvider.define_singleton_method(:default) { provider }
+    MarketHistory::YahooAdapter.define_singleton_method(:new) { history_provider }
   end
 end

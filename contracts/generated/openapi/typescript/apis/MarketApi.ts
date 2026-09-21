@@ -19,15 +19,77 @@ import {
     ErrorEnvelopeToJSON,
 } from '../models/ErrorEnvelope';
 import {
+    type MarketHistory,
+    MarketHistoryFromJSON,
+    MarketHistoryToJSON,
+} from '../models/MarketHistory';
+import {
     type MarketSummary,
     MarketSummaryFromJSON,
     MarketSummaryToJSON,
 } from '../models/MarketSummary';
 
+export interface GetMarketHistoryRequest {
+    symbol: string;
+}
+
 /**
  *
  */
 export class MarketApi extends runtime.BaseAPI {
+
+    /**
+     * Creates request options for getMarketHistory without sending the request
+     */
+    async getMarketHistoryRequestOpts(requestParameters: GetMarketHistoryRequest): Promise<runtime.RequestOpts> {
+        if (requestParameters['symbol'] == null) {
+            throw new runtime.RequiredError(
+                'symbol',
+                'Required parameter "symbol" was null or undefined when calling getMarketHistory().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+        if (this.configuration && this.configuration.accessToken) {
+            const token = this.configuration.accessToken;
+            const tokenString = await token("bearerAuth", []);
+
+            if (tokenString) {
+                headerParameters["Authorization"] = `Bearer ${tokenString}`;
+            }
+        }
+
+        let urlPath = `/v1/market/history/{symbol}`;
+        urlPath = urlPath.replace('{symbol}', encodeURIComponent(String(requestParameters['symbol'])));
+
+        return {
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        };
+    }
+
+    /**
+     * Return one year of daily closing prices for an instrument.
+     */
+    async getMarketHistoryRaw(requestParameters: GetMarketHistoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<MarketHistory>> {
+        const requestOptions = await this.getMarketHistoryRequestOpts(requestParameters);
+        const response = await this.request(requestOptions, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => MarketHistoryFromJSON(jsonValue));
+    }
+
+    /**
+     * Return one year of daily closing prices for an instrument.
+     */
+    async getMarketHistory(requestParameters: GetMarketHistoryRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<MarketHistory> {
+        const response = await this.getMarketHistoryRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
 
     /**
      * Creates request options for getMarketSummary without sending the request
