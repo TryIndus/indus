@@ -11,6 +11,7 @@ Rails.application.routes.draw do
     resources :reports, only: %i[index show create destroy]
     post "reports/:id/cancel", to: "reports#cancel"
     get "market/summary", to: "market#summary"
+    get "market/history/:symbol", to: "market_history#show"
     get "instruments/search", to: "instruments#search"
     get "fundamentals/:symbol", to: "fundamentals#show"
     post "explanations", to: "explanations#create"
@@ -27,6 +28,7 @@ Rails.application.routes.draw do
       resources :reports, only: %i[index show create destroy]
       post "reports/:id/cancel", to: "reports#cancel"
       get "market/summary", to: "market#summary"
+      get "market/history/:symbol", to: "market_history#show"
       get "instruments/search", to: "instruments#search"
       get "fundamentals/:symbol", to: "fundamentals#show"
       post "explanations", to: "explanations#create"

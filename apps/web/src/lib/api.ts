@@ -12,9 +12,10 @@ export interface ApiClient {
 }
 
 export function createApiClient(baseUrl: string, token: () => Promise<string | null>): ApiClient {
+  const resolvePath = (path: string) => new URL(path.replace(/^\/+/, ''), `${baseUrl.replace(/\/+$/, '')}/`)
   const request = async <T>(path: string, schema: ZodType<T>, options: RequestInit = {}) => {
     const accessToken = await token()
-    const response = await fetch(new URL(path, baseUrl), {
+    const response = await fetch(resolvePath(path), {
       ...options,
       headers: { Accept: 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...options.headers },
     })
@@ -46,6 +47,13 @@ export const reportPageSchema = page(reportSchema)
 export type Report = z.infer<typeof reportSchema>
 export type ReportPage = z.infer<typeof reportPageSchema>
 export const fundamentalsSchema = z.object({ symbol: z.string(), as_of: dateTime, source: z.string(), metrics: z.record(z.string(), z.union([z.number(), z.string(), z.null()])) })
+export const marketHistorySchema = z.object({ symbol: z.string(), currency: z.string().length(3), range: z.literal('1y'), points: z.array(z.object({ timestamp: dateTime, close: z.number().nonnegative() })).min(1).max(400) })
+export const chatResponseSchema = z.object({
+  conversation_id: z.string().uuid(),
+  message: z.object({ role: z.literal('assistant'), content: z.string() }),
+  sources: z.array(z.object({ label: z.string(), uri: z.string().optional(), as_of: dateTime })),
+  usage: z.object({ input_tokens: z.number().int().nonnegative(), output_tokens: z.number().int().nonnegative() }),
+})
 export const userSchema = z.object({ id: z.string().uuid(), email: z.string().email(), display_name: z.string(), created_at: dateTime, updated_at: dateTime })
 
 // This thin wire adapter mirrors the generated OpenAPI model names while keeping JSON casing explicit.

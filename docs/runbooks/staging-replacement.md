@@ -10,10 +10,9 @@ Configure these public GitHub staging Environment variables before dispatch:
 
 - `STAGING_WEB_ORIGIN`: the HTTPS public origin, without a trailing slash.
 - `STAGING_COGNITO_AUTHORITY`: the Cognito user-pool issuer URL
-  (`https://cognito-idp.us-east-1.amazonaws.com/<pool-id>`), used for OIDC discovery.
+  (`https://cognito-idp.us-east-1.amazonaws.com/<pool-id>`), used to identify the user pool.
 - `STAGING_COGNITO_CLIENT_ID`: the public web client ID.
 
-The Cognito client must allow `<origin>/auth/callback` and logout to `<origin>`.
 Existing repository build-role and region variables are also required.
 These values are public browser configuration; never supply provider keys here.
 

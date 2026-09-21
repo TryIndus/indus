@@ -1,3 +1,5 @@
+require_dependency "reports/research_activities"
+
 class ResearchReportJob < ApplicationJob
   queue_as :default
 

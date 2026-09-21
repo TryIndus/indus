@@ -3,11 +3,7 @@ resource "aws_cognito_user_pool" "this" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
   deletion_protection      = local.production ? "ACTIVE" : "INACTIVE"
-  mfa_configuration        = local.production ? "ON" : "OPTIONAL"
-
-  software_token_mfa_configuration {
-    enabled = true
-  }
+  mfa_configuration        = "OFF"
 
   password_policy {
     minimum_length                   = 14
@@ -28,6 +24,7 @@ resource "aws_cognito_user_pool_client" "web" {
   generate_secret                      = false
   prevent_user_existence_errors        = "ENABLED"
   enable_token_revocation              = true
+  explicit_auth_flows                  = ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_SRP_AUTH"]
   supported_identity_providers         = ["COGNITO"]
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]

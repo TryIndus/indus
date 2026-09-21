@@ -212,9 +212,7 @@ jobs:
             --build-arg "VITE_API_URL=$WEB_ORIGIN/api" \
             --build-arg "VITE_MARKET_STREAM_URL=$WEB_ORIGIN/stream" \
             --build-arg "VITE_COGNITO_AUTHORITY=$COGNITO_AUTHORITY" \
-            --build-arg "VITE_COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" \
-            --build-arg "VITE_COGNITO_REDIRECT_URI=$WEB_ORIGIN/auth/callback" \
-            --build-arg "VITE_COGNITO_LOGOUT_URI=$WEB_ORIGIN" .
+            --build-arg "VITE_COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" .
           echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
       - name: Scan platform-api
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0

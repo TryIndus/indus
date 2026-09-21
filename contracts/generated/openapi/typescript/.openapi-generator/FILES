@@ -32,6 +32,8 @@ docs/InstrumentSearchResult.md
 docs/InstrumentType.md
 docs/InstrumentsApi.md
 docs/MarketApi.md
+docs/MarketHistory.md
+docs/MarketHistoryPointsInner.md
 docs/MarketQuote.md
 docs/MarketSummary.md
 docs/MetricExplanation.md
@@ -77,6 +79,8 @@ models/Health.ts
 models/InstrumentSearchPage.ts
 models/InstrumentSearchResult.ts
 models/InstrumentType.ts
+models/MarketHistory.ts
+models/MarketHistoryPointsInner.ts
 models/MarketQuote.ts
 models/MarketSummary.ts
 models/MetricExplanation.ts
