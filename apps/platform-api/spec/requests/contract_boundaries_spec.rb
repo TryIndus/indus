@@ -24,6 +24,14 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
     expect(body.fetch("items").first.keys).to contain_exactly("id", "symbol", "instrument_type", "created_at")
   end
 
+  it "accepts the browser's flat JSON mutation contract without synthetic parameter wrapping" do
+    post "/v1/favorites", params: { symbol: "AAPL", instrument_type: "equity" }.to_json,
+      headers: write_headers.merge("Content-Type" => "application/json")
+
+    expect(response).to have_http_status(:created)
+    expect(JSON.parse(response.body)).to include("symbol" => "AAPL", "instrument_type" => "equity")
+  end
+
   it "deletes exactly one favorite by its resource identifier" do
     user = User.create!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub"),
       email: claims.fetch("email"), display_name: "Contract")
@@ -81,6 +89,18 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
     get "/v1/fundamentals/AAPL", headers: auth
     expect(JSON.parse(response.body)).to include("symbol" => "AAPL", "source" => "yahoo",
       "metrics" => { "regularMarketPrice" => 200.0 })
+  end
+
+  it "returns normalized historical closing prices" do
+    snapshot = MarketHistory::Snapshot.new(symbol: "AAPL", currency: "USD",
+      points: [ { timestamp: "2026-08-05T10:00:00Z", close: 200.0 } ])
+    provider = instance_double(MarketHistory::YahooAdapter, fetch: snapshot)
+    allow(MarketHistory::YahooAdapter).to receive(:new).and_return(provider)
+
+    get "/v1/market/history/AAPL", headers: auth
+
+    expect(JSON.parse(response.body)).to eq("symbol" => "AAPL", "currency" => "USD", "range" => "1y",
+      "points" => [ { "timestamp" => "2026-08-05T10:00:00Z", "close" => 200.0 } ])
   end
 
   it "returns a bounded instrument search page" do
@@ -164,18 +184,15 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
     expect(OutboxEvent.last.payload).to include("focus" => "Revenue durability")
   end
 
-  it "cancels an owned report and its stable Temporal workflow" do
+  it "cancels an owned report so queued work exits before generation" do
     user = User.find_or_create_by!(issuer: claims["iss"], external_subject: claims["sub"]) do |record|
       record.email = claims["email"]
       record.display_name = "Contract"
     end
     report = user.reports.create!(symbol: "AAPL", title: "AAPL research", status: "generating", workflow_id: "report-1")
-    temporal = instance_double(Reports::TemporalClient, cancel_report: true)
-    allow(Reports::TemporalClient).to receive(:from_env).and_return(temporal)
     post "/v1/reports/#{report.id}/cancel", headers: write_headers
     expect(response).to have_http_status(:ok)
     expect(JSON.parse(response.body)).to include("status" => "cancelled")
-    expect(temporal).to have_received(:cancel_report).with("report-1")
     expect(OutboxEvent.last.payload).to include("status" => "cancelled", "previous_status" => "generating")
   end
 

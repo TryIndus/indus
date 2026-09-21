@@ -5,9 +5,7 @@ module Reports
     TASK_QUEUE = "indus-research-reports-v1"
 
     def self.from_env
-      client = Temporalio::Client.connect(ENV.fetch("TEMPORAL_ADDRESS", "temporal:7233"),
-        ENV.fetch("TEMPORAL_NAMESPACE", "default"))
-      new(client: client)
+      new(client: TemporalConnection.connect)
     end
 
     def initialize(client:)

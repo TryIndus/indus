@@ -133,6 +133,24 @@ variable "database_max_acu" {
   default     = 4
 }
 
+variable "replacement_platform_enabled" {
+  type        = bool
+  description = "Whether GitOps deploys the replacement application workloads."
+  default     = false
+}
+
+variable "temporal_address" {
+  type        = string
+  description = "Temporal Cloud gRPC endpoint used by report workflows."
+  default     = ""
+}
+
+variable "temporal_namespace" {
+  type        = string
+  description = "Temporal Cloud namespace used by report workflows."
+  default     = ""
+}
+
 variable "shared_ecr_repository_urls" {
   type = map(string)
 }

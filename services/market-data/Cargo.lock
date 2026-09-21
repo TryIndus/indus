@@ -1608,6 +1608,7 @@ dependencies = [
  "rand 0.9.5",
  "rdkafka",
  "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "sqlx",

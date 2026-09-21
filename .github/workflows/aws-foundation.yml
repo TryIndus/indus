@@ -48,6 +48,7 @@ jobs:
         run: |
           ruby scripts/deploy/test-infrastructure.rb
           ruby scripts/deploy/test-application.rb
+          node --test scripts/deploy/test-staging-images.mjs
 
       - name: Validate Terraform formatting and environments
         shell: bash
@@ -86,11 +87,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          fixture='{"cluster":{"name":"cluster-test","vpc_id":"vpc-test"},"workload_role_arns":{"aws-load-balancer-controller":"role-load-balancer-test","legacy-next":"role-application-test"},"shared_ecr_repository_urls":{"legacy-next":"repository-test"},"secret_arns":{"legacy_next":"secret-test"},"edge":{"legacy_next_target_group_arn":"target-group-test"}}'
+          fixture='{"cluster":{"name":"cluster-test","vpc_id":"vpc-test"},"network":{"vpc_cidr":"10.0.0.0/16"},"workload_role_arns":{"aws-load-balancer-controller":"role-lb","legacy-next":"role-legacy","platform-api":"role-api","sidekiq":"role-sidekiq","platform-outbox":"role-outbox","reports-consumer":"role-reports","market-data":"role-market","research-worker":"role-worker","database-migrator":"role-migrator","web-publisher":"role-publisher"},"shared_ecr_repository_urls":{"legacy-next":"repository-test"},"secret_arns":{"legacy_next":"secret-legacy","platform_api":"secret-api","market_data":"secret-market","research_worker":"secret-worker","database_migration":"secret-migration"},"edge":{"legacy_next_target_group_arn":"target-legacy","platform_api_target_group_arn":"target-api","market_data_target_group_arn":"target-market","cloudfront_distribution_id":"distribution-test"},"identity":{"issuer":"issuer-test","client_id":"client-test","userinfo_url":"userinfo-test"},"data_platform":{"web_bucket":"web-test","rds_proxy_endpoint":"database-test","redis_endpoint":"redis-test","redis_port":6379,"redis_cache_name":"cache-test","redis_user":"user-test","msk_bootstrap_brokers":"kafka-test","artifacts_bucket":"artifacts-test","raw_events_bucket":"events-test"},"replacement_platform":{"enabled":true,"temporal_address":"temporal-test","temporal_namespace":"namespace-test"}}'
           for environment in staging production; do
             TERRAFORM_OUTPUT_JSON="$fixture" AWS_REGION=region-test \
               ./scripts/deploy/render-gitops-bootstrap.sh "$environment" \
-              | jq -e '.kind == "Application" and .spec.source.helm.valuesObject.vpcId == "vpc-test" and .spec.source.helm.valuesObject.legacyNext.runtimeSecretArn == "secret-test"' \
+              | jq -e '.kind == "Application" and .spec.source.helm.valuesObject.vpcId == "vpc-test" and .spec.source.helm.valuesObject.platform.enabled == true and .spec.source.helm.valuesObject.platform.values.config.redisEndpoint == "redis-test"' \
               >/dev/null
           done
 

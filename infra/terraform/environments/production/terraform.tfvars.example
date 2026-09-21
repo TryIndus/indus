@@ -5,13 +5,16 @@ monthly_budget_usd            = 300
 legacy_next_secret_name       = "replace-with-private-secret-name"
 aws_region        = "us-east-1"
 vpc_cidr          = "10.40.0.0/16"
-domain_name       = "app.indus.example.com"
+domain_name       = "tryindus.ca"
 route53_zone_name = "indus.example.com"
 legacy_origin_hostname = "indus-trade.vercel.app"
 aws_traffic_weight     = 0
 alert_email_addresses = ["on-call@example.com"]
 cognito_callback_urls = ["https://app.indus.example.com/auth/callback"]
 cognito_logout_urls   = ["https://app.indus.example.com"]
+replacement_platform_enabled = true
+temporal_address             = "namespace.account.tmprl.cloud:7233"
+temporal_namespace           = "namespace.account"
 
 shared_ecr_repository_urls = {
   legacy-next     = "111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/legacy-next"

@@ -6,6 +6,8 @@ module Reports
 
     def heartbeat(stage)
       Temporalio::Activity::Context.current.heartbeat(stage)
+    rescue StandardError
+      Rails.logger.debug(event: "report_job_progress", stage: stage)
     end
   end
 

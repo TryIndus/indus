@@ -136,7 +136,9 @@ run against that branch's commit before the PR is merged. The workflow does not
 approve or merge its own PRs.
 
 Use `./bin/indus deploy app staging` from `staging` or
-`./bin/indus deploy app production` from `main`. Infrastructure is dispatched
+`./bin/indus deploy app production` from `main`. For replacement images, follow the
+[staging replacement publishing runbook](staging-replacement.md).
+Infrastructure is dispatched
 with `./bin/indus deploy infra <staging|production> <plan|apply|tear-up|tear-down|destroy>`.
 `tear-down` removes EKS, Aurora instances, RDS Proxy, CloudFront, ALB, NAT,
 application DNS records, and their dependent routes and workload IAM resources.

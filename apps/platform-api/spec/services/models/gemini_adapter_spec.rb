@@ -32,7 +32,8 @@ RSpec.describe Models::GeminiAdapter do
       usage: { "promptTokenCount" => 10, "candidatesTokenCount" => 8, "totalTokenCount" => 18 })
     expect(transport.request["x-goog-api-key"]).to eq("not-a-real-key")
     expect(JSON.parse(transport.request.body)).to include("generationConfig" => include(
-      "temperature" => 0.2, "responseMimeType" => "application/json", "responseSchema" => schema.stringify_keys))
+      "responseMimeType" => "application/json", "thinkingConfig" => { "thinkingLevel" => "low" },
+      "responseSchema" => schema.stringify_keys))
   end
 
   it "fails closed when the provider returns no content" do

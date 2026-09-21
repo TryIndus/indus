@@ -4,6 +4,12 @@ RSpec.describe Reports::TemporalClient do
   let(:client) { instance_double(Temporalio::Client) }
   subject(:gateway) { described_class.new(client: client) }
 
+  it "uses the shared authenticated connection factory" do
+    allow(Reports::TemporalConnection).to receive(:connect).and_return(client)
+    expect(described_class.from_env).to be_a(described_class)
+    expect(Reports::TemporalConnection).to have_received(:connect)
+  end
+
   it "starts one bounded workflow using a reject-duplicate workflow ID" do
     allow(client).to receive(:start_workflow)
     input = { "workflow_id" => "report-123", "report_id" => "123" }

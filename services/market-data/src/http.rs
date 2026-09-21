@@ -51,6 +51,7 @@ pub fn router(state: AppState, allowed_origins: &[String]) -> Result<Router, htt
         .route("/health/ready", get(readiness))
         .route("/metrics", get(metrics))
         .route("/v1/streams/{symbol}", get(stream))
+        .route("/stream/v1/streams/{symbol}", get(stream))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
         .with_state(state))

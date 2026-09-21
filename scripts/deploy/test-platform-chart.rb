@@ -12,7 +12,7 @@ failures = []
 workloads = documents.select { |document| %w[Deployment Job].include?(document["kind"]) }
 
 expected_workloads = %w[
-  platform-api market-data sidekiq platform-outbox reports-consumer research-worker
+  platform-api market-data sidekiq platform-outbox reports-consumer
 ]
 rendered_names = workloads.map { |document| document.dig("metadata", "name").to_s }
 expected_workloads.each do |name|

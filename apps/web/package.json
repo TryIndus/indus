@@ -10,14 +10,14 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "bash ../../scripts/test-web-e2e.sh",
     "preview": "vite preview"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-router": "^1.170.19",
+    "amazon-cognito-identity-js": "^6.3.20",
     "lucide-react": "^1.28.0",
-    "oidc-client-ts": "3.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zod": "^4.4.3"

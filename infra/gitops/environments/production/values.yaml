@@ -37,14 +37,14 @@ config:
   temporalAddress: replace.tmprl.cloud:7233
   temporalNamespace: production.indus
 images:
-  platformApi: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api@sha256:0000000000000000000000000000000000000000000000000000000000000000
-  marketData: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/market-data@sha256:0000000000000000000000000000000000000000000000000000000000000000
-  researchWorker: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000
-  web: 111111111111.dkr.ecr.us-east-1.amazonaws.com/indus/web@sha256:0000000000000000000000000000000000000000000000000000000000000000
-webPublisher: { releaseId: "0000000000000000000000000000000000000000" }
-platformApi: { replicas: 4, minReplicas: 4, maxReplicas: 30 }
-sidekiq: { replicas: 3, minReplicas: 3, maxReplicas: 20 }
-marketData: { replicas: 4, minReplicas: 4, maxReplicas: 30 }
-researchWorker: { replicas: 3, minReplicas: 3, maxReplicas: 20 }
-platformOutbox: { replicas: 3 }
-reportsConsumer: { replicas: 3 }
+  platformApi: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/platform-api@sha256:a7b965623e121b33f72cef8882b43b916c725dbfaf41b377280e8fa7e9e4ffd5
+  marketData: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/market-data@sha256:7561e29f9c8e746c3f0316823aa7c9a541dd2b21ca0257cb5f6943be6e34806c
+  researchWorker: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/research-worker@sha256:a7b965623e121b33f72cef8882b43b916c725dbfaf41b377280e8fa7e9e4ffd5
+  web: 239830941801.dkr.ecr.us-east-1.amazonaws.com/indus/web@sha256:3328c70ee10f579ad78d8d1f2606614e42c753cf3170efd1cbdb90e7494f0e7d
+webPublisher: { releaseId: "1d341d4724ba4330d4161dd5d2fb80e384811228" }
+platformApi: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
+sidekiq: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
+marketData: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
+researchWorker: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
+platformOutbox: { replicas: 1 }
+reportsConsumer: { replicas: 1 }

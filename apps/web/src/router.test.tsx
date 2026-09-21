@@ -6,11 +6,13 @@ import { AppContextProvider } from './app-context'
 import type { AppContext } from './lib/context'
 import { unavailableMarketStream } from './lib/market-stream'
 import { makeRouter } from './router'
+import type { AuthAdapter } from './lib/auth'
 
 const now = '2026-08-05T12:00:00.000Z'
 function responseFor(path: string): unknown {
   if (path === '/v1/market/summary') return { indices: [], watchlist: [] }
-  if (path.startsWith('/v1/fundamentals/')) return { symbol: 'AAPL', as_of: now, source: 'Yahoo Finance', metrics: { market_cap: 3_200_000_000_000 } }
+  if (path.startsWith('/v1/market/history/')) return { symbol: 'AAPL', currency: 'USD', range: '1y', points: [{ timestamp: '2025-08-05T12:00:00.000Z', close: 180 }, { timestamp: now, close: 218.27 }] }
+  if (path.startsWith('/v1/fundamentals/')) return { symbol: 'AAPL', as_of: now, source: 'Yahoo Finance', metrics: { regularMarketPrice: 218.27, market_cap: 3_200_000_000_000, net_margin: 0.25 } }
   if (path === '/v1/me') return { id: '00000000-0000-4000-8000-000000000001', email: 'user@example.test', display_name: 'Avery Investor', created_at: now, updated_at: now }
   return { next_cursor: null, items: [] }
 }
@@ -20,10 +22,13 @@ function context(authenticated: boolean, resolve: (path: string) => unknown | Pr
   return {
     auth: {
       getUser: vi.fn(async () => authState ? { id: 'user-1', email: 'user@example.test' } : null),
-      signIn: vi.fn(async () => { authState = true }),
-      completeSignIn: vi.fn(async () => { authState = true }),
       signOut: vi.fn(async () => { authState = false; return false }),
       accessToken: vi.fn(async () => null),
+      passwordSignIn: vi.fn(async () => { authState = true }),
+      signUp: vi.fn(async () => 'confirmation-required' as const),
+      confirmSignUp: vi.fn(async () => {}),
+      requestPasswordReset: vi.fn(async () => {}),
+      confirmPasswordReset: vi.fn(async () => {}),
     },
     api: {
       get: async (path, schema) => schema.parse(await resolve(path)),
@@ -34,8 +39,9 @@ function context(authenticated: boolean, resolve: (path: string) => unknown | Pr
   }
 }
 
-async function renderPath(path: string, authenticated: boolean, resolve?: (path: string) => unknown | Promise<unknown>, mutate?: (path: string, method: string, body: unknown, idempotencyKey: string) => unknown | Promise<unknown>) {
+async function renderPath(path: string, authenticated: boolean, resolve?: (path: string) => unknown | Promise<unknown>, mutate?: (path: string, method: string, body: unknown, idempotencyKey: string) => unknown | Promise<unknown>, authOverrides?: Partial<AuthAdapter>) {
   const value = context(authenticated, resolve, mutate)
+  Object.assign(value.auth, authOverrides)
   const router = makeRouter(value, createMemoryHistory({ initialEntries: [path] }))
   render(<AppContextProvider value={value}><QueryClientProvider client={value.queryClient}><RouterProvider router={router} /></QueryClientProvider></AppContextProvider>)
   await waitFor(() => expect(router.state.status).toBe('idle'))
@@ -43,22 +49,84 @@ async function renderPath(path: string, authenticated: boolean, resolve?: (path:
 }
 
 describe('application routing', () => {
+  it('renders the PR 17 public landing experience', async () => {
+    await renderPath('/', false)
+    expect(await screen.findByRole('heading', { name: 'Financial intelligence, in context.' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Start researching' })).toHaveAttribute('href', '/auth')
+    expect(screen.getByRole('heading', { name: 'Research a company without switching tools.' })).toBeVisible()
+  })
+
   it('redirects an anonymous user away from protected pages', async () => {
     const router = await renderPath('/reports', false)
-    expect(router.state.location.pathname).toBe('/auth')
-    expect(await screen.findByRole('heading', { name: 'Welcome to Indus' })).toBeVisible()
+    await waitFor(() => expect(router.state.location.pathname).toBe('/auth'))
+    expect(await screen.findByRole('heading', { name: 'Continue your research.' })).toBeVisible()
+  })
+
+  it('supports embedded Cognito account and recovery flows', async () => {
+    let passwordAuthenticated = false
+    const passwordSignIn = vi.fn(async () => { passwordAuthenticated = true })
+    const getUser = vi.fn(async () => passwordAuthenticated ? { id: 'user-1', email: 'user@example.test' } : null)
+    const signUp = vi.fn(async () => 'confirmation-required' as const)
+    const confirmSignUp = vi.fn(async () => {})
+    const requestPasswordReset = vi.fn(async () => {})
+    const confirmPasswordReset = vi.fn(async () => {})
+    const router = await renderPath('/auth', false, undefined, undefined, { getUser, passwordSignIn, signUp, confirmSignUp, requestPasswordReset, confirmPasswordReset })
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'Password123!Secure' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(passwordSignIn).toHaveBeenCalledWith('user@example.test', 'Password123!Secure'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
+
+    cleanupView()
+    await renderPath('/auth', false, undefined, undefined, { signUp, confirmSignUp, requestPasswordReset, confirmPasswordReset })
+    fireEvent.click(screen.getByRole('button', { name: 'Create an account' }))
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Avery' } })
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Investor' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'Password123!Secure' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm account' }))
+    expect(await screen.findByRole('heading', { name: 'Continue your research.' })).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send recovery code' }))
+    expect(await screen.findByRole('button', { name: 'Set new password' })).toBeVisible()
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '654321' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'NewPassword123!Secure' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Set new password' }))
+    await waitFor(() => expect(confirmPasswordReset).toHaveBeenCalledWith('user@example.test', '654321', 'NewPassword123!Secure'))
   })
 
   it('renders the authenticated dashboard with an empty watchlist state', async () => {
     await renderPath('/dashboard', true)
-    expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Company research' })).toBeVisible()
     expect(await screen.findByText('No instruments yet')).toBeVisible()
   })
 
   it('normalizes company symbols for display', async () => {
     await renderPath('/company/aapl', true)
     expect(await screen.findByRole('heading', { name: 'AAPL' })).toBeVisible()
+    expect(screen.getByText('Market Price')).toBeVisible()
+    expect(screen.getAllByText('$218.27')).toHaveLength(3)
+    expect(screen.getByText('Market Cap')).toBeVisible()
+    expect(screen.getByText(/^\$3\.2/)).toBeVisible()
+    expect(screen.getByText('25.0%')).toBeVisible()
+    expect(screen.queryByText('market_cap')).not.toBeInTheDocument()
+    expect(await screen.findByRole('img', { name: 'AAPL one-year closing price chart' })).toBeVisible()
+    expect(screen.getByText(/AAPL is trading at \$218\.27/)).toBeVisible()
     expect(screen.getByText(/Source: Yahoo Finance/)).toBeVisible()
+  })
+
+  it('generates a grounded company research brief on demand', async () => {
+    const mutation = vi.fn(() => ({ conversation_id: '00000000-0000-4000-8000-000000000010', message: { role: 'assistant', content: 'Apple has durable cash flow.' }, sources: [{ label: 'yahoo:spark:AAPL', as_of: now }], usage: { input_tokens: 20, output_tokens: 8 } }))
+    await renderPath('/company/AAPL', true, undefined, mutation)
+    fireEvent.click(await screen.findByRole('button', { name: 'Generate brief' }))
+    expect(await screen.findByText('Apple has durable cash flow.')).toBeVisible()
+    expect(mutation).toHaveBeenCalledWith('/v1/chat', 'POST', expect.objectContaining({ symbol: 'AAPL' }), expect.stringMatching(/^[0-9a-f-]{36}$/))
   })
 
   it('renders loading and empty resource states', async () => {
@@ -180,21 +248,14 @@ describe('application routing', () => {
     const router = await renderPath('/auth', true)
 
     expect(router.state.location.pathname).toBe('/dashboard')
-    expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: 'Company research' })).toBeVisible()
   })
 
-  it('starts hosted sign-in and completes the callback lifecycle', async () => {
-    const router = await renderPath('/auth', false)
-    fireEvent.click(screen.getByRole('button', { name: 'Continue to secure sign in' }))
-    await waitFor(() => expect(router.options.context.auth.signIn).toHaveBeenCalled())
-    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
-
-    cleanupView()
-    const callbackRouter = await renderPath('/auth/callback', false)
-    expect(await screen.findByRole('heading', { name: 'Good morning' })).toBeVisible()
-    expect(callbackRouter.state.location.pathname).toBe('/dashboard')
-    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-    await waitFor(() => expect(callbackRouter.state.location.pathname).toBe('/auth'))
+  it('offers Cognito email sign-in without a hosted-provider option', async () => {
+    await renderPath('/auth', false)
+    expect(screen.getByLabelText('Email')).toBeVisible()
+    expect(screen.getByLabelText('Password')).toBeVisible()
+    expect(screen.queryByText(/Google|SSO/i)).not.toBeInTheDocument()
   })
 
   it('renders a stable not-found boundary', async () => {

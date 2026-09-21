@@ -20,6 +20,14 @@ locals {
       namespace = "kube-system"
       name      = "aws-load-balancer-controller"
     }
+    platform-api      = { namespace = "indus", name = "platform-api" }
+    sidekiq           = { namespace = "indus", name = "sidekiq" }
+    platform-outbox   = { namespace = "indus", name = "platform-outbox" }
+    reports-consumer  = { namespace = "indus", name = "reports-consumer" }
+    market-data       = { namespace = "indus", name = "market-data" }
+    research-worker   = { namespace = "indus", name = "research-worker" }
+    database-migrator = { namespace = "indus", name = "database-migrator" }
+    web-publisher     = { namespace = "indus", name = "web-publisher" }
   }
 }
 
@@ -96,4 +104,126 @@ resource "aws_iam_role_policy" "load_balancer_controller" {
   name   = "${local.name}-load-balancer-controller"
   role   = aws_iam_role.workload["aws-load-balancer-controller"].id
   policy = data.aws_iam_policy_document.load_balancer_controller.json
+}
+
+locals {
+  workload_secret_access = {
+    platform-api      = "platform-api"
+    sidekiq           = "platform-api"
+    platform-outbox   = "platform-api"
+    reports-consumer  = "platform-api"
+    market-data       = "market-data"
+    research-worker   = "research-worker"
+    database-migrator = "database-migration"
+  }
+  kafka_workloads = toset(["platform-api", "platform-outbox", "reports-consumer", "market-data"])
+}
+
+data "aws_iam_policy_document" "runtime_secret" {
+  for_each = local.workload_secret_access
+
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.replacement[each.value].arn]
+  }
+  statement {
+    actions   = ["kms:Decrypt"]
+    resources = [aws_kms_key.data.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "runtime_secret" {
+  for_each = local.workload_secret_access
+  name     = "runtime-secret"
+  role     = aws_iam_role.workload[each.key].id
+  policy   = data.aws_iam_policy_document.runtime_secret[each.key].json
+}
+
+data "aws_iam_policy_document" "kafka" {
+  for_each = local.kafka_workloads
+
+  statement {
+    actions   = ["kafka-cluster:Connect", "kafka-cluster:DescribeCluster"]
+    resources = [aws_msk_serverless_cluster.events.arn]
+  }
+  statement {
+    actions   = ["kafka-cluster:CreateTopic", "kafka-cluster:DescribeTopic", "kafka-cluster:ReadData", "kafka-cluster:WriteData"]
+    resources = ["${replace(aws_msk_serverless_cluster.events.arn, ":cluster/", ":topic/")}/*"]
+  }
+  statement {
+    actions   = ["kafka-cluster:AlterGroup", "kafka-cluster:DescribeGroup"]
+    resources = ["${replace(aws_msk_serverless_cluster.events.arn, ":cluster/", ":group/")}/*"]
+  }
+  statement {
+    actions   = ["kafka-cluster:AlterTransactionalId", "kafka-cluster:DescribeTransactionalId"]
+    resources = ["${replace(aws_msk_serverless_cluster.events.arn, ":cluster/", ":transactional-id/")}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "kafka" {
+  for_each = local.kafka_workloads
+  name     = "kafka"
+  role     = aws_iam_role.workload[each.key].id
+  policy   = data.aws_iam_policy_document.kafka[each.key].json
+}
+
+data "aws_iam_policy_document" "redis" {
+  statement {
+    actions   = ["elasticache:Connect"]
+    resources = [aws_elasticache_serverless_cache.application.arn, aws_elasticache_user.application.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "redis" {
+  for_each = toset(["platform-api", "sidekiq"])
+  name     = "redis"
+  role     = aws_iam_role.workload[each.key].id
+  policy   = data.aws_iam_policy_document.redis.json
+}
+
+data "aws_iam_policy_document" "artifact_access" {
+  statement {
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:AbortMultipartUpload"]
+    resources = ["${aws_s3_bucket.data["artifacts"].arn}/*"]
+  }
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.data["artifacts"].arn]
+  }
+  statement {
+    actions   = ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"]
+    resources = [aws_kms_key.data.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "artifact_access" {
+  for_each = toset(["platform-api", "research-worker", "sidekiq"])
+  name     = "artifacts"
+  role     = aws_iam_role.workload[each.key].id
+  policy   = data.aws_iam_policy_document.artifact_access.json
+}
+
+data "aws_iam_policy_document" "web_publish" {
+  statement {
+    actions   = ["s3:DeleteObject", "s3:GetObject", "s3:PutObject"]
+    resources = ["${aws_s3_bucket.data["web"].arn}/*"]
+  }
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.data["web"].arn]
+  }
+  statement {
+    actions   = ["cloudfront:CreateInvalidation"]
+    resources = [aws_cloudfront_distribution.this.arn]
+  }
+  statement {
+    actions   = ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey"]
+    resources = [aws_kms_key.data.arn]
+  }
+}
+
+resource "aws_iam_role_policy" "web_publish" {
+  name   = "web-publish"
+  role   = aws_iam_role.workload["web-publisher"].id
+  policy = data.aws_iam_policy_document.web_publish.json
 }

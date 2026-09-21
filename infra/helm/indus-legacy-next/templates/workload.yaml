@@ -91,6 +91,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
             capabilities: { drop: ["ALL"] }
           startupProbe:
             httpGet: { path: "/api/health?mode=ready", port: http }
