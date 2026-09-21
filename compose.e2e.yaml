@@ -1,0 +1,33 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: indus_e2e
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U indus -d indus_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports: !reset []
+    volumes: !reset []
+
+  redis:
+    ports: !reset []
+    volumes: !reset []
+
+  platform-api:
+    environment:
+      DATABASE_URL: postgres://indus:indus-local-password@postgres:5432/indus_e2e
+      RAILS_ENV: test
+      CORS_ORIGINS: http://127.0.0.1:4173
+      E2E_TEST_BOUNDARY: "true"
+      E2E_ACCESS_TOKEN: e2e-access-token
+      E2E_SECONDARY_ACCESS_TOKEN: e2e-secondary-access-token
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:3000/readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    ports: !override
+      - "127.0.0.1:${E2E_API_PORT:-13100}:3000"

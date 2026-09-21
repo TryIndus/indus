@@ -10,7 +10,7 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "bash ../../scripts/test-web-e2e.sh",
     "preview": "vite preview"
   },
   "dependencies": {
