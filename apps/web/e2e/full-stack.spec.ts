@@ -3,18 +3,19 @@ import { expect, type APIRequestContext, type BrowserContext, test } from '@play
 
 const apiUrl = `http://127.0.0.1:${process.env.E2E_API_PORT ?? '13100'}`
 const authorization = { Authorization: 'Bearer e2e-access-token' }
+const secondaryAuthorization = { Authorization: 'Bearer e2e-secondary-access-token' }
 
 async function authenticate(context: BrowserContext) {
   await context.addInitScript(() => localStorage.setItem('indus:e2e-auth', 'true'))
 }
 
-async function clearFavorites(request: APIRequestContext) {
-  const response = await request.get(`${apiUrl}/v1/favorites?page_size=100`, { headers: authorization })
+async function clearResources(request: APIRequestContext, resource: 'favorites' | 'reports', headers: Record<string, string>) {
+  const response = await request.get(`${apiUrl}/v1/${resource}?page_size=100`, { headers })
   expect(response.status()).toBe(200)
   const page = await response.json() as { items: Array<{ id: string }> }
-  for (const favorite of page.items) {
-    const deleted = await request.delete(`${apiUrl}/v1/favorites/${favorite.id}`, {
-      headers: { ...authorization, 'Idempotency-Key': crypto.randomUUID() },
+  for (const item of page.items) {
+    const deleted = await request.delete(`${apiUrl}/v1/${resource}/${item.id}`, {
+      headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() },
     })
     expect(deleted.status()).toBe(204)
   }
@@ -22,7 +23,19 @@ async function clearFavorites(request: APIRequestContext) {
 
 test.describe('Chromium full-stack journeys', () => {
   test.beforeEach(async ({ request }) => {
-    await clearFavorites(request)
+    for (const headers of [authorization, secondaryAuthorization]) {
+      await clearResources(request, 'favorites', headers)
+      await clearResources(request, 'reports', headers)
+    }
+  })
+
+  test('opens the product landing page and reaches embedded sign in', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: 'Financial intelligence, in context.' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Research a company without switching tools.' })).toBeVisible()
+    await page.getByRole('link', { name: 'Start researching' }).click()
+    await expect(page).toHaveURL(/\/auth$/)
+    await expect(page.getByRole('heading', { name: 'Continue your research.' })).toBeVisible()
   })
 
   test('fails closed, signs in locally, and signs out of protected routes', async ({ page }) => {
@@ -49,7 +62,7 @@ test.describe('Chromium full-stack journeys', () => {
     await expect(page).toHaveURL(/\/auth(?:\?.*)?$/)
   })
 
-  test('persists a favorite through the browser, Rails, and PostgreSQL', async ({ context, page }) => {
+  test('persists a favorite and generates an evidence-backed brief through Rails', async ({ context, page }) => {
     await authenticate(context)
     await page.goto('/favorites')
     await expect(page.getByText('No favorites yet')).toBeVisible()
@@ -75,7 +88,14 @@ test.describe('Chromium full-stack journeys', () => {
     await expect(page.getByText('Market Cap')).toBeVisible()
     await expect(page.getByRole('img', { name: 'TSLA one-year closing price chart' })).toBeVisible()
     await expect(page.getByText(/TSLA Holdings is trading at/)).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Generate brief' })).toBeVisible()
+    const generated = page.waitForResponse(response =>
+      response.url() === `${apiUrl}/v1/chat` && response.request().method() === 'POST')
+    await page.getByRole('button', { name: 'Generate brief' }).click()
+    const generatedResponse = await generated
+    expect(generatedResponse.status()).toBe(200)
+    expect(generatedResponse.request().headers()['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/)
+    await expect(page.getByText('TSLA has an evidence-backed research brief.')).toBeVisible()
+    await expect(page.getByText(/Yahoo Finance quote \(TSLA\)/)).toBeVisible()
 
     await page.goto('/favorites')
     const deleted = page.waitForResponse(response =>
@@ -85,7 +105,52 @@ test.describe('Chromium full-stack journeys', () => {
     await expect(page.getByText('No favorites yet')).toBeVisible()
   })
 
-  test('keeps the Rails tenant boundary closed without a bearer token', async ({ request }) => {
+  test('persists and cancels a report through the browser, Rails, and PostgreSQL', async ({ context, page }) => {
+    await authenticate(context)
+    await page.goto('/reports')
+    await expect(page.getByText('No reports yet')).toBeVisible()
+
+    const created = page.waitForResponse(response =>
+      response.url() === `${apiUrl}/v1/reports` && response.request().method() === 'POST')
+    await page.getByLabel('Company symbol').fill('aapl')
+    await page.getByRole('button', { name: 'Generate' }).click()
+
+    const createResponse = await created
+    expect(createResponse.status()).toBe(202)
+    expect(createResponse.request().headers()['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/)
+    await expect(page.getByText('AAPL research report')).toBeVisible()
+    await expect(page.getByText('queued', { exact: true })).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByText('AAPL research report')).toBeVisible()
+    const cancelled = page.waitForResponse(response =>
+      response.url().endsWith('/cancel') && response.request().method() === 'POST')
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    expect((await cancelled).status()).toBe(200)
+    await expect(page.getByText('cancelled', { exact: true })).toBeVisible()
+
+    await page.reload()
+    await expect(page.getByText('cancelled', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Cancel' })).toHaveCount(0)
+  })
+
+  test('searches equities and slash-delimited crypto through the Rails provider boundary', async ({ context, page }) => {
+    await authenticate(context)
+    await page.goto('/search')
+    await page.getByLabel('Search instruments').fill('apple')
+    await page.getByRole('button', { name: 'Search' }).click()
+    await expect(page.getByText('Apple Inc. · NASDAQ')).toBeVisible()
+
+    await page.goto('/crypto')
+    await expect(page.getByText('Bitcoin')).toBeVisible()
+    const bitcoin = page.getByRole('link', { name: /BTC\/USD/ })
+    await expect(bitcoin).toBeVisible()
+    await bitcoin.click()
+    await expect(page.getByRole('heading', { name: 'BTC/USD' })).toBeVisible()
+    await expect(page.getByRole('img', { name: 'BTC/USD one-year closing price chart' })).toBeVisible()
+  })
+
+  test('keeps unauthenticated and cross-tenant Rails boundaries closed', async ({ request }) => {
     const response = await request.get(`${apiUrl}/v1/favorites`)
     expect(response.status()).toBe(401)
     await expect(response.json()).resolves.toMatchObject({
@@ -93,6 +158,25 @@ test.describe('Chromium full-stack journeys', () => {
       code: 'unauthorized',
       title: 'Authentication required',
     })
+
+    const created = await request.post(`${apiUrl}/v1/favorites`, {
+      headers: { ...authorization, 'Idempotency-Key': crypto.randomUUID() },
+      data: { symbol: 'NVDA', instrument_type: 'equity' },
+    })
+    expect(created.status()).toBe(201)
+    const favorite = await created.json() as { id: string }
+
+    const secondaryPage = await request.get(`${apiUrl}/v1/favorites?page_size=100`, { headers: secondaryAuthorization })
+    expect(secondaryPage.status()).toBe(200)
+    await expect(secondaryPage.json()).resolves.toMatchObject({ items: [] })
+    const hiddenDelete = await request.delete(`${apiUrl}/v1/favorites/${favorite.id}`, {
+      headers: { ...secondaryAuthorization, 'Idempotency-Key': crypto.randomUUID() },
+    })
+    expect(hiddenDelete.status()).toBe(204)
+
+    const primaryPage = await request.get(`${apiUrl}/v1/favorites?page_size=100`, { headers: authorization })
+    expect(primaryPage.status()).toBe(200)
+    await expect(primaryPage.json()).resolves.toMatchObject({ items: [{ id: favorite.id, symbol: 'NVDA' }] })
   })
 
   test('bounds an API failure and recovers through the visible retry', async ({ context, page }) => {

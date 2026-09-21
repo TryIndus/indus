@@ -3,23 +3,34 @@
 # HTTP, authorization, persistence, idempotency, and serialization paths real.
 if Rails.env.test? && ENV["E2E_TEST_BOUNDARY"] == "true"
   Rails.application.config.to_prepare do
-    expected_token = ENV.fetch("E2E_ACCESS_TOKEN")
+    identities = {
+      ENV.fetch("E2E_ACCESS_TOKEN") => {
+        "iss" => "https://identity.indus.test/e2e",
+        "sub" => "playwright-user",
+        "email" => "investor@example.test",
+        "name" => "Playwright Investor"
+      },
+      ENV.fetch("E2E_SECONDARY_ACCESS_TOKEN") => {
+        "iss" => "https://identity.indus.test/e2e",
+        "sub" => "playwright-secondary-user",
+        "email" => "secondary@example.test",
+        "name" => "Secondary Investor"
+      }
+    }
     verifier = Class.new do
-      define_method(:initialize) { |token| @token = token }
+      define_method(:initialize) { |tokens| @tokens = tokens }
 
       define_method(:verify) do |token|
-        unless token.bytesize == @token.bytesize && ActiveSupport::SecurityUtils.secure_compare(token, @token)
+        claims = @tokens.find do |candidate, _claims|
+          token.bytesize == candidate.bytesize && ActiveSupport::SecurityUtils.secure_compare(token, candidate)
+        end&.last
+        if claims.nil?
           raise Authentication::Unauthorized, "invalid end-to-end test token"
         end
 
-        {
-          "iss" => "https://identity.indus.test/e2e",
-          "sub" => "playwright-user",
-          "email" => "investor@example.test",
-          "name" => "Playwright Investor"
-        }
+        claims
       end
-    end.new(expected_token)
+    end.new(identities)
 
     provider = Class.new(FundamentalsProvider) do
       def fetch(symbol:)
@@ -67,8 +78,45 @@ if Rails.env.test? && ENV["E2E_TEST_BOUNDARY"] == "true"
       end
     end.new
 
+    search_provider = Class.new do
+      CATALOG = [
+        { symbol: "AAPL", name: "Apple Inc.", instrument_type: "equity", exchange: "NASDAQ" },
+        { symbol: "BTC/USD", name: "Bitcoin", instrument_type: "crypto", exchange: "Alpaca" }
+      ].freeze
+
+      def search(query:, limit:)
+        normalized = query.to_s.downcase
+        matches = if normalized == "crypto"
+          CATALOG.select { |item| item[:instrument_type] == "crypto" }
+        else
+          CATALOG.select { |item| item[:symbol].downcase.include?(normalized) || item[:name].downcase.include?(normalized) }
+        end
+        matches.first(limit)
+      end
+    end.new
+
+    model_gateway = Class.new do
+      def execute(task:, input:, evidence:)
+        raise ArgumentError, "unsupported end-to-end model task" unless task == "financial_chat"
+
+        symbol = input[:symbol].presence || "The company"
+        ModelExecution.new(
+          payload: {
+            "message" => { "role" => "assistant", "content" => "#{symbol} has an evidence-backed research brief." },
+            "sources" => evidence.citations
+          },
+          model: "e2e-fixture",
+          usage: { input_tokens: 20, output_tokens: 8 },
+          task: task,
+          prompt_version: "v2"
+        )
+      end
+    end.new
+
     Authentication.verifier = verifier
     FundamentalsProvider.define_singleton_method(:default) { provider }
     MarketHistory::YahooAdapter.define_singleton_method(:new) { history_provider }
+    Instruments::YahooSearchAdapter.define_singleton_method(:new) { search_provider }
+    ModelGateway.define_singleton_method(:default) { model_gateway }
   end
 end

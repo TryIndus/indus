@@ -31,7 +31,7 @@ bun run build
 bun run test:e2e
 ```
 
-The browser suite runs once in Chromium against a disposable PostgreSQL and Rails stack. It verifies anonymous fail-closed routing, the local sign-in lifecycle, a persisted favorite lifecycle, the Rails tenant boundary, failure recovery, responsive navigation, serious accessibility rules, and a compiled shell-load budget. External Cognito and market providers are replaced only when Rails runs in `test` with `E2E_TEST_BOUNDARY=true`; the browser, HTTP, authorization, idempotency, persistence, and serialization paths remain real. The stack and its database volume are removed after each run.
+The browser suite runs once in Chromium against a disposable PostgreSQL and Rails stack. It verifies the public landing and sign-in lifecycle, persisted favorites and reports, report cancellation, equity and slash-delimited crypto search, a model-assisted brief, unauthenticated and cross-tenant boundaries, failure recovery, responsive navigation, serious accessibility rules, and a compiled shell-load budget. External Cognito, market, and model providers are replaced only when Rails runs in `test` with `E2E_TEST_BOUNDARY=true`; the browser, HTTP, authorization, quota, idempotency, persistence, and serialization paths remain real. The stack and its database volume are removed after each run.
 
 The web server is compiled with `VITE_E2E_AUTH=true`; test contexts must additionally opt in through a local-storage marker. Builds without that explicit flag cannot select the test identity adapter, and the unit suite verifies that unconfigured normal builds remain fail-closed.
 
