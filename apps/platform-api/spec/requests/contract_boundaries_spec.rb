@@ -24,6 +24,14 @@ RSpec.describe "OpenAPI product boundaries", type: :request do
     expect(body.fetch("items").first.keys).to contain_exactly("id", "symbol", "instrument_type", "created_at")
   end
 
+  it "accepts the browser's flat JSON mutation contract without synthetic parameter wrapping" do
+    post "/v1/favorites", params: { symbol: "AAPL", instrument_type: "equity" }.to_json,
+      headers: write_headers.merge("Content-Type" => "application/json")
+
+    expect(response).to have_http_status(:created)
+    expect(JSON.parse(response.body)).to include("symbol" => "AAPL", "instrument_type" => "equity")
+  end
+
   it "deletes exactly one favorite by its resource identifier" do
     user = User.create!(issuer: claims.fetch("iss"), external_subject: claims.fetch("sub"),
       email: claims.fetch("email"), display_name: "Contract")
