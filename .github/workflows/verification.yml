@@ -231,7 +231,7 @@ jobs:
         run: docker build apps/platform-api
 
   replacement-web:
-    name: Replacement web
+    name: Chromium full-stack web
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     defaults:
@@ -256,11 +256,22 @@ jobs:
           bun run test:coverage
           bun run build
 
-      - name: Install browser engines
-        run: bunx playwright install --with-deps chromium firefox webkit
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
 
-      - name: Run browser, accessibility, and performance verification
+      - name: Run the disposable full-stack browser suite
         run: bun run test:e2e
+
+      - name: Upload full-stack browser diagnostics
+        if: ${{ failure() && hashFiles('apps/web/playwright-report/**', 'apps/web/test-results/**') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: full-stack-browser-diagnostics-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   market-data:
     name: Rust market data

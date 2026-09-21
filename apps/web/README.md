@@ -31,7 +31,9 @@ bun run build
 bun run test:e2e
 ```
 
-The browser suite verifies anonymous fail-closed routing, authenticated dashboard and navigation journeys, serious accessibility rules, Chromium, Firefox, WebKit and mobile profiles, and a local shell-load budget. Its web server is compiled with `VITE_E2E_AUTH=true`; test contexts must additionally opt in through a local-storage marker. Builds without that explicit flag cannot select the test identity adapter, and the unit suite verifies that unconfigured normal builds remain fail-closed. The Rails summary request is intercepted with schema-valid fixture data until the compatibility API is available.
+The browser suite runs once in Chromium against a disposable PostgreSQL and Rails stack. It verifies the public landing and sign-in lifecycle, persisted favorites and reports, report cancellation, equity and slash-delimited crypto search, a model-assisted brief, unauthenticated and cross-tenant boundaries, failure recovery, responsive navigation, serious accessibility rules, and a compiled shell-load budget. External Cognito, market, and model providers are replaced only when Rails runs in `test` with `E2E_TEST_BOUNDARY=true`; the browser, HTTP, authorization, quota, idempotency, persistence, and serialization paths remain real. The stack and its database volume are removed after each run.
+
+The web server is compiled with `VITE_E2E_AUTH=true`; test contexts must additionally opt in through a local-storage marker. Builds without that explicit flag cannot select the test identity adapter, and the unit suite verifies that unconfigured normal builds remain fail-closed.
 
 `src/lib/contract-equivalence.test.ts` reads the committed generated client as text and checks the endpoint paths, methods, idempotency headers, and JSON field mappings used by the Zod adapter. This catches generator drift without compiling generator runtime code under the application's stricter TypeScript policy.
 
