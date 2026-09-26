@@ -53,7 +53,10 @@ output "data_platform" {
     export_bucket         = aws_s3_bucket.data["exports"].id
     cognito_user_pool_id  = aws_cognito_user_pool.this.id
     database_secret_arn   = aws_rds_cluster.data.master_user_secret[0].secret_arn
-    rds_proxy_endpoint    = aws_db_proxy.data.endpoint
+    rds_proxy_endpoint    = var.database_access_mode == "direct" ? null : aws_db_proxy.data[0].endpoint
+    database_endpoint     = var.database_access_mode == "proxy" ? aws_db_proxy.data[0].endpoint : aws_rds_cluster.data.endpoint
+    aurora_endpoint       = aws_rds_cluster.data.endpoint
+    database_access_mode  = var.database_access_mode
     aurora_cluster_arn    = aws_rds_cluster.data.arn
     redis_endpoint        = aws_elasticache_serverless_cache.application.endpoint[0].address
     redis_port            = aws_elasticache_serverless_cache.application.endpoint[0].port

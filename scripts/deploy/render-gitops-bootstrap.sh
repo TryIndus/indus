@@ -92,7 +92,7 @@ jq -n \
                   databaseMigration: $infrastructure.secret_arns.database_migration
                 },
                 config: {
-                  rdsProxyEndpoint: $infrastructure.data_platform.rds_proxy_endpoint,
+                  rdsProxyEndpoint: ($infrastructure.data_platform.database_endpoint // $infrastructure.data_platform.rds_proxy_endpoint),
                   redisEndpoint: $infrastructure.data_platform.redis_endpoint,
                   redisPort: $infrastructure.data_platform.redis_port,
                   redisCacheName: $infrastructure.data_platform.redis_cache_name,

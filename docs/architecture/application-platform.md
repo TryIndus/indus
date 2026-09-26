@@ -46,3 +46,7 @@ Kafka, Temporal, and the Rust service run alongside the application profile. Man
 ## Rollback
 
 For local recovery, stop the affected Compose profile and remove only disposable data volumes when necessary. Production rollback uses traffic, image, workflow, and forward-only database controls. Never restore a shared database by checking out an older migration.
+
+## Database connectivity
+
+Aurora remains private and TLS-required. Terraform database access modes retain RDS Proxy by default, allow direct private connectivity to be prepared alongside it, and remove the proxy only after runtime-secret clients have moved. `DATABASE_URL` in Secrets Manager is authoritative; GitOps endpoint metadata does not rewrite runtime credentials. See [AWS cost reductions](../runbooks/aws-cost-reductions.md) for connection-capacity checks, deployment sequencing, and rollback.

@@ -20,6 +20,7 @@ resource "aws_security_group" "database" {
 }
 
 resource "aws_security_group" "rds_proxy" {
+  count       = var.database_access_mode == "direct" ? 0 : 1
   name        = "${local.name}-rds-proxy"
   description = "PostgreSQL access from EKS workloads"
   vpc_id      = aws_vpc.this.id
@@ -28,29 +29,32 @@ resource "aws_security_group" "rds_proxy" {
 }
 
 resource "aws_security_group_rule" "proxy_from_cluster" {
+  count                    = var.database_access_mode == "direct" ? 0 : 1
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.rds_proxy.id
+  security_group_id        = aws_security_group.rds_proxy[0].id
   source_security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
 }
 
 resource "aws_security_group_rule" "database_from_proxy" {
+  count                    = var.database_access_mode == "direct" ? 0 : 1
   type                     = "ingress"
   from_port                = 5432
   to_port                  = 5432
   protocol                 = "tcp"
   security_group_id        = aws_security_group.database.id
-  source_security_group_id = aws_security_group.rds_proxy.id
+  source_security_group_id = aws_security_group.rds_proxy[0].id
 }
 
 resource "aws_security_group_rule" "proxy_to_database" {
+  count                    = var.database_access_mode == "direct" ? 0 : 1
   type                     = "egress"
   from_port                = 5432
   to_port                  = 5432
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.rds_proxy.id
+  security_group_id        = aws_security_group.rds_proxy[0].id
   source_security_group_id = aws_security_group.database.id
 }
 
@@ -138,6 +142,7 @@ data "aws_iam_policy_document" "rds_proxy_assume" {
 }
 
 resource "aws_iam_role" "rds_proxy" {
+  count              = var.database_access_mode == "direct" ? 0 : 1
   name               = "${local.name}-rds-proxy"
   assume_role_policy = data.aws_iam_policy_document.rds_proxy_assume.json
   tags               = local.common_tags
@@ -158,17 +163,19 @@ data "aws_iam_policy_document" "rds_proxy" {
 }
 
 resource "aws_iam_role_policy" "rds_proxy" {
+  count  = var.database_access_mode == "direct" ? 0 : 1
   name   = "database-secret"
-  role   = aws_iam_role.rds_proxy.id
+  role   = aws_iam_role.rds_proxy[0].id
   policy = data.aws_iam_policy_document.rds_proxy.json
 }
 
 resource "aws_db_proxy" "data" {
+  count                  = var.database_access_mode == "direct" ? 0 : 1
   name                   = local.name
   engine_family          = "POSTGRESQL"
-  role_arn               = aws_iam_role.rds_proxy.arn
+  role_arn               = aws_iam_role.rds_proxy[0].arn
   vpc_subnet_ids         = values(aws_subnet.private)[*].id
-  vpc_security_group_ids = [aws_security_group.rds_proxy.id]
+  vpc_security_group_ids = [aws_security_group.rds_proxy[0].id]
   require_tls            = true
 
   depends_on = [aws_iam_role_policy.rds_proxy]
@@ -183,13 +190,15 @@ resource "aws_db_proxy" "data" {
 }
 
 resource "aws_db_proxy_default_target_group" "data" {
-  db_proxy_name = aws_db_proxy.data.name
+  count         = var.database_access_mode == "direct" ? 0 : 1
+  db_proxy_name = aws_db_proxy.data[0].name
 }
 
 resource "aws_db_proxy_target" "data" {
+  count                 = var.database_access_mode == "direct" ? 0 : 1
   db_cluster_identifier = aws_rds_cluster.data.id
-  db_proxy_name         = aws_db_proxy.data.name
-  target_group_name     = aws_db_proxy_default_target_group.data.name
+  db_proxy_name         = aws_db_proxy.data[0].name
+  target_group_name     = aws_db_proxy_default_target_group.data[0].name
 
   depends_on = [aws_rds_cluster_instance.data]
 }
@@ -240,4 +249,15 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
       sse_algorithm     = each.key == "web" ? "AES256" : "aws:kms"
     }
   }
+}
+
+# Prepare private direct connectivity while the proxy is still available.
+resource "aws_security_group_rule" "database_from_cluster" {
+  count                    = var.database_access_mode == "proxy" ? 0 : 1
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.database.id
+  source_security_group_id = aws_eks_cluster.this.vpc_config[0].cluster_security_group_id
 }
