@@ -50,3 +50,9 @@ For local recovery, stop the affected Compose profile and remove only disposable
 ## Database connectivity
 
 Aurora remains private and TLS-required. Terraform database access modes retain RDS Proxy by default, allow direct private connectivity to be prepared alongside it, and remove the proxy only after runtime-secret clients have moved. `DATABASE_URL` in Secrets Manager is authoritative; GitOps endpoint metadata does not rewrite runtime credentials. See [AWS cost reductions](../runbooks/aws-cost-reductions.md) for connection-capacity checks, deployment sequencing, and rollback.
+
+## AWS architecture diagram
+
+![AWS architecture and staged database access](aws-architecture.png)
+
+The [diagram source](aws-architecture.py) shows proxy mode as the default, direct access as a staged alternative, and Kafka as an existing dependency. Render from the repository root with Graphviz installed and `diagrams==0.25.1`: `python docs/architecture/aws-architecture.py`. The diagram describes supported modes, not evidence that a production cutover has completed.

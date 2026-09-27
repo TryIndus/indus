@@ -1,6 +1,9 @@
+"""Render from the repository root with diagrams and Graphviz installed."""
+
 from diagrams import Cluster, Diagram, Edge
-from diagrams.aws.compute import EKS
-from diagrams.aws.database import Aurora, RDS
+from diagrams.aws.analytics import ManagedStreamingForKafka
+from diagrams.aws.compute import ECR, EKS
+from diagrams.aws.database import Aurora, ElastiCache, RDS
 from diagrams.aws.management import Cloudwatch
 from diagrams.aws.network import CloudFront, ELB, Route53
 from diagrams.aws.security import Cognito, SecretsManager
@@ -10,47 +13,60 @@ from diagrams.onprem.vcs import Github
 
 
 with Diagram(
-    "Indus AWS architecture",
+    "Indus AWS architecture — staged database access",
     filename="docs/architecture/aws-architecture",
     outformat="png",
     show=False,
     direction="LR",
     graph_attr={
-        "pad": "1.4",
-        "nodesep": "1.3",
-        "ranksep": "1.8",
-        "splines": "ortho",
+        "pad": "0.6",
+        "labelloc": "t",
+        "nodesep": "0.8",
+        "ranksep": "1.2",
+        "splines": "spline",
         "bgcolor": "white",
         "fontname": "Arial",
         "fontsize": "20",
     },
-    node_attr={"fontname": "Arial", "fontsize": "14"},
-    edge_attr={"fontname": "Arial", "fontsize": "12"},
+    node_attr={"fontname": "Arial", "fontsize": "12"},
+    edge_attr={"fontname": "Arial", "fontsize": "10"},
 ):
-    users = Users("Users")
-    github = Github("GitHub Actions")
-    route53 = Route53("Route 53")
-    cloudfront = CloudFront("CloudFront")
+    users = Users("Users\ntryindus.ca")
+    github = Github("GitHub Actions\nSeparate infrastructure / app releases")
 
-    with Cluster("AWS Account [us-east-1]", graph_attr={"margin": "32", "pad": "0.8"}):
-        with Cluster("Public Subnets [2 AZs]", graph_attr={"margin": "28", "pad": "0.6"}):
-            alb = ELB("Application Load Balancer")
+    with Cluster("AWS account · us-east-1", graph_attr={"margin": "24"}):
+        route53 = Route53("Route 53")
+        cloudfront = CloudFront("CloudFront\nStatic web + API / stream origins")
+        web = S3("React assets")
+        cognito = Cognito("Cognito\nBrowser authentication")
+        registry = ECR("Scanned, signed\nimmutable images")
+        secrets = SecretsManager("Server-only\nruntime secrets")
+        artifacts = S3("Research artifacts\nEncrypted audit / export buckets")
+        logs = Cloudwatch("Audit + authenticator logs\nOptional API logs\nRejected flows: 10 min")
 
-        with Cluster("Private Subnets [Active Workload AZ]", graph_attr={"margin": "28", "pad": "0.6"}):
-            eks = EKS("EKS workloads")
-            secrets = SecretsManager("Runtime Secrets")
+        with Cluster("VPC · public subnets in 2 AZs"):
+            alb = ELB("Application Load Balancer\nHTTPS API + authenticated SSE")
 
-        with Cluster("Private Data Boundary [2 AZs]", graph_attr={"margin": "28", "pad": "0.6"}):
-            aurora = Aurora("Aurora PostgreSQL")
-            proxy = RDS("RDS Proxy")
-            cognito = Cognito("Cognito User Pool")
-            exports = S3("Encrypted Export and Audit Buckets")
-            logs = Cloudwatch("Database and Application Logs")
+        with Cluster("VPC · private workloads in active AZ"):
+            eks = EKS("EKS · production: 2 nodes\nRails API + Rust market data\nSidekiq + outbox / report workers")
 
-    users >> route53 >> cloudfront >> Edge(label="HTTPS") >> alb >> eks
-    github >> Edge(label="Immutable Image and Data Job") >> eks
-    eks >> Edge(label="TLS") >> proxy >> aurora
+        with Cluster("VPC · private managed data services"):
+            proxy = RDS("RDS Proxy\nRetained in proxy / prepare-direct\nRemoved only in direct mode")
+            aurora = Aurora("Aurora PostgreSQL\nEncrypted, TLS-required, backed up")
+            cache = ElastiCache("Valkey\nSidekiq queues")
+            kafka = ManagedStreamingForKafka("MSK Serverless\nMarket + report events\nStill required; removal is proposed")
+
+    users >> route53 >> cloudfront
+    cloudfront >> Edge(label="Static assets") >> web
+    cloudfront >> Edge(label="API / stream") >> alb >> eks
+    users >> Edge(label="Sign-in") >> cognito
+    github >> Edge(label="Build / scan / publish") >> registry
+    registry >> Edge(label="GitOps image digests") >> eks
+    eks >> Edge(label="Default proxy mode · TLS") >> proxy >> aurora
+    eks >> Edge(label="prepare-direct / direct · TLS", style="dashed", color="#2563eb") >> aurora
     eks >> secrets
-    eks >> cognito
-    eks >> Edge(label="Verified Export Artifacts") >> exports
-    aurora >> logs
+    eks >> cache
+    eks >> kafka
+    eks >> artifacts
+    eks >> Edge(label="Application + control-plane logs") >> logs
+    aurora >> Edge(label="Database logs") >> logs
