@@ -14,7 +14,7 @@ RUN VITE_API_URL="${VITE_API_URL}" \
     VITE_COGNITO_CLIENT_ID="${VITE_COGNITO_CLIENT_ID}" \
     bun run build
 
-FROM public.ecr.aws/aws-cli/aws-cli:2.36.48
+FROM amazon/aws-cli:2.36.48
 
 RUN dnf upgrade --refresh --releasever=latest -y \
     && dnf clean all
