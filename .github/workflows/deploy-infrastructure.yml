@@ -111,6 +111,7 @@ jobs:
               -target=module.environment.aws_lb_target_group.legacy_next
               -target=module.environment.aws_lb.this
               -target=module.environment.aws_security_group_rule.cluster_from_alb
+              -target=module.environment.aws_security_group_rule.database_from_cluster
               -target=module.environment.aws_security_group_rule.proxy_from_cluster
               -target=module.environment.aws_eks_addon.this
               -target=module.environment.aws_eks_node_group.system

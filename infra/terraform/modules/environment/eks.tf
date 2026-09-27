@@ -38,7 +38,7 @@ resource "aws_eks_cluster" "this" {
     subnet_ids              = values(aws_subnet.private)[*].id
   }
 
-  enabled_cluster_log_types = ["api", "audit", "authenticator"]
+  enabled_cluster_log_types = var.eks_log_types
 
   depends_on = [aws_iam_role_policy_attachment.eks_cluster]
 

@@ -117,6 +117,28 @@ variable "tags" {
   default = {}
 }
 
+variable "database_access_mode" {
+  type        = string
+  description = "proxy retains existing access; prepare-direct adds private Aurora access; direct removes the proxy after runtime secrets are migrated."
+  default     = "proxy"
+
+  validation {
+    condition     = contains(["proxy", "prepare-direct", "direct"], var.database_access_mode)
+    error_message = "database_access_mode must be proxy, prepare-direct, or direct."
+  }
+}
+
+variable "eks_log_types" {
+  type        = set(string)
+  description = "Control-plane logs; audit and authenticator remain enabled."
+  default     = ["audit", "authenticator"]
+
+  validation {
+    condition     = alltrue([for log_type in var.eks_log_types : contains(["api", "audit", "authenticator", "controllerManager", "scheduler"], log_type)]) && alltrue([for required in ["audit", "authenticator"] : contains(var.eks_log_types, required)])
+    error_message = "Keep audit and authenticator enabled and select only supported EKS log types."
+  }
+}
+
 provider "aws" {
   region              = var.aws_region
   allowed_account_ids = [var.account_id]
@@ -151,6 +173,8 @@ module "environment" {
   alert_email_addresses               = var.alert_email_addresses
   cognito_callback_urls               = var.cognito_callback_urls
   cognito_logout_urls                 = var.cognito_logout_urls
+  database_access_mode                = var.database_access_mode
+  eks_log_types                       = var.eks_log_types
   database_min_acu                    = var.database_min_acu
   database_max_acu                    = var.database_max_acu
   replacement_platform_enabled        = var.replacement_platform_enabled
