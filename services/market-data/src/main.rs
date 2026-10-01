@@ -39,7 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     store.run_retention(config.retention_days).await?;
     health.set_database_ready(true);
     let publisher: Arc<dyn EventPublisher> = match config.event_transport {
-        EventTransport::Kafka => Arc::new(KafkaPublisher::new(config.kafka.as_ref().expect("Kafka configuration"))?),
+        EventTransport::Kafka => Arc::new(KafkaPublisher::new(
+            config.kafka.as_ref().expect("Kafka configuration"),
+        )?),
         EventTransport::Postgres => Arc::new(PostgresPublisher::new(store.clone())),
     };
     health.set_kafka_ready(config.event_transport == EventTransport::Kafka);

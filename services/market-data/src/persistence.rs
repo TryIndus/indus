@@ -78,9 +78,13 @@ impl PostgresStore {
         Ok(())
     }
 
-    pub async fn persist_direct(&self, event: &NormalizedEvent) -> Result<PersistOutcome, StoreError> {
+    pub async fn persist_direct(
+        &self,
+        event: &NormalizedEvent,
+    ) -> Result<PersistOutcome, StoreError> {
         let validated = NormalizedEvent::decode(event.topic(), &event.encode())?;
-        self.persist_validated(validated, event.topic(), None, true).await
+        self.persist_validated(validated, event.topic(), None, true)
+            .await
     }
 
     pub async fn journal_start(&self, replay_capacity: usize) -> Result<i64, StoreError> {
@@ -91,7 +95,11 @@ impl PostgresStore {
         .fetch_one(&self.pool).await?)
     }
 
-    pub async fn journal_after(&self, sequence: i64, limit: i64) -> Result<Vec<(i64, String, Vec<u8>)>, StoreError> {
+    pub async fn journal_after(
+        &self,
+        sequence: i64,
+        limit: i64,
+    ) -> Result<Vec<(i64, String, Vec<u8>)>, StoreError> {
         Ok(sqlx::query_as::<_, (i64, String, Vec<u8>)>(
             "SELECT sequence, topic, payload FROM market_data.direct_event_journal WHERE sequence > $1 ORDER BY sequence LIMIT $2",
         )
@@ -115,7 +123,11 @@ impl PostgresStore {
     }
 
     async fn persist_validated(
-        &self, event: NormalizedEvent, topic: &str, position: Option<(i32, i64)>, journal: bool,
+        &self,
+        event: NormalizedEvent,
+        topic: &str,
+        position: Option<(i32, i64)>,
+        journal: bool,
     ) -> Result<PersistOutcome, StoreError> {
         let envelope = event.envelope()?;
         let event_id = match Uuid::parse_str(&envelope.event_id) {
@@ -137,8 +149,11 @@ impl PostgresStore {
         let encoded = journal.then(|| event.encode());
         let mut transaction = self.pool.begin().await?;
         if journal {
-            sqlx::query("SELECT pg_advisory_xact_lock(hashtext('market_data.direct_event_journal'))")
-                .execute(&mut *transaction).await?;
+            sqlx::query(
+                "SELECT pg_advisory_xact_lock(hashtext('market_data.direct_event_journal'))",
+            )
+            .execute(&mut *transaction)
+            .await?;
         }
         let inserted = sqlx::query(
             "INSERT INTO market_data.consumed_events \
@@ -246,7 +261,15 @@ impl EventStore for PostgresStore {
             Ok(event) => event,
             Err(error) => return self.reject(record, &error.to_string()).await,
         };
-        match self.persist_validated(event, &record.topic, Some((record.partition, record.offset)), false).await {
+        match self
+            .persist_validated(
+                event,
+                &record.topic,
+                Some((record.partition, record.offset)),
+                false,
+            )
+            .await
+        {
             Err(StoreError::Event(error)) => self.reject(record, &error.to_string()).await,
             Err(StoreError::EventId) => self.reject(record, &StoreError::EventId.to_string()).await,
             result => result,

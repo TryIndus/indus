@@ -79,10 +79,12 @@ impl Config {
         let event_transport = match env::var("EVENT_TRANSPORT").as_deref() {
             Ok("postgres") => EventTransport::Postgres,
             Ok("kafka") | Err(_) => EventTransport::Kafka,
-            Ok(_) => return Err(ConfigError::Invalid {
-                name: "EVENT_TRANSPORT",
-                reason: "expected kafka or postgres".into(),
-            }),
+            Ok(_) => {
+                return Err(ConfigError::Invalid {
+                    name: "EVENT_TRANSPORT",
+                    reason: "expected kafka or postgres".into(),
+                });
+            }
         };
         let jwks_url = optional("MARKET_JWKS_URL");
         let hs256_secret = optional("MARKET_JWT_HS256_SECRET");
@@ -303,9 +305,18 @@ mod tests {
         let config = Config::from_env().expect("the minimum complete configuration should load");
 
         assert_eq!(config.bind_addr, "0.0.0.0:8081".parse().unwrap());
-        assert_eq!(config.kafka.as_ref().unwrap().transactional_id, "indus-market-data-producer");
-        assert_eq!(config.kafka.as_ref().unwrap().group_id, "indus-market-data-writer-v1");
-        assert_eq!(config.kafka.as_ref().unwrap().security_protocol, "PLAINTEXT");
+        assert_eq!(
+            config.kafka.as_ref().unwrap().transactional_id,
+            "indus-market-data-producer"
+        );
+        assert_eq!(
+            config.kafka.as_ref().unwrap().group_id,
+            "indus-market-data-writer-v1"
+        );
+        assert_eq!(
+            config.kafka.as_ref().unwrap().security_protocol,
+            "PLAINTEXT"
+        );
         assert_eq!(config.alpaca.symbols, ["AAPL", "BTC/USD"]);
         assert_eq!(config.stream.stale_after, Duration::from_secs(30));
         assert_eq!(config.stream.heartbeat, Duration::from_secs(15));
@@ -347,8 +358,14 @@ mod tests {
         assert_eq!(config.stream.stale_after, Duration::from_secs(45));
         assert_eq!(config.stream.max_global, 100);
         assert_eq!(config.retention_days, 30);
-        assert_eq!(config.kafka.as_ref().unwrap().sasl_mechanism.as_deref(), Some("AWS_MSK_IAM"));
-        assert_eq!(config.kafka.as_ref().unwrap().aws_region.as_deref(), Some("us-east-1"));
+        assert_eq!(
+            config.kafka.as_ref().unwrap().sasl_mechanism.as_deref(),
+            Some("AWS_MSK_IAM")
+        );
+        assert_eq!(
+            config.kafka.as_ref().unwrap().aws_region.as_deref(),
+            Some("us-east-1")
+        );
         assert_eq!(config.alpaca.stock_ws_url, "wss://stocks.example");
     }
 

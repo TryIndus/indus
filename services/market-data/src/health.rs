@@ -67,9 +67,17 @@ impl ServiceHealth {
         Readiness {
             ready: database && kafka && (!required || upstream) && self.is_live(),
             database: state(database),
-            kafka: if postgres_transport { "disabled" } else { state(kafka) },
+            kafka: if postgres_transport {
+                "disabled"
+            } else {
+                state(kafka)
+            },
             transport: state(kafka),
-            transport_mode: if postgres_transport { "postgres" } else { "kafka" },
+            transport_mode: if postgres_transport {
+                "postgres"
+            } else {
+                "kafka"
+            },
             upstream: if !required {
                 "disabled"
             } else {
