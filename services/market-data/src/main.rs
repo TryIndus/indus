@@ -2,7 +2,8 @@ use std::{sync::Arc, time::Duration};
 
 use indus_market_data::{
     auth::JwtAuthenticator,
-    config::Config,
+    config::{Config, EventTransport},
+    direct::{PostgresPublisher, run_journal_fanout},
     health::ServiceHealth,
     http::{AppState, router},
     kafka::{EventPublisher, KafkaPublisher, run_consumer},
@@ -30,14 +31,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     let metrics = Metrics::new()?;
     let health = Arc::new(ServiceHealth::default());
+    health.set_postgres_transport(config.event_transport == EventTransport::Postgres);
     health.set_upstream_required(config.alpaca.enabled);
 
     let store = Arc::new(PostgresStore::connect(&config.database_url).await?);
     store.ping().await?;
     store.run_retention(config.retention_days).await?;
     health.set_database_ready(true);
-    let publisher: Arc<dyn EventPublisher> = Arc::new(KafkaPublisher::new(&config.kafka)?);
-    health.set_kafka_ready(true);
+    let publisher: Arc<dyn EventPublisher> = match config.event_transport {
+        EventTransport::Kafka => Arc::new(KafkaPublisher::new(config.kafka.as_ref().expect("Kafka configuration"))?),
+        EventTransport::Postgres => Arc::new(PostgresPublisher::new(store.clone())),
+    };
+    health.set_kafka_ready(config.event_transport == EventTransport::Kafka);
     let authenticator = Arc::new(JwtAuthenticator::new(&config.auth).await?);
     let hub = Arc::new(StreamHub::new(
         config.stream.buffer_capacity,
@@ -73,24 +78,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
     let consumer_store = store.clone();
     let consumer_config = config.kafka.clone();
+    let event_transport = config.event_transport;
+    let replay_capacity = config.stream.replay_capacity;
+    let consumer_hub = hub.clone();
     let consumer_metrics = metrics.clone();
     let consumer_health = health.clone();
     let consumer_shutdown = shutdown_rx.clone();
     tasks.spawn(async move {
         let mut consumer_shutdown = consumer_shutdown;
         loop {
-            match run_consumer(
-                consumer_config.clone(),
-                consumer_store.clone(),
-                consumer_metrics.clone(),
-                consumer_health.clone(),
-                consumer_shutdown.clone(),
-            )
-            .await
-            {
-                Ok(()) if *consumer_shutdown.borrow() => return Ok(()),
-                Ok(()) => warn!("Kafka consumer exited; restarting"),
-                Err(error) => warn!(%error, "Kafka consumer failed; restarting without committing a later offset"),
+            match event_transport {
+                EventTransport::Kafka => {
+                    match run_consumer(
+                        consumer_config.clone().expect("Kafka configuration"),
+                        consumer_store.clone(), consumer_metrics.clone(),
+                        consumer_health.clone(), consumer_shutdown.clone(),
+                    ).await {
+                        Ok(()) if *consumer_shutdown.borrow() => return Ok(()),
+                        Ok(()) => warn!("Kafka consumer exited; restarting"),
+                        Err(error) => warn!(%error, "Kafka consumer failed; restarting without committing a later offset"),
+                    }
+                }
+                EventTransport::Postgres => {
+                    match run_journal_fanout(
+                        consumer_store.clone(), consumer_hub.clone(), consumer_health.clone(),
+                        replay_capacity, consumer_shutdown.clone(),
+                    ).await {
+                        Ok(()) if *consumer_shutdown.borrow() => return Ok(()),
+                        Ok(()) => warn!("PostgreSQL journal fanout exited; restarting"),
+                        Err(error) => warn!(%error, "PostgreSQL journal fanout failed; restarting"),
+                    }
+                }
             }
             consumer_health.set_kafka_ready(false);
             tokio::select! {
@@ -103,6 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let pipeline_hub = hub.clone();
+    let direct_transport = config.event_transport == EventTransport::Postgres;
     let pipeline_metrics = metrics.clone();
     let pipeline_publisher = publisher.clone();
     let mut pipeline_shutdown = shutdown_rx.clone();
@@ -136,7 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             _ = time::sleep(Duration::from_secs(1)) => {},
                             changed = pipeline_shutdown.changed() => {
                                 if changed.is_err() || *pipeline_shutdown.borrow() {
-                                    return Err(provider::ProviderError::Connection("shutdown before Kafka acknowledged retained batch".into()));
+                                    return Err(provider::ProviderError::Connection("shutdown before event persistence acknowledged retained batch".into()));
                                 }
                             }
                         }
@@ -144,10 +163,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             pipeline_metrics.published.inc_by(batch.len() as u64);
-            for event in batch {
-                match event.live_event() {
-                    Ok(event) => pipeline_hub.publish(event),
-                    Err(error) => warn!(%error, "acknowledged event could not be fanned out"),
+            if !direct_transport {
+                for event in batch {
+                    match event.live_event() {
+                        Ok(event) => pipeline_hub.publish(event),
+                        Err(error) => warn!(%error, "acknowledged event could not be fanned out"),
+                    }
                 }
             }
         }

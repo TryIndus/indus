@@ -4,6 +4,7 @@ pub mod event;
 pub mod health;
 pub mod http;
 pub mod kafka;
+pub mod direct;
 pub mod metrics;
 pub mod persistence;
 pub mod provider;

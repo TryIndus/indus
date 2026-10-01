@@ -14,6 +14,8 @@ report transaction -> outbox row -> Kafka -> idempotent consumer -> Temporal wor
 
 The HTTP request never dual-writes PostgreSQL and Kafka. A report and its `reports.lifecycle.v1` outbox row commit together. The publisher acknowledges the row only after the broker acknowledges the event and records bounded retry metadata otherwise.
 
+For the cost-reduced runtime, `EVENT_TRANSPORT=postgres` makes the outbox worker claim eligible rows with `FOR UPDATE SKIP LOCKED`, validate the envelope and report ownership, enqueue the existing `ResearchReportJob`, and acknowledge the row. The Kafka path remains available with `EVENT_TRANSPORT=kafka`. Outbox delivery and Sidekiq enqueue are at least once across a crash boundary; report workflow IDs and activity leases must tolerate a repeated job. Keep the Kafka consumer at zero replicas only when the PostgreSQL dispatcher is active. The MSK Terraform definition and Kafka architecture remain available for rollback.
+
 ## Event delivery
 
 Every Rails event has a versioned envelope with an event ID, producer, occurrence time, tenant, correlation ID, causation ID, and idempotency key. Consumers reject unsupported schema versions and claim an event receipt transactionally before applying its effect. Kafka delivery is therefore at least once; duplicate tolerance is mandatory and duplicate events are observable, not exceptional.
@@ -40,5 +42,7 @@ Artifacts are written through `Reports::ArtifactStore`. Local development uses M
 - Model unavailable or invalid: Temporal retries transient errors and records a bounded terminal failure after policy exhaustion.
 - Object storage unavailable: the artifact activity retries without marking the report complete.
 - Process crash: Temporal history, outbox rows, event receipts, and activity leases recover work without relying on process memory.
+
+In PostgreSQL transport mode, an unavailable Sidekiq queue leaves the outbox row eligible for retry after bounded backoff. A database outage stops dispatch entirely. Kafka outages do not affect the PostgreSQL mode.
 
 The web application, Rails API, market-data service, and workflow workers communicate only through their documented HTTP, event, and storage boundaries.

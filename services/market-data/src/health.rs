@@ -7,6 +7,7 @@ use serde::Serialize;
 pub struct ServiceHealth {
     database_ready: AtomicBool,
     kafka_ready: AtomicBool,
+    postgres_transport: AtomicBool,
     upstream_required: AtomicBool,
     upstream_connected: AtomicBool,
     last_upstream_event: AtomicI64,
@@ -18,6 +19,8 @@ pub struct Readiness {
     pub ready: bool,
     pub database: &'static str,
     pub kafka: &'static str,
+    pub transport: &'static str,
+    pub transport_mode: &'static str,
     pub upstream: &'static str,
 }
 
@@ -28,6 +31,10 @@ impl ServiceHealth {
 
     pub fn set_kafka_ready(&self, value: bool) {
         self.kafka_ready.store(value, Ordering::Relaxed);
+    }
+
+    pub fn set_postgres_transport(&self, value: bool) {
+        self.postgres_transport.store(value, Ordering::Relaxed);
     }
 
     pub fn set_upstream_required(&self, value: bool) {
@@ -54,12 +61,15 @@ impl ServiceHealth {
     pub fn readiness(&self) -> Readiness {
         let database = self.database_ready.load(Ordering::Relaxed);
         let kafka = self.kafka_ready.load(Ordering::Relaxed);
+        let postgres_transport = self.postgres_transport.load(Ordering::Relaxed);
         let required = self.upstream_required.load(Ordering::Relaxed);
         let upstream = self.upstream_connected.load(Ordering::Relaxed);
         Readiness {
             ready: database && kafka && (!required || upstream) && self.is_live(),
             database: state(database),
-            kafka: state(kafka),
+            kafka: if postgres_transport { "disabled" } else { state(kafka) },
+            transport: state(kafka),
+            transport_mode: if postgres_transport { "postgres" } else { "kafka" },
             upstream: if !required {
                 "disabled"
             } else {

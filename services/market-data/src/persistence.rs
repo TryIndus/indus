@@ -72,7 +72,30 @@ impl PostgresStore {
             .bind(i32::try_from(retention_days).unwrap_or(i32::MAX))
             .execute(&self.pool)
             .await?;
+        sqlx::query("DELETE FROM market_data.direct_event_journal WHERE recorded_at < clock_timestamp() - make_interval(days => $1)")
+            .bind(i32::try_from(retention_days).unwrap_or(i32::MAX))
+            .execute(&self.pool).await?;
         Ok(())
+    }
+
+    pub async fn persist_direct(&self, event: &NormalizedEvent) -> Result<PersistOutcome, StoreError> {
+        let validated = NormalizedEvent::decode(event.topic(), &event.encode())?;
+        self.persist_validated(validated, event.topic(), None, true).await
+    }
+
+    pub async fn journal_start(&self, replay_capacity: usize) -> Result<i64, StoreError> {
+        Ok(sqlx::query_scalar::<_, i64>(
+            "SELECT COALESCE((SELECT sequence FROM market_data.direct_event_journal ORDER BY sequence DESC OFFSET $1 LIMIT 1), 0)",
+        )
+        .bind(i64::try_from(replay_capacity).unwrap_or(i64::MAX))
+        .fetch_one(&self.pool).await?)
+    }
+
+    pub async fn journal_after(&self, sequence: i64, limit: i64) -> Result<Vec<(i64, String, Vec<u8>)>, StoreError> {
+        Ok(sqlx::query_as::<_, (i64, String, Vec<u8>)>(
+            "SELECT sequence, topic, payload FROM market_data.direct_event_journal WHERE sequence > $1 ORDER BY sequence LIMIT $2",
+        )
+        .bind(sequence).bind(limit).fetch_all(&self.pool).await?)
     }
 
     pub async fn record_feed_measurement(
@@ -91,44 +114,17 @@ impl PostgresStore {
         Ok(())
     }
 
-    async fn reject(
-        &self,
-        record: &KafkaRecord,
-        reason: &str,
+    async fn persist_validated(
+        &self, event: NormalizedEvent, topic: &str, position: Option<(i32, i64)>, journal: bool,
     ) -> Result<PersistOutcome, StoreError> {
-        sqlx::query(
-            "INSERT INTO market_data.rejected_events \
-             (event_id, topic, partition_id, offset_id, reason, payload) \
-             VALUES ($1, $2, $3, $4, $5, $6) \
-             ON CONFLICT (topic, partition_id, offset_id) DO NOTHING",
-        )
-        .bind(record.event_id.as_deref())
-        .bind(&record.topic)
-        .bind(record.partition)
-        .bind(record.offset)
-        .bind(reason)
-        .bind(&record.payload)
-        .execute(&self.pool)
-        .await?;
-        Ok(PersistOutcome::Rejected)
-    }
-}
-
-#[async_trait]
-impl EventStore for PostgresStore {
-    async fn persist(&self, record: &KafkaRecord) -> Result<PersistOutcome, StoreError> {
-        let event = match NormalizedEvent::decode(&record.topic, &record.payload) {
-            Ok(event) => event,
-            Err(error) => return self.reject(record, &error.to_string()).await,
-        };
         let envelope = event.envelope()?;
         let event_id = match Uuid::parse_str(&envelope.event_id) {
             Ok(event_id) => event_id,
-            Err(_) => return self.reject(record, &StoreError::EventId.to_string()).await,
+            Err(_) => return Err(StoreError::EventId),
         };
         let occurred_at = match timestamp(envelope.occurred_at.as_ref(), "occurred_at") {
             Ok(occurred_at) => occurred_at,
-            Err(error) => return self.reject(record, &error.to_string()).await,
+            Err(error) => return Err(StoreError::Event(error)),
         };
         let market_timestamp = match &event {
             NormalizedEvent::Bar(event) => timestamp(event.window_start.as_ref(), "window_start")
@@ -136,18 +132,23 @@ impl EventStore for PostgresStore {
             NormalizedEvent::Quote(event) => timestamp(event.observed_at.as_ref(), "observed_at"),
         };
         if let Err(error) = market_timestamp {
-            return self.reject(record, &error.to_string()).await;
+            return Err(StoreError::Event(error));
         }
+        let encoded = journal.then(|| event.encode());
         let mut transaction = self.pool.begin().await?;
+        if journal {
+            sqlx::query("SELECT pg_advisory_xact_lock(hashtext('market_data.direct_event_journal'))")
+                .execute(&mut *transaction).await?;
+        }
         let inserted = sqlx::query(
             "INSERT INTO market_data.consumed_events \
              (event_id, topic, partition_id, offset_id, occurred_at) \
              VALUES ($1, $2, $3, $4, $5) ON CONFLICT (event_id) DO NOTHING",
         )
         .bind(event_id)
-        .bind(&record.topic)
-        .bind(record.partition)
-        .bind(record.offset)
+        .bind(topic)
+        .bind(position.map(|value| value.0))
+        .bind(position.map(|value| value.1))
         .bind(occurred_at)
         .execute(&mut *transaction)
         .await?;
@@ -207,8 +208,49 @@ impl EventStore for PostgresStore {
                 .await?;
             }
         }
+        if let Some(payload) = encoded {
+            sqlx::query("INSERT INTO market_data.direct_event_journal (event_id, topic, payload) VALUES ($1, $2, $3)")
+                .bind(event_id).bind(topic).bind(payload).execute(&mut *transaction).await?;
+        }
         transaction.commit().await?;
         Ok(PersistOutcome::Stored)
+    }
+
+    async fn reject(
+        &self,
+        record: &KafkaRecord,
+        reason: &str,
+    ) -> Result<PersistOutcome, StoreError> {
+        sqlx::query(
+            "INSERT INTO market_data.rejected_events \
+             (event_id, topic, partition_id, offset_id, reason, payload) \
+             VALUES ($1, $2, $3, $4, $5, $6) \
+             ON CONFLICT (topic, partition_id, offset_id) DO NOTHING",
+        )
+        .bind(record.event_id.as_deref())
+        .bind(&record.topic)
+        .bind(record.partition)
+        .bind(record.offset)
+        .bind(reason)
+        .bind(&record.payload)
+        .execute(&self.pool)
+        .await?;
+        Ok(PersistOutcome::Rejected)
+    }
+}
+
+#[async_trait]
+impl EventStore for PostgresStore {
+    async fn persist(&self, record: &KafkaRecord) -> Result<PersistOutcome, StoreError> {
+        let event = match NormalizedEvent::decode(&record.topic, &record.payload) {
+            Ok(event) => event,
+            Err(error) => return self.reject(record, &error.to_string()).await,
+        };
+        match self.persist_validated(event, &record.topic, Some((record.partition, record.offset)), false).await {
+            Err(StoreError::Event(error)) => self.reject(record, &error.to_string()).await,
+            Err(StoreError::EventId) => self.reject(record, &StoreError::EventId.to_string()).await,
+            result => result,
+        }
     }
 }
 

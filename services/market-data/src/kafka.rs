@@ -46,6 +46,8 @@ pub enum KafkaError {
     Transaction(String),
     #[error("event metadata is invalid: {0}")]
     Event(String),
+    #[error("direct event persistence failed: {0}")]
+    Persistence(#[from] crate::persistence::StoreError),
 }
 
 pub struct KafkaContext {

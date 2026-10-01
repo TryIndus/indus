@@ -6,12 +6,19 @@ use thiserror::Error;
 pub struct Config {
     pub bind_addr: SocketAddr,
     pub database_url: String,
-    pub kafka: KafkaConfig,
+    pub event_transport: EventTransport,
+    pub kafka: Option<KafkaConfig>,
     pub auth: AuthConfig,
     pub alpaca: AlpacaConfig,
     pub stream: StreamConfig,
     pub retention_days: u32,
     pub allowed_origins: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EventTransport {
+    Kafka,
+    Postgres,
 }
 
 #[derive(Clone, Debug)]
@@ -69,6 +76,14 @@ pub enum ConfigError {
 
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
+        let event_transport = match env::var("EVENT_TRANSPORT").as_deref() {
+            Ok("postgres") => EventTransport::Postgres,
+            Ok("kafka") | Err(_) => EventTransport::Kafka,
+            Ok(_) => return Err(ConfigError::Invalid {
+                name: "EVENT_TRANSPORT",
+                reason: "expected kafka or postgres".into(),
+            }),
+        };
         let jwks_url = optional("MARKET_JWKS_URL");
         let hs256_secret = optional("MARKET_JWT_HS256_SECRET");
         if jwks_url.is_some() == hs256_secret.is_some() {
@@ -99,7 +114,11 @@ impl Config {
         Ok(Self {
             bind_addr: parse_with_default("MARKET_BIND_ADDR", "0.0.0.0:8081")?,
             database_url: required("DATABASE_URL")?,
-            kafka: KafkaConfig::from_env()?,
+            event_transport,
+            kafka: match event_transport {
+                EventTransport::Kafka => Some(KafkaConfig::from_env()?),
+                EventTransport::Postgres => None,
+            },
             auth: AuthConfig {
                 issuer: required("MARKET_JWT_ISSUER")?,
                 audience: required("MARKET_JWT_AUDIENCE")?,
@@ -206,6 +225,7 @@ mod tests {
         "ALPACA_STOCK_WS_URL",
         "AWS_REGION",
         "DATABASE_URL",
+        "EVENT_TRANSPORT",
         "KAFKA_BOOTSTRAP_SERVERS",
         "KAFKA_GROUP_ID",
         "KAFKA_SASL_MECHANISM",
@@ -283,9 +303,9 @@ mod tests {
         let config = Config::from_env().expect("the minimum complete configuration should load");
 
         assert_eq!(config.bind_addr, "0.0.0.0:8081".parse().unwrap());
-        assert_eq!(config.kafka.transactional_id, "indus-market-data-producer");
-        assert_eq!(config.kafka.group_id, "indus-market-data-writer-v1");
-        assert_eq!(config.kafka.security_protocol, "PLAINTEXT");
+        assert_eq!(config.kafka.as_ref().unwrap().transactional_id, "indus-market-data-producer");
+        assert_eq!(config.kafka.as_ref().unwrap().group_id, "indus-market-data-writer-v1");
+        assert_eq!(config.kafka.as_ref().unwrap().security_protocol, "PLAINTEXT");
         assert_eq!(config.alpaca.symbols, ["AAPL", "BTC/USD"]);
         assert_eq!(config.stream.stale_after, Duration::from_secs(30));
         assert_eq!(config.stream.heartbeat, Duration::from_secs(15));
@@ -327,9 +347,19 @@ mod tests {
         assert_eq!(config.stream.stale_after, Duration::from_secs(45));
         assert_eq!(config.stream.max_global, 100);
         assert_eq!(config.retention_days, 30);
-        assert_eq!(config.kafka.sasl_mechanism.as_deref(), Some("AWS_MSK_IAM"));
-        assert_eq!(config.kafka.aws_region.as_deref(), Some("us-east-1"));
+        assert_eq!(config.kafka.as_ref().unwrap().sasl_mechanism.as_deref(), Some("AWS_MSK_IAM"));
+        assert_eq!(config.kafka.as_ref().unwrap().aws_region.as_deref(), Some("us-east-1"));
         assert_eq!(config.alpaca.stock_ws_url, "wss://stocks.example");
+    }
+
+    #[test]
+    fn postgres_transport_does_not_require_a_kafka_endpoint() {
+        let environment = required_environment();
+        environment.set("EVENT_TRANSPORT", "postgres");
+        environment.set("KAFKA_BOOTSTRAP_SERVERS", "");
+        let config = Config::from_env().unwrap();
+        assert_eq!(config.event_transport, EventTransport::Postgres);
+        assert!(config.kafka.is_none());
     }
 
     #[test]

@@ -1,8 +1,11 @@
 #!/usr/bin/env ruby
 require_relative "../config/environment"
 
-producer = Events::KafkaProducer.from_env
-publisher = Events::OutboxPublisher.new(producer: producer)
+transport = ENV.fetch("EVENT_TRANSPORT", "kafka")
+raise ArgumentError, "unsupported event transport" unless %w[kafka postgres].include?(transport)
+
+producer = Events::KafkaProducer.from_env if transport == "kafka"
+publisher = transport == "postgres" ? Events::PostgresOutboxDispatcher.new : Events::OutboxPublisher.new(producer: producer)
 shutdown = false
 %w[INT TERM].each { |signal| Signal.trap(signal) { shutdown = true } }
 
