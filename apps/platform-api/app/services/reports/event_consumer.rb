@@ -29,6 +29,5 @@ module Reports
     ensure
       @consumer.close
     end
-
   end
 end
