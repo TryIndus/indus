@@ -130,7 +130,10 @@ async fn direct_events_commit_without_kafka_offsets_and_replay_from_the_journal(
     ));
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
-            if !hub.subscribe(event.symbol(), None).replay.is_empty()
+            if !hub
+                .subscribe(event.symbol(), Some("missing-cursor"))
+                .replay
+                .is_empty()
                 && health.readiness().transport == "ready"
             {
                 break;
