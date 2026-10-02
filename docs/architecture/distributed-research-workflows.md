@@ -14,7 +14,7 @@ report transaction -> outbox row -> Kafka -> idempotent consumer -> Temporal wor
 
 The HTTP request never dual-writes PostgreSQL and Kafka. A report and its `reports.lifecycle.v1` outbox row commit together. The publisher acknowledges the row only after the broker acknowledges the event and records bounded retry metadata otherwise.
 
-For the cost-reduced runtime, `EVENT_TRANSPORT=postgres` makes the outbox worker claim eligible rows with `FOR UPDATE SKIP LOCKED`, validate the envelope and report ownership, enqueue the existing `ResearchReportJob`, and acknowledge the row. The Kafka path remains available with `EVENT_TRANSPORT=kafka`. Outbox delivery and Sidekiq enqueue are at least once across a crash boundary; report workflow IDs and activity leases must tolerate a repeated job. Keep the Kafka consumer at zero replicas only when the PostgreSQL dispatcher is active. The MSK Terraform definition and Kafka architecture remain available for rollback.
+Kafka on MSK is the production transport (`EVENT_TRANSPORT=kafka`). The optional `EVENT_TRANSPORT=postgres` mode makes the outbox worker claim eligible rows with `FOR UPDATE SKIP LOCKED`, validate the envelope and report ownership, enqueue the existing `ResearchReportJob`, and acknowledge the row. Outbox delivery and Sidekiq enqueue are at least once across a crash boundary; report workflow IDs and activity leases must tolerate a repeated job. Configure the Kafka consumer with zero replicas when PostgreSQL mode is active.
 
 ## Event delivery
 
