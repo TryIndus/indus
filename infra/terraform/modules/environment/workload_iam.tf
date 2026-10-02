@@ -116,7 +116,7 @@ locals {
     research-worker   = "research-worker"
     database-migrator = "database-migration"
   }
-  kafka_workloads = toset(["platform-api", "platform-outbox", "reports-consumer", "market-data"])
+  kafka_workloads = var.enable_msk ? toset(["platform-api", "platform-outbox", "reports-consumer", "market-data"]) : toset([])
 }
 
 data "aws_iam_policy_document" "runtime_secret" {
@@ -144,19 +144,19 @@ data "aws_iam_policy_document" "kafka" {
 
   statement {
     actions   = ["kafka-cluster:Connect", "kafka-cluster:DescribeCluster"]
-    resources = [aws_msk_serverless_cluster.events.arn]
+    resources = [aws_msk_serverless_cluster.events[0].arn]
   }
   statement {
     actions   = ["kafka-cluster:CreateTopic", "kafka-cluster:DescribeTopic", "kafka-cluster:ReadData", "kafka-cluster:WriteData"]
-    resources = ["${replace(aws_msk_serverless_cluster.events.arn, ":cluster/", ":topic/")}/*"]
+    resources = ["${replace(aws_msk_serverless_cluster.events[0].arn, ":cluster/", ":topic/")}/*"]
   }
   statement {
     actions   = ["kafka-cluster:AlterGroup", "kafka-cluster:DescribeGroup"]
-    resources = ["${replace(aws_msk_serverless_cluster.events.arn, ":cluster/", ":group/")}/*"]
+    resources = ["${replace(aws_msk_serverless_cluster.events[0].arn, ":cluster/", ":group/")}/*"]
   }
   statement {
     actions   = ["kafka-cluster:AlterTransactionalId", "kafka-cluster:DescribeTransactionalId"]
-    resources = ["${replace(aws_msk_serverless_cluster.events.arn, ":cluster/", ":transactional-id/")}/*"]
+    resources = ["${replace(aws_msk_serverless_cluster.events[0].arn, ":cluster/", ":transactional-id/")}/*"]
   }
 }
 

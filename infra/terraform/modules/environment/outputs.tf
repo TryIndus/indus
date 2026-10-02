@@ -62,7 +62,7 @@ output "data_platform" {
     redis_port            = aws_elasticache_serverless_cache.application.endpoint[0].port
     redis_cache_name      = aws_elasticache_serverless_cache.application.name
     redis_user            = aws_elasticache_user.application.user_name
-    msk_bootstrap_brokers = aws_msk_serverless_cluster.events.bootstrap_brokers_sasl_iam
+    msk_bootstrap_brokers = var.enable_msk ? aws_msk_serverless_cluster.events[0].bootstrap_brokers_sasl_iam : ""
   }
 }
 
