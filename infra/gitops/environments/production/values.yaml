@@ -32,7 +32,7 @@ config:
   redisCacheName: indus-production
   redisUser: indus-production-app
   mskBootstrapBrokers: replace-production.kafka-serverless.us-east-1.amazonaws.com:9098
-  eventTransport: kafka
+  eventTransport: postgres
   artifactBucket: indus-production-artifacts-111111111111
   rawEventsBucket: indus-production-raw-events-111111111111
   temporalAddress: replace.tmprl.cloud:7233
@@ -48,4 +48,4 @@ sidekiq: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
 marketData: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
 researchWorker: { replicas: 1, minReplicas: 1, maxReplicas: 3 }
 platformOutbox: { replicas: 1 }
-reportsConsumer: { replicas: 1 }
+reportsConsumer: { replicas: 0 }
