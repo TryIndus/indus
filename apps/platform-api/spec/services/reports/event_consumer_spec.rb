@@ -70,6 +70,15 @@ RSpec.describe Reports::EventConsumer do
     expect(consumer).to be_closed
   end
 
+  it "does not commit a queued event when enqueueing returns false" do
+    allow(ResearchReportJob).to receive(:perform_later).and_return(false)
+    consumer = consumer_class.new([ message_class.new(JSON.generate(queued_payload)) ])
+
+    expect { described_class.new(consumer: consumer).run }.to raise_error("report job was not enqueued")
+    expect(ConsumedEvent.count).to eq(0)
+    expect(consumer.commits).to be_empty
+  end
+
   def queued_payload
     { "envelope" => Events::Envelope.build(event_id: SecureRandom.uuid, event_type: "report.queued",
       tenant_id: user.id, correlation_id: "request-1", idempotency_key: "request-1").deep_stringify_keys,

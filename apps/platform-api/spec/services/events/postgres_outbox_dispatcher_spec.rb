@@ -31,6 +31,13 @@ RSpec.describe Events::PostgresOutboxDispatcher do
     expect(event.next_attempt_at).to be > Time.current
   end
 
+  it "retains the event when enqueueing returns false" do
+    event
+    allow(ResearchReportJob).to receive(:perform_later).and_return(false)
+    expect(described_class.new.publish_batch(limit: 1)).to eq(0)
+    expect(event.reload).to have_attributes(published_at: nil, attempts: 1, last_error: "RuntimeError")
+  end
+
   it "does not dispatch an event for another tenant" do
     payload = event.payload
     payload["envelope"]["tenant_id"] = SecureRandom.uuid

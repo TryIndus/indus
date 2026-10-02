@@ -11,8 +11,9 @@ module Reports
       raise ArgumentError, "report workflow does not match event" unless workflow_id == "report-#{report.id}"
       raise ArgumentError, "report workflow changed" if report.workflow_id.present? && report.workflow_id != workflow_id
       report.update!(workflow_id: workflow_id) if report.workflow_id.nil?
-      ResearchReportJob.perform_later({ "report_id" => report.id, "workflow_id" => workflow_id,
+      enqueued = ResearchReportJob.perform_later({ "report_id" => report.id, "workflow_id" => workflow_id,
         "correlation_id" => payload.dig("envelope", "correlation_id"), "focus" => payload["focus"] })
+      raise "report job was not enqueued" if enqueued == false
     end
   end
 end
