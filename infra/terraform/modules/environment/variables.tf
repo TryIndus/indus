@@ -139,6 +139,12 @@ variable "replacement_platform_enabled" {
   default     = false
 }
 
+variable "enable_msk" {
+  type        = bool
+  description = "Provision MSK and its workload IAM policies for Kafka event transport."
+  default     = true
+}
+
 variable "temporal_address" {
   type        = string
   description = "Temporal Cloud gRPC endpoint used by report workflows."

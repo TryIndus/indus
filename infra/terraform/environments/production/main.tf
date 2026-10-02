@@ -178,6 +178,7 @@ module "environment" {
   database_min_acu                    = var.database_min_acu
   database_max_acu                    = var.database_max_acu
   replacement_platform_enabled        = var.replacement_platform_enabled
+  enable_msk                          = false
   temporal_address                    = var.temporal_address
   temporal_namespace                  = var.temporal_namespace
   tags                                = var.tags

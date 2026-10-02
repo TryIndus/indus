@@ -111,6 +111,7 @@ resource "aws_security_group_rule" "kafka_from_cluster" {
 }
 
 resource "aws_msk_serverless_cluster" "events" {
+  count        = var.enable_msk ? 1 : 0
   cluster_name = local.name
 
   vpc_config {
@@ -127,4 +128,9 @@ resource "aws_msk_serverless_cluster" "events" {
   }
 
   tags = local.common_tags
+}
+
+moved {
+  from = aws_msk_serverless_cluster.events
+  to   = aws_msk_serverless_cluster.events[0]
 }
