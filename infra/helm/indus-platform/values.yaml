@@ -43,6 +43,7 @@ config:
   redisCacheName: indus-staging
   redisUser: indus-staging-app
   mskBootstrapBrokers: replace.kafka-serverless.us-east-1.amazonaws.com:9098
+  eventTransport: kafka
   artifactBucket: replace-artifacts
   rawEventsBucket: replace-raw-events
   temporalAddress: replace.tmprl.cloud:7233

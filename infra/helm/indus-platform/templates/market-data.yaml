@@ -52,6 +52,7 @@ spec:
             - { name: MARKET_MAX_STREAMS_PER_USER, value: "8" }
             - { name: MARKET_MAX_STREAMS_GLOBAL, value: "10000" }
             - { name: MARKET_RETENTION_DAYS, value: "90" }
+            - { name: EVENT_TRANSPORT, value: {{ .Values.config.eventTransport | quote }} }
             - { name: KAFKA_BOOTSTRAP_SERVERS, value: {{ .Values.config.mskBootstrapBrokers | quote }} }
             - { name: KAFKA_TRANSACTIONAL_ID, value: {{ printf "market-data-%s" .Values.environment | quote }} }
             - { name: KAFKA_GROUP_ID, value: {{ printf "market-data-%s" .Values.environment | quote }} }

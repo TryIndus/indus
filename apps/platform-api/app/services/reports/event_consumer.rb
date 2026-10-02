@@ -18,7 +18,7 @@ module Reports
     def run
       @consumer.each do |message|
         payload = JSON.parse(message.payload)
-        @receipts.process(payload) { start_if_queued(payload) }
+        @receipts.process(payload) { Reports::EventHandler.call(payload) }
         @consumer.store_offset(message)
         @consumer.commit(nil, false)
       rescue JSON::ParserError, ArgumentError => error
@@ -28,20 +28,6 @@ module Reports
       end
     ensure
       @consumer.close
-    end
-
-    private
-
-    def start_if_queued(payload)
-      return unless payload.fetch("status") == "queued"
-
-      report = Report.find(payload.fetch("report_id"))
-      return if report.status == "cancelled"
-
-      workflow_id = payload.fetch("workflow_id")
-      report.update!(workflow_id: workflow_id) if report.workflow_id.nil?
-      ResearchReportJob.perform_later({ "report_id" => report.id, "workflow_id" => workflow_id,
-        "correlation_id" => payload.dig("envelope", "correlation_id"), "focus" => payload["focus"] })
     end
   end
 end
