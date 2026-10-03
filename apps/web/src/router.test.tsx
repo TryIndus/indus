@@ -99,6 +99,7 @@ describe('application routing', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send recovery code' }))
     expect(await screen.findByRole('button', { name: 'Set new password' })).toBeVisible()
+    expect(screen.getByRole('button', { name: /Resend in 30s/ })).toBeDisabled()
     fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '654321' } })
     fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'NewPassword123!Secure' } })
     fireEvent.click(screen.getByRole('button', { name: 'Set new password' }))
@@ -153,6 +154,18 @@ describe('application routing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm account' }))
     await waitFor(() => expect(confirmSignUp).toHaveBeenCalledTimes(2))
     expect(await screen.findByText('Email confirmed. Sign in to continue.')).toBeVisible()
+  })
+
+  it('does not render an unexpected provider error on the sign-in surface', async () => {
+    const passwordSignIn = vi.fn(async () => { throw new Error('sensitive provider payload') })
+    await renderPath('/auth', false, undefined, undefined, { passwordSignIn })
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'Password123!Secure' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not sign you in')
+    expect(screen.queryByText('sensitive provider payload')).not.toBeInTheDocument()
   })
 
   it('renders the authenticated dashboard with an empty watchlist state', async () => {

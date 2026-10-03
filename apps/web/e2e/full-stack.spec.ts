@@ -62,6 +62,33 @@ test.describe('Chromium full-stack journeys', () => {
     await expect(page).toHaveURL(/\/auth(?:\?.*)?$/)
   })
 
+  test('keeps email confirmation inside the Indus sign-in experience', async ({ page }) => {
+    await page.goto('/auth')
+    await page.getByRole('button', { name: 'Create an account' }).click()
+    await page.getByLabel('First name').fill('Avery')
+    await page.getByLabel('Last name').fill('Investor')
+    await page.getByLabel('Email').fill('investor@example.test')
+    await page.locator('input[autocomplete="new-password"]').fill('Password123!Secure')
+    await page.getByRole('button', { name: 'Create account' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
+    await expect(page.getByText('We sent a code to your email. Enter it here to continue.')).toBeVisible()
+    await expect(page.getByLabel('Verification code')).toBeFocused()
+    await expect(page.getByRole('button', { name: /Resend in 30s/ })).toBeDisabled()
+    await page.getByLabel('Verification code').fill('123456')
+    await page.getByRole('button', { name: 'Confirm account' }).click()
+    await expect(page).toHaveURL(/\/dashboard$/)
+  })
+
+  test('lets a user request a replacement confirmation code without leaving Indus', async ({ page }) => {
+    await page.goto('/auth')
+    await page.getByRole('button', { name: 'Confirm your email' }).click()
+    await page.getByLabel('Email').fill('investor@example.test')
+    await page.getByRole('button', { name: 'Send a new code' }).click()
+    await expect(page.getByText('A new code is on its way. Check your inbox and spam folder.')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Resend in 30s/ })).toBeDisabled()
+  })
+
   test('persists a favorite and generates an evidence-backed brief through Rails', async ({ context, page }) => {
     await authenticate(context)
     await page.goto('/favorites')

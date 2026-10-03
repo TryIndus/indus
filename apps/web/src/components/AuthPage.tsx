@@ -15,7 +15,11 @@ function authErrorMessage(cause: unknown, mode: Mode): string {
     case 'UsernameExistsException': return 'An account already uses this email. Sign in or confirm your email instead.'
     case 'InvalidPasswordException': return 'Use at least 14 characters with uppercase, lowercase, a number, and a symbol.'
     case 'NotAuthorizedException': return mode === 'confirm' ? 'This account may already be confirmed. Try signing in.' : 'The email or password is incorrect. Try again or reset your password.'
-    default: return cause instanceof Error ? cause.message : 'We could not complete that request. Try again.'
+    case 'NetworkError':
+    case 'NetworkingError': return 'We could not reach the sign-in service. Check your connection and try again.'
+    default: return mode === 'signin'
+      ? 'We could not sign you in. Check your details and try again.'
+      : 'We could not complete that request. Try again.'
   }
 }
 
@@ -46,7 +50,8 @@ export function AuthPage() {
   }, [resendSeconds])
 
   const changeMode = (next: Mode) => {
-    setMode(next); setError(''); setMessage(''); setCode('')
+    setMode(next); setError(''); setMessage(''); setCode(''); setResendSeconds(0)
+    if (next !== 'confirm') setPassword('')
   }
 
   const perform = async (action: () => Promise<void>) => {
@@ -69,7 +74,8 @@ export function AuthPage() {
     if (busy || resendSeconds > 0) return
     if (!email.trim()) { setError('Enter your email address first.'); return }
     void perform(async () => {
-      await auth.resendConfirmationCode(email)
+      if (mode === 'reset') await auth.requestPasswordReset(email)
+      else await auth.resendConfirmationCode(email)
       setResendSeconds(30)
       setMessage('A new code is on its way. Check your inbox and spam folder.')
     })
@@ -96,7 +102,7 @@ export function AuthPage() {
         setMode('signin'); setMessage('Email confirmed. Sign in to continue.')
         return
       }
-      if (mode === 'forgot') { await auth.requestPasswordReset(email); setMode('reset'); setMessage('Enter the recovery code sent to your email.'); return }
+      if (mode === 'forgot') { await auth.requestPasswordReset(email); setMode('reset'); setResendSeconds(30); setMessage('Enter the recovery code sent to your email.'); return }
       await auth.confirmPasswordReset(email, code, password)
       try { await finishSignIn() } catch { setMode('signin'); setMessage('Password updated. Sign in to continue.') }
     })
@@ -117,7 +123,7 @@ export function AuthPage() {
         {error && <p role="alert" className="auth-error">{error}</p>}{message && <p role="status" className="auth-message">{message}</p>}
         <button className="auth-submit" disabled={busy}>{busy ? <Loader2 className="animate-spin"/> : <>{button}<ArrowRight/></>}</button>
       </form>
-      <div className="auth-actions">{mode === 'signin' ? <><button type="button" onClick={() => changeMode('forgot')}>Forgot password?</button><p>New to Indus? <button type="button" onClick={() => changeMode('signup')}>Create an account</button></p><p>Still waiting to verify? <button type="button" onClick={() => changeMode('confirm')}>Confirm your email</button></p></> : <>{mode === 'confirm' && <p>Didn't get the code? <button type="button" onClick={resendCode} disabled={busy || resendSeconds > 0}>{resendSeconds > 0 ? `Resend in ${resendSeconds}s` : 'Send a new code'}</button></p>}<button type="button" onClick={() => changeMode('signin')}>Back to sign in</button></>}</div>
+      <div className="auth-actions">{mode === 'signin' ? <><button type="button" onClick={() => changeMode('forgot')}>Forgot password?</button><p>New to Indus? <button type="button" onClick={() => changeMode('signup')}>Create an account</button></p><p>Still waiting to verify? <button type="button" onClick={() => changeMode('confirm')}>Confirm your email</button></p></> : <>{(mode === 'confirm' || mode === 'reset') && <p>Didn't get the code? <button type="button" onClick={resendCode} disabled={busy || resendSeconds > 0}>{resendSeconds > 0 ? `Resend in ${resendSeconds}s` : 'Send a new code'}</button></p>}<button type="button" onClick={() => changeMode('signin')}>Back to sign in</button></>}</div>
     </div></main>
   </div>
 }
