@@ -87,6 +87,11 @@ variable "cognito_logout_urls" {
   default = []
 }
 
+variable "enable_branded_cognito_email" {
+  type    = bool
+  default = false
+}
+
 variable "database_min_acu" {
   type    = number
   default = 0.5
@@ -173,6 +178,7 @@ module "environment" {
   alert_email_addresses               = var.alert_email_addresses
   cognito_callback_urls               = var.cognito_callback_urls
   cognito_logout_urls                 = var.cognito_logout_urls
+  enable_branded_cognito_email        = var.enable_branded_cognito_email
   database_access_mode                = var.database_access_mode
   eks_log_types                       = var.eks_log_types
   database_min_acu                    = var.database_min_acu

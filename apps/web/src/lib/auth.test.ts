@@ -48,6 +48,7 @@ describe('authentication adapter selection', () => {
     vi.spyOn(CognitoUser.prototype, 'authenticateUser').mockImplementation((_details, callbacks) => { callbacks.onSuccess({} as never); return undefined as never })
     vi.spyOn(CognitoUserPool.prototype, 'signUp').mockImplementation((_username, _password, _attributes, _validation, callback) => { callback?.(undefined, { userConfirmed: false } as never); return undefined as never })
     vi.spyOn(CognitoUser.prototype, 'confirmRegistration').mockImplementation((_code, _forceAlias, callback) => { callback(undefined, 'SUCCESS'); return undefined as never })
+    const resendConfirmationCode = vi.spyOn(CognitoUser.prototype, 'resendConfirmationCode').mockImplementation(callback => { callback(undefined, {} as never); return undefined as never })
     vi.spyOn(CognitoUser.prototype, 'forgotPassword').mockImplementation(callbacks => { callbacks.inputVerificationCode?.({} as never); return undefined as never })
     vi.spyOn(CognitoUser.prototype, 'confirmPassword').mockImplementation((_code, _password, callbacks) => { callbacks.onSuccess('SUCCESS'); return undefined as never })
 
@@ -55,6 +56,8 @@ describe('authentication adapter selection', () => {
     await expect(auth.passwordSignIn?.('USER@EXAMPLE.TEST', 'password123')).resolves.toBeUndefined()
     await expect(auth.signUp?.('USER@EXAMPLE.TEST', 'password123', 'Avery', 'Investor')).resolves.toBe('confirmation-required')
     await expect(auth.confirmSignUp?.('USER@EXAMPLE.TEST', '123456')).resolves.toBeUndefined()
+    await expect(auth.resendConfirmationCode('USER@EXAMPLE.TEST')).resolves.toBeUndefined()
+    expect(resendConfirmationCode).toHaveBeenCalledOnce()
     await expect(auth.requestPasswordReset?.('USER@EXAMPLE.TEST')).resolves.toBeUndefined()
     await expect(auth.confirmPasswordReset?.('USER@EXAMPLE.TEST', '654321', 'newpassword123')).resolves.toBeUndefined()
   })

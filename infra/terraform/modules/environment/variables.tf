@@ -121,6 +121,12 @@ variable "cognito_logout_urls" {
   default     = []
 }
 
+variable "enable_branded_cognito_email" {
+  type        = bool
+  description = "Use a verified SES sender and Indus HTML template for Cognito verification codes after SES production access is ready."
+  default     = false
+}
+
 variable "database_min_acu" {
   type        = number
   description = "Aurora Serverless v2 minimum ACU for the application data store."

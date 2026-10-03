@@ -1,6 +1,17 @@
 require "yaml"
 require "open3"
 
+verification_template = File.read(File.expand_path("../../infra/terraform/modules/environment/templates/cognito-verification.html", __dir__))
+raise "Cognito verification template must include Cognito's code placeholder" unless verification_template.include?("{####}")
+raise "Cognito verification template must return users to Indus" unless verification_template.include?("${app_url}")
+raise "Cognito verification template must cover password recovery" unless verification_template.include?("Forgot password?")
+raise "Cognito verification template must not expose Cognito branding" if verification_template.match?(/cognito/i)
+
+identity = File.read(File.expand_path("../../infra/terraform/modules/environment/identity.tf", __dir__))
+raise "Branded email must remain opt-in" unless identity.include?("for_each = var.enable_branded_cognito_email ? [1] : []")
+raise "Branded email must use Cognito's code confirmation flow" unless identity.include?("default_email_option = \"CONFIRM_WITH_CODE\"")
+raise "Branded email must use the verified SES sender" unless identity.include?("email_sending_account = \"DEVELOPER\"")
+
 # Exercise the workflow's actual shell without AWS credentials or Terraform writes.
 workflow = YAML.load_file(File.expand_path("../../.github/workflows/deploy-infrastructure.yml", __dir__))
 target = workflow.fetch("jobs").fetch("target").fetch("steps").first.fetch("run")

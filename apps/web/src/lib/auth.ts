@@ -12,6 +12,7 @@ export interface AuthAdapter {
   passwordSignIn(email: string, password: string): Promise<void>
   signUp(email: string, password: string, firstName: string, lastName: string): Promise<'confirmed' | 'confirmation-required'>
   confirmSignUp(email: string, code: string): Promise<void>
+  resendConfirmationCode(email: string): Promise<void>
   requestPasswordReset(email: string): Promise<void>
   confirmPasswordReset(email: string, code: string, password: string): Promise<void>
 }
@@ -63,6 +64,11 @@ class CognitoAuthAdapter implements AuthAdapter {
     await new Promise<void>((resolve, reject) => user.confirmRegistration(code.trim(), true, error => error ? reject(error) : resolve()))
   }
 
+  async resendConfirmationCode(email: string) {
+    const user = new CognitoUser({ Username: email.trim().toLowerCase(), Pool: this.pool })
+    await new Promise<void>((resolve, reject) => user.resendConfirmationCode(error => error ? reject(error) : resolve()))
+  }
+
   async requestPasswordReset(email: string) {
     const user = new CognitoUser({ Username: email.trim().toLowerCase(), Pool: this.pool })
     await new Promise<void>((resolve, reject) => user.forgotPassword({ onSuccess: () => resolve(), onFailure: reject, inputVerificationCode: () => resolve() }))
@@ -82,6 +88,7 @@ class UnconfiguredAuthAdapter implements AuthAdapter {
   async passwordSignIn() { this.unavailable() }
   async signUp(): Promise<'confirmed' | 'confirmation-required'> { return this.unavailable() }
   async confirmSignUp() { this.unavailable() }
+  async resendConfirmationCode() { this.unavailable() }
   async requestPasswordReset() { this.unavailable() }
   async confirmPasswordReset() { this.unavailable() }
 }
@@ -96,6 +103,7 @@ class E2eAuthAdapter implements AuthAdapter {
   async passwordSignIn() { browserStorage()?.setItem(E2E_AUTH_KEY, 'true') }
   async signUp() { return 'confirmation-required' as const }
   async confirmSignUp() {}
+  async resendConfirmationCode() {}
   async requestPasswordReset() {}
   async confirmPasswordReset() {}
 }

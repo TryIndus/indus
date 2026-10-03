@@ -23,6 +23,8 @@ Rails also owns two provider boundaries:
 
 Authentication is an explicit adapter boundary rather than controller-specific token parsing. Rails validates Cognito bearer tokens through issuer, audience, signature, expiry, and JWKS checks, then maps the immutable subject to an application user.
 
+The React application keeps signup confirmation and password recovery on Indus. Cognito issues and checks short-lived email codes; users can resend a confirmation code and resume an unfinished signup from sign-in. The optional SES-backed Cognito email configuration sends an Indus-branded code template from the environment's verified domain. It is enabled only after SES sending access and domain verification have been checked in that environment; the default Cognito sender remains the rollback path. See [Cognito email operations](../runbooks/cognito-email.md).
+
 Test-only authentication is available only in the Rails test environment. Development and production fail closed when their configured verifier is unavailable or ambiguous. Authorization remains a separate Pundit decision after authentication.
 
 ## Write reliability
