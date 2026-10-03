@@ -83,9 +83,10 @@ test.describe('Chromium full-stack journeys', () => {
   test('lets a user request a replacement confirmation code without leaving Indus', async ({ page }) => {
     await page.goto('/auth')
     await page.getByRole('button', { name: 'Confirm your email' }).click()
+    await expect(page.getByLabel('Email')).toBeFocused()
     await page.getByLabel('Email').fill('investor@example.test')
     await page.getByRole('button', { name: 'Send a new code' }).click()
-    await expect(page.getByText('A new code is on its way. Check your inbox and spam folder.')).toBeVisible()
+    await expect(page.getByText('If this email can receive a code, check its inbox and spam folder.')).toBeVisible()
     await expect(page.getByRole('button', { name: /Resend in 30s/ })).toBeDisabled()
   })
 

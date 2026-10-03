@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createMemoryHistory } from '@tanstack/react-router'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppContextProvider } from './app-context'
 import type { AppContext } from './lib/context'
 import { unavailableMarketStream } from './lib/market-stream'
@@ -9,6 +9,7 @@ import { makeRouter } from './router'
 import type { AuthAdapter } from './lib/auth'
 
 const now = '2026-08-05T12:00:00.000Z'
+afterEach(() => { sessionStorage.clear(); vi.restoreAllMocks() })
 function responseFor(path: string): unknown {
   if (path === '/v1/market/summary') return { indices: [], watchlist: [] }
   if (path.startsWith('/v1/market/history/')) return { symbol: 'AAPL', currency: 'USD', range: '1y', points: [{ timestamp: '2025-08-05T12:00:00.000Z', close: 180 }, { timestamp: now, close: 218.27 }] }
@@ -166,6 +167,99 @@ describe('application routing', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not sign you in')
     expect(screen.queryByText('sensitive provider payload')).not.toBeInTheDocument()
+  })
+
+  it('restores an unfinished confirmation without storing its password or code', async () => {
+    const signUp = vi.fn(async () => 'confirmation-required' as const)
+    await renderPath('/auth', false, undefined, undefined, { signUp })
+    fireEvent.click(screen.getByRole('button', { name: 'Create an account' }))
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Avery' } })
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Investor' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'Password123!Secure' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+
+    expect(sessionStorage.getItem('indus:pending-auth-flow')).toContain('user@example.test')
+    const storedValues = Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.getItem(sessionStorage.key(index)!)).join(' ')
+    expect(storedValues).not.toContain('Password123!Secure')
+    expect(storedValues).not.toContain('123456')
+    cleanupView()
+
+    await renderPath('/auth', false)
+    expect(await screen.findByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
+    expect(screen.getByLabelText('Email')).toHaveValue('user@example.test')
+    expect(screen.getByLabelText('Verification code')).toHaveValue('')
+    expect(screen.getByRole('button', { name: /Resend in 30s/ })).toBeDisabled()
+  })
+
+  it('keeps resend blocked across screen changes and allows it after elapsed time', async () => {
+    const resendConfirmationCode = vi.fn(async () => {})
+    await renderPath('/auth', false, undefined, undefined, { resendConfirmationCode })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm your email' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new code' }))
+    await waitFor(() => expect(resendConfirmationCode).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Back to sign in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm your email' }))
+    expect(screen.getByRole('button', { name: /Resend in 30s/ })).toBeDisabled()
+
+    const currentTime = Date.now()
+    vi.spyOn(Date, 'now').mockReturnValue(currentTime + 31_000)
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new code' }))
+    await waitFor(() => expect(resendConfirmationCode).toHaveBeenCalledTimes(2))
+  })
+
+  it('rejects a duplicate confirmation submit while the first request is running', async () => {
+    let finishConfirmation: (() => void) | undefined
+    const confirmSignUp = vi.fn(() => new Promise<void>(resolve => { finishConfirmation = resolve }))
+    await renderPath('/auth', false, undefined, undefined, { confirmSignUp })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm your email' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    const form = screen.getByRole('button', { name: 'Confirm account' }).closest('form')!
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    expect(confirmSignUp).toHaveBeenCalledTimes(1)
+    finishConfirmation?.()
+    expect(await screen.findByText('Email confirmed. Sign in to continue.')).toBeVisible()
+  })
+
+  it('hands off to sign-in when automatic sign-in fails after confirmation', async () => {
+    const passwordSignIn = vi.fn(async () => { throw Object.assign(new Error('provider detail'), { name: 'NotAuthorizedException' }) })
+    await renderPath('/auth', false, undefined, undefined, { passwordSignIn })
+    fireEvent.click(screen.getByRole('button', { name: 'Create an account' }))
+    fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Avery' } })
+    fireEvent.change(screen.getByLabelText('Last name'), { target: { value: 'Investor' } })
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'Password123!Secure' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    expect(await screen.findByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm account' }))
+
+    expect(await screen.findByText('Email confirmed. Sign in to continue.')).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Continue your research.' })).toBeVisible()
+    expect(screen.queryByText('provider detail')).not.toBeInTheDocument()
+  })
+
+  it('can resend a password recovery code after the cooldown', async () => {
+    const requestPasswordReset = vi.fn(async () => {})
+    await renderPath('/auth', false, undefined, undefined, { requestPasswordReset })
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send recovery code' }))
+    expect(await screen.findByRole('button', { name: 'Set new password' })).toBeVisible()
+    expect(requestPasswordReset).toHaveBeenCalledTimes(1)
+
+    const currentTime = Date.now()
+    vi.spyOn(Date, 'now').mockReturnValue(currentTime + 31_000)
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new code' }))
+    await waitFor(() => expect(requestPasswordReset).toHaveBeenCalledTimes(2))
+    expect(screen.getByText('If this email can receive a code, check its inbox and spam folder.')).toBeVisible()
   })
 
   it('renders the authenticated dashboard with an empty watchlist state', async () => {
