@@ -27,6 +27,7 @@ function context(authenticated: boolean, resolve: (path: string) => unknown | Pr
       passwordSignIn: vi.fn(async () => { authState = true }),
       signUp: vi.fn(async () => 'confirmation-required' as const),
       confirmSignUp: vi.fn(async () => {}),
+      resendConfirmationCode: vi.fn(async () => {}),
       requestPasswordReset: vi.fn(async () => {}),
       confirmPasswordReset: vi.fn(async () => {}),
     },
@@ -89,8 +90,11 @@ describe('application routing', () => {
     expect(await screen.findByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
     fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
     fireEvent.click(screen.getByRole('button', { name: 'Confirm account' }))
-    expect(await screen.findByRole('heading', { name: 'Continue your research.' })).toBeVisible()
+    await waitFor(() => expect(confirmSignUp).toHaveBeenCalledWith('user@example.test', '123456'))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Company research' })).toBeVisible())
 
+    cleanupView()
+    await renderPath('/auth', false, undefined, undefined, { requestPasswordReset, confirmPasswordReset })
     fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send recovery code' }))
@@ -99,6 +103,56 @@ describe('application routing', () => {
     fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'NewPassword123!Secure' } })
     fireEvent.click(screen.getByRole('button', { name: 'Set new password' }))
     await waitFor(() => expect(confirmPasswordReset).toHaveBeenCalledWith('user@example.test', '654321', 'NewPassword123!Secure'))
+  })
+
+  it('recovers an unconfirmed sign-in with a resent code', async () => {
+    let authenticated = false
+    const passwordSignIn = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('User is not confirmed.'), { name: 'UserNotConfirmedException' }))
+      .mockImplementationOnce(async () => { authenticated = true })
+    const getUser = vi.fn(async () => authenticated ? { id: 'user-1', email: 'user@example.test' } : null)
+    const confirmSignUp = vi.fn(async () => {})
+    const resendConfirmationCode = vi.fn(async () => {})
+    const router = await renderPath('/auth', false, undefined, undefined, { getUser, passwordSignIn, confirmSignUp, resendConfirmationCode })
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: 'Password123!Secure' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('heading', { name: 'Confirm your account.' })).toBeVisible()
+    expect(screen.getByText(/Confirm your email to finish/)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new code' }))
+    await waitFor(() => expect(resendConfirmationCode).toHaveBeenCalledWith('user@example.test'))
+    expect(screen.getByRole('button', { name: /Resend in 30s/ })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm account' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'))
+    expect(confirmSignUp).toHaveBeenCalledWith('user@example.test', '123456')
+    expect(passwordSignIn).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps confirmation retryable after a delivery or code error', async () => {
+    const resendConfirmationCode = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('provider detail'), { name: 'LimitExceededException' }))
+      .mockResolvedValueOnce(undefined)
+    const confirmSignUp = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('provider detail'), { name: 'CodeMismatchException' }))
+      .mockResolvedValueOnce(undefined)
+    await renderPath('/auth', false, undefined, undefined, { resendConfirmationCode, confirmSignUp })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm your email' }))
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.test' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new code' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many attempts')
+    expect(screen.queryByText('provider detail')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Send a new code' }))
+    await waitFor(() => expect(resendConfirmationCode).toHaveBeenCalledTimes(2))
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '000000' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm account' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('That code is incorrect')
+    fireEvent.change(screen.getByLabelText('Verification code'), { target: { value: '123456' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm account' }))
+    await waitFor(() => expect(confirmSignUp).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Email confirmed. Sign in to continue.')).toBeVisible()
   })
 
   it('renders the authenticated dashboard with an empty watchlist state', async () => {
