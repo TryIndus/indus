@@ -12,6 +12,7 @@ aws_traffic_weight     = 0
 alert_email_addresses = ["on-call@example.com"]
 cognito_callback_urls = ["https://app.indus.example.com/auth/callback"]
 cognito_logout_urls   = ["https://app.indus.example.com"]
+enable_branded_cognito_email = false
 replacement_platform_enabled = true
 temporal_address             = "namespace.account.tmprl.cloud:7233"
 temporal_namespace           = "namespace.account"
