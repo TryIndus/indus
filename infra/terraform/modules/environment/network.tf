@@ -138,6 +138,7 @@ data "aws_iam_policy_document" "vpc_flow_assume" {
 }
 
 resource "aws_iam_role" "vpc_flow" {
+  count              = var.enable_supplementary_monitoring ? 1 : 0
   name               = "${local.name}-vpc-flow"
   assume_role_policy = data.aws_iam_policy_document.vpc_flow_assume.json
   tags               = local.common_tags
@@ -158,13 +159,15 @@ data "aws_iam_policy_document" "vpc_flow" {
 }
 
 resource "aws_iam_role_policy" "vpc_flow" {
+  count  = var.enable_supplementary_monitoring ? 1 : 0
   name   = "${local.name}-vpc-flow"
-  role   = aws_iam_role.vpc_flow.id
+  role   = aws_iam_role.vpc_flow[0].id
   policy = data.aws_iam_policy_document.vpc_flow.json
 }
 
 resource "aws_flow_log" "vpc" {
-  iam_role_arn             = aws_iam_role.vpc_flow.arn
+  count                    = var.enable_supplementary_monitoring ? 1 : 0
+  iam_role_arn             = aws_iam_role.vpc_flow[0].arn
   log_destination          = aws_cloudwatch_log_group.vpc_flow.arn
   log_destination_type     = "cloud-watch-logs"
   traffic_type             = "REJECT"

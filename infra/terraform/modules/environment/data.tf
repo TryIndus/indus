@@ -104,7 +104,7 @@ resource "aws_rds_cluster" "data" {
   deletion_protection             = local.production
   skip_final_snapshot             = !local.production
   final_snapshot_identifier       = local.production ? "${local.name}-final" : null
-  enabled_cloudwatch_logs_exports = ["postgresql"]
+  enabled_cloudwatch_logs_exports = var.enable_supplementary_monitoring ? ["postgresql"] : []
 
   serverlessv2_scaling_configuration {
     min_capacity = var.database_min_acu
@@ -123,7 +123,7 @@ resource "aws_rds_cluster_instance" "data" {
   auto_minor_version_upgrade   = true
   publicly_accessible          = false
   availability_zone            = local.primary_az
-  performance_insights_enabled = true
+  performance_insights_enabled = var.enable_supplementary_monitoring
 
   tags = local.common_tags
 }

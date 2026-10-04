@@ -2,9 +2,15 @@
 
 The environment module keeps the existing two-node production capacity, private database, backups, authentication, and application images. Infrastructure is applied separately through `Deploy infrastructure`; merging this change does not apply Terraform.
 
+## Suspend supplementary monitoring
+
+`enable_supplementary_monitoring` defaults to `false` in production and staging. It omits VPC flow logging, PostgreSQL log exports, Performance Insights, CloudWatch alarms, SNS alert delivery, monthly budget notifications, and account cost anomaly alerts. The existing application and VPC flow log groups stay managed with their 14-day retention so applying this change does not delete their retained events. Those events expire under the existing retention policy, and storage charges can continue until then. EKS `audit` and `authenticator` control-plane logs remain enabled as security records. Aurora backups and the core application infrastructure remain enabled. Set the flag to `true` in the environment Terraform configuration to restore supplementary monitoring, then apply a reviewed infrastructure plan.
+
+This change reduces observability and cost notifications. Operators must inspect service health and AWS spend directly while the flag is disabled.
+
 ## Logging
 
-EKS retains `audit` and `authenticator` logging by default and omits the verbose `api` stream. For incident response, set `eks_log_types = ["api", "audit", "authenticator"]` in the environment Terraform configuration and apply a reviewed plan. Rejected VPC flows remain logged, with a ten-minute aggregation window instead of one minute. Application errors, database exports, log retention, and alarms are unchanged. Savings depend on the actual contribution of these streams to ingestion; do not assume the entire CloudWatch bill disappears.
+EKS retains `audit` and `authenticator` logging by default and omits the verbose `api` stream. For incident response, set `eks_log_types = ["api", "audit", "authenticator"]` in the environment Terraform configuration and apply a reviewed plan. Rejected VPC flows are logged with a ten-minute aggregation window only when supplementary monitoring is enabled. PostgreSQL log exports and alarms follow the same flag. Application and VPC flow log groups retain existing events for 14 days; their presence alone does not resume flow logging. Savings depend on actual ingestion and retention, so the CloudWatch bill may continue for required EKS logs and previously stored events.
 
 ## Remove RDS Proxy without dropping existing clients
 
@@ -24,7 +30,7 @@ There is no schema migration or data movement. Based on September 25 billing, re
 
 Before proxy removal, restore the previous runtime-secret versions and restart the database clients; the proxy is still available. After removal, change the mode back to `prepare-direct`, plan and apply to recreate the proxy, obtain its new endpoint, update runtime secrets to that endpoint, restart clients, and validate health before optionally returning to `proxy`. A recreated proxy's hostname may differ: never assume the old hostname works. No database restore is required.
 
-For logging rollback, restore the `api` log type and the one-minute flow aggregation window in a topic PR and apply a reviewed infrastructure plan. Historical logs remain subject to their existing retention policy.
+For monitoring rollback, set `enable_supplementary_monitoring = true` in a topic PR and apply a reviewed infrastructure plan. The retained log groups continue using their existing 14-day retention policy; audit and authenticator records remain available throughout.
 
 ## Verification
 

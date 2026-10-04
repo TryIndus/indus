@@ -3,7 +3,7 @@ data "aws_iam_policy_document" "alerts_topic" {
     sid       = "AllowCloudWatchAlarms"
     effect    = "Allow"
     actions   = ["sns:Publish"]
-    resources = [aws_sns_topic.alerts.arn]
+    resources = var.enable_supplementary_monitoring ? [aws_sns_topic.alerts[0].arn] : []
 
     principals {
       type        = "Service"
@@ -21,7 +21,7 @@ data "aws_iam_policy_document" "alerts_topic" {
     sid       = "AllowBudgets"
     effect    = "Allow"
     actions   = ["sns:Publish"]
-    resources = [aws_sns_topic.alerts.arn]
+    resources = var.enable_supplementary_monitoring ? [aws_sns_topic.alerts[0].arn] : []
 
     principals {
       type        = "Service"
@@ -39,7 +39,7 @@ data "aws_iam_policy_document" "alerts_topic" {
     sid       = "AllowCostAnomalyDetection"
     effect    = "Allow"
     actions   = ["sns:Publish"]
-    resources = [aws_sns_topic.alerts.arn]
+    resources = var.enable_supplementary_monitoring ? [aws_sns_topic.alerts[0].arn] : []
 
     principals {
       type        = "Service"
@@ -55,11 +55,13 @@ data "aws_iam_policy_document" "alerts_topic" {
 }
 
 resource "aws_sns_topic_policy" "alerts" {
-  arn    = aws_sns_topic.alerts.arn
+  count  = var.enable_supplementary_monitoring ? 1 : 0
+  arn    = aws_sns_topic.alerts[0].arn
   policy = data.aws_iam_policy_document.alerts_topic.json
 }
 
 resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_targets" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-alb-unhealthy-targets"
   alarm_description   = "The application load balancer has an unhealthy target."
   namespace           = "AWS/ApplicationELB"
@@ -70,8 +72,8 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_targets" {
   period              = 60
   statistic           = "Maximum"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
-  ok_actions          = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  ok_actions          = [aws_sns_topic.alerts[0].arn]
 
   dimensions = {
     LoadBalancer = aws_lb.this.arn_suffix
@@ -82,6 +84,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_targets" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "alb_target_errors" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-alb-target-5xx"
   alarm_description   = "Application targets returned repeated server errors."
   namespace           = "AWS/ApplicationELB"
@@ -92,8 +95,8 @@ resource "aws_cloudwatch_metric_alarm" "alb_target_errors" {
   period              = 60
   statistic           = "Sum"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
-  ok_actions          = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  ok_actions          = [aws_sns_topic.alerts[0].arn]
 
   dimensions = {
     LoadBalancer = aws_lb.this.arn_suffix
@@ -104,6 +107,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_target_errors" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "cloudfront_errors" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-cloudfront-5xx-rate"
   alarm_description   = "CloudFront is returning an elevated percentage of server errors."
   namespace           = "AWS/CloudFront"
@@ -114,8 +118,8 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_errors" {
   period              = 300
   statistic           = "Average"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
-  ok_actions          = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  ok_actions          = [aws_sns_topic.alerts[0].arn]
 
   dimensions = {
     DistributionId = aws_cloudfront_distribution.this.id
@@ -126,6 +130,7 @@ resource "aws_cloudwatch_metric_alarm" "cloudfront_errors" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "database_cpu" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-database-high-cpu"
   alarm_description   = "Aurora CPU utilization is persistently high."
   namespace           = "AWS/RDS"
@@ -136,8 +141,8 @@ resource "aws_cloudwatch_metric_alarm" "database_cpu" {
   period              = 300
   statistic           = "Average"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
-  ok_actions          = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  ok_actions          = [aws_sns_topic.alerts[0].arn]
 
   dimensions = {
     DBClusterIdentifier = aws_rds_cluster.data.cluster_identifier
@@ -147,6 +152,7 @@ resource "aws_cloudwatch_metric_alarm" "database_cpu" {
 }
 
 resource "aws_budgets_budget" "monthly" {
+  count        = var.enable_supplementary_monitoring ? 1 : 0
   name         = "${local.name}-monthly"
   budget_type  = "COST"
   limit_amount = tostring(var.monthly_budget_usd)
@@ -163,7 +169,7 @@ resource "aws_budgets_budget" "monthly" {
     threshold                 = 80
     threshold_type            = "PERCENTAGE"
     notification_type         = "FORECASTED"
-    subscriber_sns_topic_arns = [aws_sns_topic.alerts.arn]
+    subscriber_sns_topic_arns = [aws_sns_topic.alerts[0].arn]
   }
 
   notification {
@@ -171,7 +177,7 @@ resource "aws_budgets_budget" "monthly" {
     threshold                 = 100
     threshold_type            = "PERCENTAGE"
     notification_type         = "ACTUAL"
-    subscriber_sns_topic_arns = [aws_sns_topic.alerts.arn]
+    subscriber_sns_topic_arns = [aws_sns_topic.alerts[0].arn]
   }
 
   depends_on = [aws_sns_topic_policy.alerts]
@@ -180,7 +186,7 @@ resource "aws_budgets_budget" "monthly" {
 }
 
 resource "aws_ce_anomaly_monitor" "account_services" {
-  count = var.enable_account_cost_anomaly_monitor ? 1 : 0
+  count = var.enable_account_cost_anomaly_monitor && var.enable_supplementary_monitoring ? 1 : 0
 
   name              = "${local.name}-account-services"
   monitor_type      = "DIMENSIONAL"
@@ -190,7 +196,7 @@ resource "aws_ce_anomaly_monitor" "account_services" {
 }
 
 resource "aws_ce_anomaly_subscription" "account_services" {
-  count = var.enable_account_cost_anomaly_monitor ? 1 : 0
+  count = var.enable_account_cost_anomaly_monitor && var.enable_supplementary_monitoring ? 1 : 0
 
   name             = "${local.name}-account-services"
   frequency        = "IMMEDIATE"
@@ -198,7 +204,7 @@ resource "aws_ce_anomaly_subscription" "account_services" {
 
   subscriber {
     type    = "SNS"
-    address = aws_sns_topic.alerts.arn
+    address = aws_sns_topic.alerts[0].arn
   }
 
   threshold_expression {
