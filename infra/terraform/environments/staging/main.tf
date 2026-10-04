@@ -38,6 +38,11 @@ variable "monthly_budget_usd" {
   type = number
 }
 
+variable "enable_supplementary_monitoring" {
+  type    = bool
+  default = false
+}
+
 variable "legacy_next_secret_name" {
   type = string
 }
@@ -168,6 +173,7 @@ module "environment" {
   monthly_budget_usd                  = var.monthly_budget_usd
   legacy_next_secret_name             = var.legacy_next_secret_name
   enable_account_cost_anomaly_monitor = false
+  enable_supplementary_monitoring     = var.enable_supplementary_monitoring
   aws_region                          = var.aws_region
   vpc_cidr                            = var.vpc_cidr
   domain_name                         = var.domain_name

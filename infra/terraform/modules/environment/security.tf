@@ -13,15 +13,16 @@ resource "aws_cloudwatch_log_group" "application" {
 }
 
 resource "aws_sns_topic" "alerts" {
+  count             = var.enable_supplementary_monitoring ? 1 : 0
   name              = "${local.name}-alerts"
   kms_master_key_id = "alias/aws/sns"
   tags              = local.common_tags
 }
 
 resource "aws_sns_topic_subscription" "alerts" {
-  for_each = var.alert_email_addresses
+  for_each = var.enable_supplementary_monitoring ? var.alert_email_addresses : toset([])
 
-  topic_arn = aws_sns_topic.alerts.arn
+  topic_arn = aws_sns_topic.alerts[0].arn
   protocol  = "email"
   endpoint  = each.value
 }

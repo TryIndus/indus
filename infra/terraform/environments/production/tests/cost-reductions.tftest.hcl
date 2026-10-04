@@ -28,6 +28,9 @@ mock_provider "aws" {
   mock_resource "aws_db_proxy" {
     defaults = { endpoint = "proxy.test.local" }
   }
+  mock_resource "aws_sns_topic" {
+    defaults = { arn = "arn:aws:sns:us-east-1:111111111111:indus-production-alerts" }
+  }
 }
 mock_provider "tls" {}
 mock_provider "random" {}
@@ -49,6 +52,21 @@ run "proxy_remains_default" {
   assert {
     condition     = output.environment.data_platform.database_access_mode == "proxy"
     error_message = "The default must not cut over existing database clients."
+  }
+}
+run "supplementary_monitoring_is_suspended_by_default" {
+  command = plan
+  assert {
+    condition     = output.environment.observability.alert_topic_arn == null
+    error_message = "Supplementary alerting and its SNS topic must be absent by default."
+  }
+}
+run "supplementary_monitoring_can_be_restored" {
+  command = plan
+  variables { enable_supplementary_monitoring = true }
+  assert {
+    condition     = output.environment.observability.alert_topic_arn == "arn:aws:sns:us-east-1:111111111111:indus-production-alerts"
+    error_message = "Operators must be able to restore supplementary alerting explicitly."
   }
 }
 run "prepare_direct_retains_proxy" {
