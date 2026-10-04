@@ -177,13 +177,37 @@ data "aws_iam_policy_document" "terraform" {
     actions = [
       "budgets:*", "cloudwatch:*", "cognito-idp:*", "ec2:*", "kms:*",
       "rds:*", "route53:*", "s3:*", "secretsmanager:*", "sns:*",
+      "sts:GetCallerIdentity"
+    ]
+    resources = ["*"]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
       "iam:AddRoleToInstanceProfile", "iam:AttachRolePolicy", "iam:CreateInstanceProfile",
       "iam:CreateRole", "iam:DeleteInstanceProfile", "iam:DeleteRole", "iam:DeleteRolePolicy",
       "iam:DetachRolePolicy", "iam:GetInstanceProfile", "iam:GetRole", "iam:ListInstanceProfilesForRole",
-      "iam:ListRolePolicies", "iam:ListRoles", "iam:PassRole", "iam:PutRolePolicy",
-      "iam:RemoveRoleFromInstanceProfile", "iam:TagInstanceProfile", "iam:TagRole", "iam:UntagInstanceProfile", "iam:UntagRole",
-      "sts:GetCallerIdentity"
+      "iam:ListRolePolicies", "iam:PutRolePolicy", "iam:RemoveRoleFromInstanceProfile",
+      "iam:TagInstanceProfile", "iam:TagRole", "iam:UntagInstanceProfile", "iam:UntagRole"
     ]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:iam::${var.account_id}:role/indus-optimized-*",
+      "arn:${data.aws_partition.current.partition}:iam::${var.account_id}:instance-profile/indus-optimized-*"
+    ]
+  }
+  statement {
+    effect    = "Allow"
+    actions   = ["iam:PassRole"]
+    resources = ["arn:${data.aws_partition.current.partition}:iam::${var.account_id}:role/indus-optimized-host"]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["ec2.amazonaws.com"]
+    }
+  }
+  statement {
+    effect    = "Allow"
+    actions   = ["iam:ListRoles"]
     resources = ["*"]
   }
   statement {
