@@ -188,13 +188,23 @@ data "aws_iam_policy_document" "terraform" {
   }
   statement {
     effect    = "Deny"
-    actions   = ["ec2:Delete*", "rds:Delete*", "s3:Delete*", "kms:ScheduleKeyDeletion", "secretsmanager:DeleteSecret", "cognito-idp:Delete*", "route53:Delete*", "iam:Delete*", "iam:DetachRolePolicy", "iam:RemoveRoleFromInstanceProfile"]
+    actions   = ["ec2:Delete*", "ec2:TerminateInstances", "ec2:StopInstances", "rds:Delete*", "rds:Stop*", "kms:ScheduleKeyDeletion", "secretsmanager:DeleteSecret", "cognito-idp:Delete*", "route53:Delete*", "iam:Delete*", "iam:DetachRolePolicy", "iam:RemoveRoleFromInstanceProfile"]
     resources = ["*"]
     condition {
       test     = "StringNotEquals"
       variable = "aws:ResourceTag/Profile"
       values   = ["optimized"]
     }
+  }
+  statement {
+    effect  = "Deny"
+    actions = ["s3:CreateBucket", "s3:Put*", "s3:Delete*"]
+    not_resources = [
+      aws_s3_bucket.state.arn,
+      "${aws_s3_bucket.state.arn}/*",
+      "arn:${data.aws_partition.current.partition}:s3:::indus-optimized-artifacts-${var.account_id}",
+      "arn:${data.aws_partition.current.partition}:s3:::indus-optimized-artifacts-${var.account_id}/*"
+    ]
   }
 }
 

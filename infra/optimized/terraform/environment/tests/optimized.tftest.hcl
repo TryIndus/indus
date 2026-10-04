@@ -5,7 +5,6 @@ mock_provider "aws" {
   mock_data "aws_caller_identity" { defaults = { account_id = "111111111111" } }
   mock_data "aws_ssm_parameter" { defaults = { value = "ami-test" } }
 }
-mock_provider "random" {}
 
 variables {
   account_id            = "111111111111"
