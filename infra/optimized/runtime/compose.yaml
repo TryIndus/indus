@@ -1,0 +1,139 @@
+name: indus-optimized
+
+services:
+  valkey:
+    image: valkey/valkey:8.1.3-alpine@sha256:d827e7f7552cdee40cc7482dbae9da020f42bc47669af6f71182a4ef76a22773
+    command: ["valkey-server", "/etc/valkey/valkey.conf"]
+    restart: unless-stopped
+    volumes:
+      - valkey-data:/data
+      - ./valkey.conf:/etc/valkey/valkey.conf:ro
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [internal]
+
+  migrate:
+    image: ${PLATFORM_API_IMAGE:?Set PLATFORM_API_IMAGE to a digest-pinned image}
+    command: ["./bin/rails", "db:prepare"]
+    env_file:
+      - path: ${RUNTIME_SECRET_DIR:-/run/indus-optimized}/platform-api.env
+        required: false
+    environment:
+      RAILS_ENV: production
+      REDIS_URL: redis://valkey:6379/0
+    depends_on:
+      valkey: { condition: service_healthy }
+    networks: [internal]
+    restart: "no"
+
+  platform-api:
+    image: ${PLATFORM_API_IMAGE:?Set PLATFORM_API_IMAGE to a digest-pinned image}
+    command: ["./bin/rails", "server", "-b", "0.0.0.0"]
+    env_file:
+      - path: ${RUNTIME_SECRET_DIR:-/run/indus-optimized}/platform-api.env
+        required: false
+    environment:
+      RAILS_ENV: production
+      RAILS_SKIP_DB_PREPARE: "true"
+      REDIS_URL: redis://valkey:6379/0
+      PORT: "3000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:3000/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks: [internal]
+    restart: unless-stopped
+
+  sidekiq:
+    image: ${PLATFORM_API_IMAGE:?Set PLATFORM_API_IMAGE to a digest-pinned image}
+    command: ["bundle", "exec", "sidekiq"]
+    env_file:
+      - path: ${RUNTIME_SECRET_DIR:-/run/indus-optimized}/platform-api.env
+        required: false
+    environment:
+      RAILS_ENV: production
+      REDIS_URL: redis://valkey:6379/0
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+    networks: [internal]
+    restart: unless-stopped
+
+  platform-outbox:
+    image: ${PLATFORM_API_IMAGE:?Set PLATFORM_API_IMAGE to a digest-pinned image}
+    command: ["./bin/outbox-publisher"]
+    env_file:
+      - path: ${RUNTIME_SECRET_DIR:-/run/indus-optimized}/platform-api.env
+        required: false
+    environment:
+      RAILS_ENV: production
+      EVENT_TRANSPORT: postgres
+      REDIS_URL: redis://valkey:6379/0
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    networks: [internal]
+    restart: unless-stopped
+
+  research-worker:
+    image: ${RESEARCH_WORKER_IMAGE:?Set RESEARCH_WORKER_IMAGE to a digest-pinned image}
+    command: ["./bin/research-worker"]
+    env_file:
+      - path: ${RUNTIME_SECRET_DIR:-/run/indus-optimized}/research-worker.env
+        required: false
+    environment:
+      RAILS_ENV: production
+      REDIS_URL: redis://valkey:6379/0
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      valkey: { condition: service_healthy }
+    networks: [internal]
+    restart: unless-stopped
+
+  market-data:
+    image: ${MARKET_DATA_IMAGE:?Set MARKET_DATA_IMAGE to a digest-pinned image}
+    env_file:
+      - path: ${RUNTIME_SECRET_DIR:-/run/indus-optimized}/market-data.env
+        required: false
+    environment:
+      EVENT_TRANSPORT: postgres
+      MARKET_BIND_ADDR: 0.0.0.0:8081
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8081/health/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks: [internal]
+    restart: unless-stopped
+
+  web-proxy:
+    image: ${WEB_IMAGE:?Set WEB_IMAGE to a digest-pinned image}
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      platform-api: { condition: service_healthy }
+      market-data: { condition: service_healthy }
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [edge, internal]
+    restart: unless-stopped
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+
+volumes:
+  valkey-data:
+  caddy-data:
+  caddy-config:

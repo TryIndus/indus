@@ -1,0 +1,30 @@
+{$INDUS_HOSTNAME} {
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+
+  @stream path /stream/*
+  handle @stream {
+    reverse_proxy market-data:8081 {
+      flush_interval -1
+      transport http { read_buffer 0 write_buffer 0 }
+    }
+  }
+
+  @api path /api/* /healthz /readyz
+  handle @api {
+    reverse_proxy platform-api:3000
+  }
+
+  handle {
+    root * /srv
+    try_files {path} /index.html
+    file_server
+  }
+}
+
