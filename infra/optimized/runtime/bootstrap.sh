@@ -8,4 +8,3 @@ dnf install -y docker
 systemctl enable --now docker
 mkdir -p /opt/indus-optimized /run/indus-optimized
 chmod 0700 /run/indus-optimized
-

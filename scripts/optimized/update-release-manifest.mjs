@@ -12,4 +12,3 @@ for (const [index, key] of keys.entries()) {
   content = content.replace(expression, `${key}=${images[index]}`);
 }
 writeFileSync(manifest, content);
-

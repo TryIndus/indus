@@ -2,7 +2,6 @@ variable "account_id" {
   type        = string
   description = "AWS account that owns the independent optimized profile."
 }
-
 variable "aws_region" {
   type    = string
   default = "us-east-1"
@@ -17,4 +16,3 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
-

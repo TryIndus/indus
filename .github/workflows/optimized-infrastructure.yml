@@ -48,4 +48,3 @@ jobs:
       - name: Apply reviewed plan
         if: inputs.operation == 'apply'
         run: terraform -chdir=infra/optimized/terraform/environment apply -input=false approved.tfplan
-

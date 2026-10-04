@@ -11,4 +11,3 @@ values into this directory, this repository, cloud-init, or the Compose file.
 Start order is Valkey, one explicit Rails `migrate` job, Rails/worker processes,
 market data migrations and ingestion, then Caddy. `RAILS_SKIP_DB_PREPARE=true`
 prevents the Rails web process from racing the one-off migration job.
-
