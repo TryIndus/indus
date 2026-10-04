@@ -187,11 +187,16 @@ data "aws_iam_policy_document" "terraform" {
     resources = ["arn:${data.aws_partition.current.partition}:ssm:${var.aws_region}:${var.account_id}:parameter/indus-optimized/supplementary-monitoring"]
   }
   statement {
+    effect    = "Allow"
+    actions   = ["ssm:DescribeParameters"]
+    resources = ["*"]
+  }
+  statement {
     effect = "Allow"
     actions = [
       "iam:AddRoleToInstanceProfile", "iam:AttachRolePolicy", "iam:CreateInstanceProfile",
       "iam:CreateRole", "iam:DeleteInstanceProfile", "iam:DeleteRole", "iam:DeleteRolePolicy",
-      "iam:DetachRolePolicy", "iam:GetInstanceProfile", "iam:GetRole", "iam:ListInstanceProfilesForRole",
+      "iam:DetachRolePolicy", "iam:GetInstanceProfile", "iam:GetRole", "iam:GetRolePolicy", "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole",
       "iam:ListRolePolicies", "iam:PutRolePolicy", "iam:RemoveRoleFromInstanceProfile",
       "iam:TagInstanceProfile", "iam:TagRole", "iam:UntagInstanceProfile", "iam:UntagRole"
     ]

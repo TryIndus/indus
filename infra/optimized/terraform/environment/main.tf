@@ -218,8 +218,9 @@ resource "aws_db_parameter_group" "this" {
   name   = "${local.name}-postgres17"
   family = "postgres17"
   parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot"
   }
   tags = local.common_tags
 }
@@ -409,7 +410,7 @@ resource "aws_instance" "host" {
   subnet_id                   = aws_subnet.public_a.id
   vpc_security_group_ids      = [aws_security_group.host.id]
   iam_instance_profile        = aws_iam_instance_profile.host.name
-  associate_public_ip_address = false
+  associate_public_ip_address = true
   user_data                   = file("${path.module}/../../runtime/bootstrap.sh")
   user_data_replace_on_change = true
   metadata_options {
