@@ -2,6 +2,12 @@
 
 The environment module keeps the existing two-node production capacity, private database, backups, authentication, and application images. Infrastructure is applied separately through `Deploy infrastructure`; merging this change does not apply Terraform.
 
+## Suspend supplementary monitoring
+
+`enable_supplementary_monitoring` defaults to `false` in production and staging. It omits application and VPC flow CloudWatch log groups, VPC flow logging, PostgreSQL log exports, Performance Insights, CloudWatch alarms, SNS alert delivery, the monthly budget notifications, and account cost anomaly alerts. EKS `audit` and `authenticator` control-plane logs remain enabled as security records. Aurora backups and the core application infrastructure remain enabled. Set the flag to `true` in the environment Terraform configuration to restore these resources, then apply a reviewed infrastructure plan. Disabling it destroys the listed managed resources and stops new monitoring data collection. Deleting the Terraform-managed log groups also deletes their retained log events; re-enabling monitoring creates empty groups. Existing CloudWatch metrics already emitted by AWS may remain available under AWS retention rules.
+
+This change reduces observability and cost notifications. Operators must inspect service health and AWS spend directly while the flag is disabled.
+
 ## Logging
 
 EKS retains `audit` and `authenticator` logging by default and omits the verbose `api` stream. For incident response, set `eks_log_types = ["api", "audit", "authenticator"]` in the environment Terraform configuration and apply a reviewed plan. Rejected VPC flows remain logged, with a ten-minute aggregation window instead of one minute. Application errors, database exports, log retention, and alarms are unchanged. Savings depend on the actual contribution of these streams to ingestion; do not assume the entire CloudWatch bill disappears.
@@ -24,7 +30,7 @@ There is no schema migration or data movement. Based on September 25 billing, re
 
 Before proxy removal, restore the previous runtime-secret versions and restart the database clients; the proxy is still available. After removal, change the mode back to `prepare-direct`, plan and apply to recreate the proxy, obtain its new endpoint, update runtime secrets to that endpoint, restart clients, and validate health before optionally returning to `proxy`. A recreated proxy's hostname may differ: never assume the old hostname works. No database restore is required.
 
-For logging rollback, restore the `api` log type and the one-minute flow aggregation window in a topic PR and apply a reviewed infrastructure plan. Historical logs remain subject to their existing retention policy.
+For logging rollback, set `enable_supplementary_monitoring = true` in a topic PR and apply a reviewed infrastructure plan. New log groups start empty; audit and authenticator records remain available throughout.
 
 ## Verification
 

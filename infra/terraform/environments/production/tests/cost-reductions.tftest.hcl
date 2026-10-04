@@ -46,9 +46,25 @@ variables {
 
 run "proxy_remains_default" {
   command = plan
+  variables { database_access_mode = "proxy" }
   assert {
     condition     = output.environment.data_platform.database_access_mode == "proxy"
     error_message = "The default must not cut over existing database clients."
+  }
+}
+run "supplementary_monitoring_is_suspended_by_default" {
+  command = plan
+  assert {
+    condition     = output.environment.observability.alert_topic_arn == null
+    error_message = "Supplementary alerting and its SNS topic must be absent by default."
+  }
+}
+run "supplementary_monitoring_can_be_restored" {
+  command = plan
+  variables { enable_supplementary_monitoring = true }
+  assert {
+    condition     = output.environment.observability.enabled
+    error_message = "Operators must be able to restore supplementary alerting explicitly."
   }
 }
 run "prepare_direct_retains_proxy" {

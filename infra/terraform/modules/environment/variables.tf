@@ -56,6 +56,12 @@ variable "enable_account_cost_anomaly_monitor" {
   default     = false
 }
 
+variable "enable_supplementary_monitoring" {
+  type        = bool
+  description = "Provision supplementary CloudWatch logs, alarms, budgets, and alert delivery. Keep EKS audit/authenticator logs enabled separately."
+  default     = false
+}
+
 variable "cost_anomaly_threshold_usd" {
   type        = number
   description = "Absolute cost impact that triggers an immediate anomaly alert."

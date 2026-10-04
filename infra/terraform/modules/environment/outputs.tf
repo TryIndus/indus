@@ -41,7 +41,8 @@ output "workload_role_arns" {
 
 output "observability" {
   value = {
-    alert_topic_arn = aws_sns_topic.alerts.arn
+    enabled         = var.enable_supplementary_monitoring
+    alert_topic_arn = var.enable_supplementary_monitoring ? aws_sns_topic.alerts[0].arn : null
   }
 }
 
