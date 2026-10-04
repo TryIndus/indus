@@ -1,0 +1,17 @@
+[Unit]
+Description=Indus optimized Compose release
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/indus-optimized
+EnvironmentFile=/opt/indus-optimized/host.env
+ExecStartPre=/opt/indus-optimized/install-release.sh /opt/indus-optimized/release.env --refresh-secrets
+ExecStart=/usr/bin/docker compose --env-file /opt/indus-optimized/release.env up --detach --remove-orphans
+ExecStop=/usr/bin/docker compose --env-file /opt/indus-optimized/release.env down
+TimeoutStartSec=10min
+
+[Install]
+WantedBy=multi-user.target

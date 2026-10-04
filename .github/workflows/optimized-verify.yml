@@ -1,0 +1,45 @@
+name: Optimized infrastructure verification
+
+on:
+  pull_request:
+    paths:
+      - infra/optimized/**
+      - scripts/optimized/**
+      - .github/workflows/optimized-*.yml
+      - apps/platform-api/bin/docker-entrypoint
+  push:
+    branches: [main]
+    paths:
+      - infra/optimized/**
+      - scripts/optimized/**
+      - .github/workflows/optimized-*.yml
+      - apps/platform-api/bin/docker-entrypoint
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Validate workflow syntax
+        run: docker run --rm --volume "$PWD:/repo:ro" --workdir /repo rhysd/actionlint@sha256:6f03470d0152251d7f07f7c4dc019dbe7024c72cd952f839544c7798843efa8f -color
+      - name: Validate independent Terraform roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          image='hashicorp/terraform@sha256:6bbb82d575aa7bd4f0a2c6e3a0838ab9590426c08a71d7a2783643f01004d356'
+          docker run --rm --volume "$PWD:/workspace:ro" --workdir /workspace "$image" fmt -check -recursive infra/optimized/terraform
+          for root in bootstrap environment; do
+            docker run --rm --entrypoint /bin/sh --env TF_DATA_DIR=/tmp/terraform-data --volume "$PWD:/workspace" --workdir "/workspace/infra/optimized/terraform/$root" "$image" -ec 'terraform init -backend=false -input=false -lockfile=readonly && terraform validate && if [ "$1" = environment ]; then terraform test; fi' sh "$root"
+          done
+      - name: Check profile isolation and runtime configuration
+        run: |
+          bash scripts/optimized/validate-isolation.sh
+          docker compose --env-file infra/optimized/runtime/release.env.example -f infra/optimized/runtime/compose.yaml config >/dev/null
+          docker run --rm --env INDUS_HOSTNAME=optimized.example.com --volume "$PWD/infra/optimized/runtime/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          bash -n scripts/optimized/install-release.sh infra/optimized/runtime/bootstrap.sh

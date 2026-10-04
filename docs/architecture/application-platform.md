@@ -53,6 +53,18 @@ For local recovery, stop the affected Compose profile and remove only disposable
 
 Aurora remains private and TLS-required. Terraform database access modes retain RDS Proxy by default, allow direct private connectivity to be prepared alongside it, and remove the proxy only after runtime-secret clients have moved. `DATABASE_URL` in Secrets Manager is authoritative; GitOps endpoint metadata does not rewrite runtime credentials. See [AWS cost reductions](../runbooks/aws-cost-reductions.md) for connection-capacity checks, deployment sequencing, and rollback.
 
+## Independent optimized AWS profile
+
+`infra/terraform` remains the main AWS profile. `infra/optimized` is a
+separately owned, opt-in configuration with its own state, identities,
+network, EC2 host, standard single-AZ RDS instance, Cognito pool, storage, and
+release pipeline; it never reads main Terraform state. It is not live merely
+because its configuration is merged. The profile is deliberately a single
+host and single-AZ runtime, and therefore has materially different capacity
+and availability characteristics from main. Its separate Cognito issuer and
+subjects also require a dedicated, audited identity/data cutover before it can
+serve existing users. See the [optimized AWS runbook](../runbooks/optimized-aws.md).
+
 ## AWS architecture diagram
 
 ![AWS architecture and staged database access](aws-architecture.png)

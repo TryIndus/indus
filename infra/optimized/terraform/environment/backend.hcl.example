@@ -1,0 +1,6 @@
+bucket       = "indus-optimized-terraform-state-111111111111"
+key          = "optimized/production/terraform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+kms_key_id   = "arn:aws:kms:us-east-1:111111111111:key/replace-me"
+use_lockfile = true
