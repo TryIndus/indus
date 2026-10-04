@@ -7,9 +7,9 @@ on:
         description: Terraform operation
         required: true
         type: choice
-        options: [plan, apply, tear-up, tear-down, destroy]
+        options: [plan, apply, tear-up, tear-down, destroy, plan-destroy-production, destroy-production]
       confirmation:
-        description: Required for staging tear-down or destroy
+        description: Required for staging tear-down/destroy or production destroy
         required: false
         type: string
 
@@ -41,7 +41,7 @@ jobs:
             *) echo "Infrastructure deployments must run from staging or main." >&2; exit 1 ;;
           esac
           case "$OPERATION" in
-            plan|apply|tear-up|tear-down|destroy) ;;
+            plan|apply|tear-up|tear-down|destroy|plan-destroy-production|destroy-production) ;;
             *) echo "Unsupported infrastructure operation." >&2; exit 1 ;;
           esac
           if [[ "$OPERATION" == tear-up || "$OPERATION" == tear-down || "$OPERATION" == destroy ]]; then
@@ -53,6 +53,10 @@ jobs:
           if [[ "$OPERATION" == destroy ]]; then
             [[ "$environment" == staging ]] || { echo "Production destroy is not implemented." >&2; exit 1; }
             [[ "$CONFIRMATION" == destroy-staging ]] || { echo "Use confirmation destroy-staging." >&2; exit 1; }
+          fi
+          if [[ "$OPERATION" == plan-destroy-production || "$OPERATION" == destroy-production ]]; then
+            [[ "$environment" == production ]] || { echo "Production destroy operations must run from main." >&2; exit 1; }
+            [[ "$CONFIRMATION" == destroy-production ]] || { echo "Use confirmation destroy-production." >&2; exit 1; }
           fi
           echo "environment=$environment" >> "$GITHUB_OUTPUT"
 
@@ -97,7 +101,7 @@ jobs:
           set -euo pipefail
           environment="${{ needs.target.outputs.environment }}"
           terraform -chdir="infra/terraform/environments/$environment" init -input=false -backend-config=backend.hcl
-          if [[ "$OPERATION" == destroy ]]; then
+          if [[ "$OPERATION" == destroy || "$OPERATION" == plan-destroy-production || "$OPERATION" == destroy-production ]]; then
             terraform -chdir="infra/terraform/environments/$environment" plan -destroy -input=false -out=approved.tfplan
           elif [[ "$OPERATION" == tear-down ]]; then
             # Keep the Aurora cluster volume and credentials; remove only its compute.
@@ -131,6 +135,6 @@ jobs:
           fi
 
       - name: Apply saved plan
-        if: inputs.operation == 'apply' || inputs.operation == 'tear-up' || inputs.operation == 'tear-down' || inputs.operation == 'destroy'
+        if: inputs.operation == 'apply' || inputs.operation == 'tear-up' || inputs.operation == 'tear-down' || inputs.operation == 'destroy' || inputs.operation == 'destroy-production'
         shell: bash
         run: terraform -chdir=infra/terraform/environments/${{ needs.target.outputs.environment }} apply -input=false approved.tfplan
