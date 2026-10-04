@@ -1,0 +1,51 @@
+name: Deploy optimized infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Reviewed Terraform operation
+        required: true
+        type: choice
+        options: [plan, apply]
+
+concurrency:
+  group: optimized-infrastructure
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    environment: optimized-production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with: { terraform_version: 1.14.2 }
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ vars.OPTIMIZED_AWS_REGION }}
+          role-to-assume: ${{ vars.OPTIMIZED_TERRAFORM_ROLE_ARN }}
+          role-session-name: indus-optimized-terraform-${{ github.run_id }}
+      - name: Restore isolated configuration
+        env:
+          BACKEND_CONFIG_B64: ${{ secrets.OPTIMIZED_TF_BACKEND_CONFIG_B64 }}
+          TFVARS_B64: ${{ secrets.OPTIMIZED_TF_VARS_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$BACKEND_CONFIG_B64"; test -n "$TFVARS_B64"
+          printf '%s' "$BACKEND_CONFIG_B64" | base64 --decode > infra/optimized/terraform/environment/backend.hcl
+          printf '%s' "$TFVARS_B64" | base64 --decode > infra/optimized/terraform/environment/terraform.tfvars
+          ! grep -Eq 'environments/production/terraform\.tfstate|indus-production' infra/optimized/terraform/environment/backend.hcl
+      - name: Plan isolated state
+        run: |
+          terraform -chdir=infra/optimized/terraform/environment init -input=false -backend-config=backend.hcl
+          terraform -chdir=infra/optimized/terraform/environment plan -input=false -out=approved.tfplan
+      - name: Apply reviewed plan
+        if: inputs.operation == 'apply'
+        run: terraform -chdir=infra/optimized/terraform/environment apply -input=false approved.tfplan
+

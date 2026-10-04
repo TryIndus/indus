@@ -1,0 +1,199 @@
+name: Publish optimized application release
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Publish image manifest or deploy its pinned digests
+        required: true
+        type: choice
+        options: [publish, deploy]
+
+concurrency:
+  group: optimized-application
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  id-token: write
+
+jobs:
+  release:
+    if: inputs.action == 'publish'
+    environment: optimized-production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      AWS_REGION: ${{ vars.OPTIMIZED_AWS_REGION }}
+      WEB_ORIGIN: ${{ vars.OPTIMIZED_WEB_ORIGIN }}
+      COGNITO_AUTHORITY: ${{ vars.OPTIMIZED_COGNITO_AUTHORITY }}
+      COGNITO_CLIENT_ID: ${{ vars.OPTIMIZED_COGNITO_CLIENT_ID }}
+      INSTANCE_ID: ${{ vars.OPTIMIZED_INSTANCE_ID }}
+      PLATFORM_API_SECRET_ARN: ${{ vars.OPTIMIZED_PLATFORM_API_SECRET_ARN }}
+      MARKET_DATA_SECRET_ARN: ${{ vars.OPTIMIZED_MARKET_DATA_SECRET_ARN }}
+      RESEARCH_WORKER_SECRET_ARN: ${{ vars.OPTIMIZED_RESEARCH_WORKER_SECRET_ARN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate non-secret deployment configuration
+        run: |
+          set -euo pipefail
+          [[ "$AWS_REGION" =~ ^[a-z]+-[a-z]+-[0-9]+$ ]]
+          [[ "$WEB_ORIGIN" =~ ^https://[a-z0-9.-]+$ ]]
+          [[ "$COGNITO_AUTHORITY" =~ ^https://cognito-idp\.${AWS_REGION}\.amazonaws\.com/${AWS_REGION}_[A-Za-z0-9]+$ ]]
+          [[ "$COGNITO_CLIENT_ID" =~ ^[a-z0-9]+$ ]]
+          if [[ "${{ inputs.action }}" == deploy ]]; then
+            [[ "$INSTANCE_ID" =~ ^i-[a-f0-9]+$ ]]
+            for arn in "$PLATFORM_API_SECRET_ARN" "$MARKET_DATA_SECRET_ARN" "$RESEARCH_WORKER_SECRET_ARN"; do [[ "$arn" =~ ^arn:aws:secretsmanager: ]] || exit 1; done
+          fi
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.OPTIMIZED_RELEASE_ROLE_ARN }}
+          role-session-name: indus-optimized-release-${{ github.run_id }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.1
+      - name: Build optimized images
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          tag="optimized-$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          prefix="$ECR_REGISTRY/indus-optimized"
+          docker build --tag "$prefix/platform-api:$tag" apps/platform-api
+          docker tag "$prefix/platform-api:$tag" "$prefix/research-worker:$tag"
+          docker build --tag "$prefix/market-data:$tag" services/market-data
+          docker build --file infra/optimized/images/web/Dockerfile --tag "$prefix/web:$tag" \
+            --build-arg "VITE_API_URL=$WEB_ORIGIN/api" \
+            --build-arg "VITE_MARKET_STREAM_URL=$WEB_ORIGIN/stream" \
+            --build-arg "VITE_COGNITO_AUTHORITY=$COGNITO_AUTHORITY" \
+            --build-arg "VITE_COGNITO_CLIENT_ID=$COGNITO_CLIENT_ID" .
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+      - name: Scan platform API image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/indus-optimized/platform-api:${{ env.RELEASE_TAG }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Scan market data image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/indus-optimized/market-data:${{ env.RELEASE_TAG }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Scan research worker image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/indus-optimized/research-worker:${{ env.RELEASE_TAG }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Scan web image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ecr.outputs.registry }}/indus-optimized/web:${{ env.RELEASE_TAG }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Generate platform API SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/indus-optimized/platform-api:${{ env.RELEASE_TAG }}
+          format: spdx-json
+          output-file: platform-api.spdx.json
+      - name: Generate market data SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/indus-optimized/market-data:${{ env.RELEASE_TAG }}
+          format: spdx-json
+          output-file: market-data.spdx.json
+      - name: Generate research worker SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/indus-optimized/research-worker:${{ env.RELEASE_TAG }}
+          format: spdx-json
+          output-file: research-worker.spdx.json
+      - name: Generate web SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/indus-optimized/web:${{ env.RELEASE_TAG }}
+          format: spdx-json
+          output-file: web.spdx.json
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Push and resolve immutable digests
+        id: images
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          for name in platform-api research-worker market-data web; do
+            docker push "$ECR_REGISTRY/indus-optimized/$name:$RELEASE_TAG"
+            digest="$(aws ecr describe-images --repository-name "indus-optimized/$name" --image-ids "imageTag=$RELEASE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
+            [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+            image="$ECR_REGISTRY/indus-optimized/$name@$digest"
+            cosign sign --yes "$image"
+            cosign attest --yes --type spdxjson --predicate "$name.spdx.json" "$image"
+            echo "$name=$image" >> "$GITHUB_OUTPUT"
+          done
+      - name: Update reviewable release manifest
+        run: |
+          node scripts/optimized/update-release-manifest.mjs infra/optimized/releases/production.env \
+            '${{ steps.images.outputs.platform-api }}' '${{ steps.images.outputs.research-worker }}' \
+            '${{ steps.images.outputs.market-data }}' '${{ steps.images.outputs.web }}'
+          sed -i "s|^INDUS_HOSTNAME=.*$|INDUS_HOSTNAME=${WEB_ORIGIN#https://}|" infra/optimized/releases/production.env
+      - name: Open release-manifest pull request
+        id: manifest-pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ github.token }}
+          add-paths: infra/optimized/releases/production.env
+          base: main
+          branch: deploy/optimized-${{ github.run_id }}-${{ github.run_attempt }}
+          commit-message: Update optimized release image digests
+          title: Update optimized release image digests
+          body: |
+            Updates the independent optimized release manifest with scanned immutable image digests.
+            Deployment requires a separate manual `deploy` dispatch after this manifest has been reviewed and merged.
+          delete-branch: true
+  deploy:
+    if: inputs.action == 'deploy' && github.ref == 'refs/heads/main'
+    environment: optimized-production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      AWS_REGION: ${{ vars.OPTIMIZED_AWS_REGION }}
+      INSTANCE_ID: ${{ vars.OPTIMIZED_INSTANCE_ID }}
+      PLATFORM_API_SECRET_ARN: ${{ vars.OPTIMIZED_PLATFORM_API_SECRET_ARN }}
+      MARKET_DATA_SECRET_ARN: ${{ vars.OPTIMIZED_MARKET_DATA_SECRET_ARN }}
+      RESEARCH_WORKER_SECRET_ARN: ${{ vars.OPTIMIZED_RESEARCH_WORKER_SECRET_ARN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.OPTIMIZED_RELEASE_ROLE_ARN }}
+          role-session-name: indus-optimized-deploy-${{ github.run_id }}
+      - name: Deploy the reviewed digest manifest
+        run: |
+          set -euo pipefail
+          [[ "$INSTANCE_ID" =~ ^i-[a-f0-9]+$ ]]
+          if grep -q 'replace-with-digest\|replace-with-preview-hostname' infra/optimized/releases/production.env; then
+            echo "release manifest contains placeholders" >&2
+            exit 1
+          fi
+          compose_b64="$(base64 < infra/optimized/runtime/compose.yaml | tr -d '\n')"
+          installer_b64="$(base64 < scripts/optimized/install-release.sh | tr -d '\n')"
+          service_b64="$(base64 < infra/optimized/runtime/indus-optimized.service | tr -d '\n')"
+          for arn in "$PLATFORM_API_SECRET_ARN" "$MARKET_DATA_SECRET_ARN" "$RESEARCH_WORKER_SECRET_ARN"; do [[ "$arn" =~ ^arn:aws:secretsmanager: ]] || exit 1; done
+          manifest_b64="$(base64 < infra/optimized/releases/production.env | tr -d '\n')"
+          command="set -euo pipefail; sudo install -d -m 0755 /opt/indus-optimized; echo '$compose_b64' | base64 -d | sudo tee /opt/indus-optimized/compose.yaml >/dev/null; echo '$installer_b64' | base64 -d | sudo tee /opt/indus-optimized/install-release.sh >/dev/null; sudo chmod 0755 /opt/indus-optimized/install-release.sh; echo '$service_b64' | base64 -d | sudo tee /opt/indus-optimized/indus-optimized.service >/dev/null; echo '$manifest_b64' | base64 -d | sudo tee /opt/indus-optimized/release.env >/dev/null; echo '$PLATFORM_API_SECRET_ARN' | sudo tee /opt/indus-optimized/platform-api.secret-arn >/dev/null; echo '$MARKET_DATA_SECRET_ARN' | sudo tee /opt/indus-optimized/market-data.secret-arn >/dev/null; echo '$RESEARCH_WORKER_SECRET_ARN' | sudo tee /opt/indus-optimized/research-worker.secret-arn >/dev/null; sudo env AWS_REGION='$AWS_REGION' /opt/indus-optimized/install-release.sh /opt/indus-optimized/release.env"
+          command_id="$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --comment indus-optimized-reviewed-release --parameters commands="$command" --query 'Command.CommandId' --output text)"
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "$INSTANCE_ID"
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text
