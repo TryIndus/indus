@@ -116,6 +116,8 @@ services:
 
   web-proxy:
     image: ${WEB_IMAGE:?Set WEB_IMAGE to a digest-pinned image}
+    environment:
+      INDUS_HOSTNAME: ${INDUS_HOSTNAME:?Set INDUS_HOSTNAME}
     ports:
       - "80:80"
       - "443:443"
@@ -130,8 +132,7 @@ services:
 
 networks:
   edge: {}
-  internal:
-    internal: true
+  internal: {}
 
 volumes:
   valkey-data:

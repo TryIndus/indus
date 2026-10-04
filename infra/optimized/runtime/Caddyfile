@@ -12,7 +12,6 @@
   handle @stream {
     reverse_proxy market-data:8081 {
       flush_interval -1
-      transport http { read_buffer 0 write_buffer 0 }
     }
   }
 

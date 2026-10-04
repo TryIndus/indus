@@ -31,9 +31,10 @@ interrupts service.
 
 ## Bootstrap and provision
 
-1. Create a protected GitHub Environment named `optimized-production`. Restrict
-   it to the approved deployment branch. Create the GitHub OIDC provider at the
-   account boundary if it does not already exist.
+1. Create GitHub Environments named `optimized-production-plan` and
+   `optimized-production`, both restricted to `main`. Require human approval
+   on `optimized-production`. Create the GitHub OIDC provider at the account
+   boundary if it does not already exist.
 2. Copy `infra/optimized/terraform/bootstrap/terraform.tfvars.example` to its
    ignored counterpart. Supply the account ID and operator-supplied OIDC provider
    ARN. Run `terraform init`, save and review `terraform plan`, then apply only
@@ -49,16 +50,33 @@ interrupts service.
    creates an optimized-owned hosted zone for that hostname; a domain owner
    must add its NS delegation in the parent zone separately. Do not point a
    main production hostname at this profile.
-5. Put the base64-encoded ignored backend and variable files in
-   `OPTIMIZED_TF_BACKEND_CONFIG_B64` and `OPTIMIZED_TF_VARS_B64`; set
-   `OPTIMIZED_AWS_REGION` and `OPTIMIZED_TERRAFORM_ROLE_ARN`. The manual
-   `optimized-infrastructure` workflow has `plan` and protected `apply` paths.
-   It rejects main state identifiers before it initializes Terraform.
+5. Put the base64-encoded ignored backend and variable files in both
+   environments as `OPTIMIZED_TF_BACKEND_CONFIG_B64` and
+   `OPTIMIZED_TF_VARS_B64`. Set `OPTIMIZED_AWS_REGION` in both, and set the
+   optimized plan and apply role ARNs as `OPTIMIZED_PLAN_ROLE_ARN` and
+   `OPTIMIZED_TERRAFORM_ROLE_ARN` respectively. Dispatch the manual
+   `optimized-infrastructure` workflow from `main`. `plan` only reviews;
+   `apply` first saves an exact plan, publishes its readable form in the job
+   summary, then waits for approval of `optimized-production` before applying
+   that saved plan. Both jobs require the optimized state bucket and key.
 
 Terraform creates secret containers only. Add runtime secret values through an
 audited operator session. Do not place database, Alpaca, Gemini, Temporal, or
 Cognito migration values in Terraform, user data, source, workflow output, or
 release manifests.
+
+Create a least-privilege PostgreSQL runtime role from an audited operator
+session using the RDS-managed master secret. Give it only the database and
+schema privileges needed by the Rails and Rust migrations and runtime; store
+its TLS-required `DATABASE_URL` in each relevant optimized runtime secret.
+Each secret value must be a Docker env-file payload with one `KEY=value` entry
+per line. Keep the optimized Cognito issuer, client, UserInfo URL, web origin,
+artifact bucket, Temporal Cloud configuration, and model provider configuration
+in the appropriate service secret. Set `MARKET_JWKS_URL`,
+`MARKET_JWT_ISSUER`, `MARKET_JWT_AUDIENCE`, `MARKET_ALLOWED_ORIGINS`, and
+Alpaca credentials for market data. Never set Kafka or ElastiCache IAM
+variables in this profile. Rotate a value in Secrets Manager and restart the
+optimized systemd service to refresh its root-owned `/run` secret files.
 
 ## First release and operations
 
@@ -81,6 +99,12 @@ serves the SPA, proxies `/api` to Rails, and proxies `/stream` to Rust with
 SSE buffering disabled. The Valkey AOF volume sits on the encrypted EBS volume.
 An abrupt host loss can lose recent queue work; do not represent it as a durable
 replacement for a separate managed cache.
+The AL2023 AMI provides AWS CLI v2, while bootstrap installs Docker and a
+checksum-verified Compose plugin. The systemd service refreshes secrets on
+reboot before starting containers. Review the saved prior manifest at
+`/opt/indus-optimized/previous-release.env` before a rollback. A failed new
+release restores those prior image digests, but does not reverse a database
+migration.
 
 Before the first Caddy start, make the delegated preview DNS name resolve to
 the optimized Elastic IP and leave port 80 reachable so ACME can issue its

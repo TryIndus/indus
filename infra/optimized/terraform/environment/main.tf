@@ -147,7 +147,7 @@ resource "aws_secretsmanager_secret" "runtime" {
 resource "aws_iam_role_policy" "host_runtime" {
   name   = "runtime-secrets-and-artifacts"
   role   = aws_iam_role.host.id
-  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [for secret in aws_secretsmanager_secret.runtime : secret.arn] }, { Effect = "Allow", Action = ["kms:Decrypt"], Resource = [aws_kms_key.data.arn] }] })
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = [for secret in aws_secretsmanager_secret.runtime : secret.arn] }, { Effect = "Allow", Action = ["kms:Decrypt", "kms:GenerateDataKey"], Resource = [aws_kms_key.data.arn] }] })
 }
 resource "aws_iam_role_policy" "host_ecr" {
   name   = "pull-optimized-images"

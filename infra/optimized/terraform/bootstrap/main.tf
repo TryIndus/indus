@@ -95,7 +95,7 @@ resource "aws_ecr_repository" "images" {
   }
 }
 
-data "aws_iam_policy_document" "github_oidc_assume" {
+data "aws_iam_policy_document" "github_oidc_assume_apply" {
   statement {
     effect = "Allow"
     principals {
@@ -116,6 +116,27 @@ data "aws_iam_policy_document" "github_oidc_assume" {
   }
 }
 
+data "aws_iam_policy_document" "github_oidc_assume_plan" {
+  statement {
+    effect = "Allow"
+    principals {
+      type        = "Federated"
+      identifiers = [var.github_oidc_provider_arn]
+    }
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_repository}:environment:optimized-production-plan"]
+    }
+  }
+}
+
 variable "github_oidc_provider_arn" {
   type        = string
   description = "Account-level GitHub OIDC provider ARN supplied by the operator."
@@ -123,7 +144,31 @@ variable "github_oidc_provider_arn" {
 
 resource "aws_iam_role" "terraform" {
   name               = "${local.name}-terraform"
-  assume_role_policy = data.aws_iam_policy_document.github_oidc_assume.json
+  assume_role_policy = data.aws_iam_policy_document.github_oidc_assume_apply.json
+}
+
+resource "aws_iam_role" "plan" {
+  name               = "${local.name}-plan"
+  assume_role_policy = data.aws_iam_policy_document.github_oidc_assume_plan.json
+}
+
+resource "aws_iam_role_policy_attachment" "plan_read_only" {
+  role       = aws_iam_role.plan.name
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/ReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy" "plan_state" {
+  name = "read-optimized-state-and-lock"
+  role = aws_iam_role.plan.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { Effect = "Allow", Action = ["s3:ListBucket"], Resource = aws_s3_bucket.state.arn },
+      { Effect = "Allow", Action = ["s3:GetObject"], Resource = "${aws_s3_bucket.state.arn}/optimized/production/terraform.tfstate" },
+      { Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], Resource = "${aws_s3_bucket.state.arn}/optimized/production/terraform.tfstate.tflock" },
+      { Effect = "Allow", Action = ["kms:Decrypt", "kms:GenerateDataKey"], Resource = aws_kms_key.bootstrap.arn }
+    ]
+  })
 }
 
 data "aws_iam_policy_document" "terraform" {
@@ -161,7 +206,7 @@ resource "aws_iam_role_policy" "terraform" {
 
 resource "aws_iam_role" "release" {
   name               = "${local.name}-release"
-  assume_role_policy = data.aws_iam_policy_document.github_oidc_assume.json
+  assume_role_policy = data.aws_iam_policy_document.github_oidc_assume_apply.json
 }
 
 resource "aws_iam_role_policy" "release" {
@@ -172,7 +217,9 @@ resource "aws_iam_role_policy" "release" {
     Statement = [
       { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
       { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:CompleteLayerUpload", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart", "ecr:BatchGetImage", "ecr:DescribeImages"], Resource = [for repository in aws_ecr_repository.images : repository.arn] },
-      { Effect = "Allow", Action = ["ssm:SendCommand", "ssm:GetCommandInvocation", "ssm:ListCommandInvocations"], Resource = "*", Condition = { StringEquals = { "ssm:resourceTag/Profile" = "optimized" } } }
+      { Effect = "Allow", Action = ["ssm:SendCommand"], Resource = "arn:${data.aws_partition.current.partition}:ssm:${var.aws_region}::document/AWS-RunShellScript" },
+      { Effect = "Allow", Action = ["ssm:SendCommand"], Resource = "arn:${data.aws_partition.current.partition}:ec2:${var.aws_region}:${var.account_id}:instance/*", Condition = { StringEquals = { "ssm:resourceTag/Profile" = "optimized" } } },
+      { Effect = "Allow", Action = ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"], Resource = "*" }
     ]
   })
 }

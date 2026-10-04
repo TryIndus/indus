@@ -1,10 +1,10 @@
-name: Deploy optimized infrastructure
+name: Plan or apply optimized infrastructure
 
 on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Reviewed Terraform operation
+        description: Plan only, or plan and request approval to apply
         required: true
         type: choice
         options: [plan, apply]
@@ -18,7 +18,49 @@ permissions:
   id-token: write
 
 jobs:
-  terraform:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    environment: optimized-production-plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with: { terraform_version: 1.14.2 }
+      - uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          aws-region: ${{ vars.OPTIMIZED_AWS_REGION }}
+          role-to-assume: ${{ vars.OPTIMIZED_PLAN_ROLE_ARN }}
+          role-session-name: indus-optimized-plan-${{ github.run_id }}
+      - name: Restore and verify isolated configuration
+        env:
+          BACKEND_CONFIG_B64: ${{ secrets.OPTIMIZED_TF_BACKEND_CONFIG_B64 }}
+          TFVARS_B64: ${{ secrets.OPTIMIZED_TF_VARS_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$BACKEND_CONFIG_B64"; test -n "$TFVARS_B64"
+          printf '%s' "$BACKEND_CONFIG_B64" | base64 --decode > infra/optimized/terraform/environment/backend.hcl
+          printf '%s' "$TFVARS_B64" | base64 --decode > infra/optimized/terraform/environment/terraform.tfvars
+          grep -Eq '^bucket[[:space:]]*=[[:space:]]*"indus-optimized-terraform-state-[0-9]{12}"[[:space:]]*$' infra/optimized/terraform/environment/backend.hcl
+          grep -Eq '^key[[:space:]]*=[[:space:]]*"optimized/production/terraform.tfstate"[[:space:]]*$' infra/optimized/terraform/environment/backend.hcl
+      - name: Create reviewable saved plan
+        run: |
+          set -euo pipefail
+          terraform -chdir=infra/optimized/terraform/environment init -input=false -lockfile=readonly -backend-config=backend.hcl
+          terraform -chdir=infra/optimized/terraform/environment plan -input=false -out=approved.tfplan
+          terraform -chdir=infra/optimized/terraform/environment show -no-color approved.tfplan >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve exact plan for approved apply
+        if: inputs.operation == 'apply'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: optimized-approved-plan
+          path: infra/optimized/terraform/environment/approved.tfplan
+          if-no-files-found: error
+          retention-days: 7
+
+  apply:
+    if: inputs.operation == 'apply' && github.ref == 'refs/heads/main'
+    needs: plan
     environment: optimized-production
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -30,21 +72,21 @@ jobs:
         with:
           aws-region: ${{ vars.OPTIMIZED_AWS_REGION }}
           role-to-assume: ${{ vars.OPTIMIZED_TERRAFORM_ROLE_ARN }}
-          role-session-name: indus-optimized-terraform-${{ github.run_id }}
-      - name: Restore isolated configuration
+          role-session-name: indus-optimized-apply-${{ github.run_id }}
+      - name: Restore isolated backend
         env:
           BACKEND_CONFIG_B64: ${{ secrets.OPTIMIZED_TF_BACKEND_CONFIG_B64 }}
-          TFVARS_B64: ${{ secrets.OPTIMIZED_TF_VARS_B64 }}
         run: |
           set -euo pipefail
-          test -n "$BACKEND_CONFIG_B64"; test -n "$TFVARS_B64"
+          test -n "$BACKEND_CONFIG_B64"
           printf '%s' "$BACKEND_CONFIG_B64" | base64 --decode > infra/optimized/terraform/environment/backend.hcl
-          printf '%s' "$TFVARS_B64" | base64 --decode > infra/optimized/terraform/environment/terraform.tfvars
-          ! grep -Eq 'environments/production/terraform\.tfstate|indus-production' infra/optimized/terraform/environment/backend.hcl
-      - name: Plan isolated state
+          grep -Eq '^bucket[[:space:]]*=[[:space:]]*"indus-optimized-terraform-state-[0-9]{12}"[[:space:]]*$' infra/optimized/terraform/environment/backend.hcl
+          grep -Eq '^key[[:space:]]*=[[:space:]]*"optimized/production/terraform.tfstate"[[:space:]]*$' infra/optimized/terraform/environment/backend.hcl
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: optimized-approved-plan
+          path: infra/optimized/terraform/environment
+      - name: Apply approved saved plan
         run: |
-          terraform -chdir=infra/optimized/terraform/environment init -input=false -backend-config=backend.hcl
-          terraform -chdir=infra/optimized/terraform/environment plan -input=false -out=approved.tfplan
-      - name: Apply reviewed plan
-        if: inputs.operation == 'apply'
-        run: terraform -chdir=infra/optimized/terraform/environment apply -input=false approved.tfplan
+          terraform -chdir=infra/optimized/terraform/environment init -input=false -lockfile=readonly -backend-config=backend.hcl
+          terraform -chdir=infra/optimized/terraform/environment apply -input=false approved.tfplan
