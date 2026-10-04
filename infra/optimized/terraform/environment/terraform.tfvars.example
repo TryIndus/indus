@@ -1,0 +1,14 @@
+account_id                 = "111111111111"
+vpc_cidr                   = "10.52.0.0/16"
+preview_domain_name        = "optimized.indus.example.com"
+cognito_callback_urls     = ["https://optimized.indus.example.com/auth/callback"]
+cognito_logout_urls       = ["https://optimized.indus.example.com/auth"]
+alert_email_addresses      = ["on-call@example.com"]
+monthly_budget_usd         = 100
+ecr_repository_arns = {
+  platform-api    = "arn:aws:ecr:us-east-1:111111111111:repository/indus-optimized/platform-api"
+  market-data     = "arn:aws:ecr:us-east-1:111111111111:repository/indus-optimized/market-data"
+  research-worker = "arn:aws:ecr:us-east-1:111111111111:repository/indus-optimized/research-worker"
+  web             = "arn:aws:ecr:us-east-1:111111111111:repository/indus-optimized/web"
+}
+tags = { CostCenter = "engineering", Owner = "platform", DataClassification = "confidential" }

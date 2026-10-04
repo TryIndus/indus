@@ -1,0 +1,4 @@
+account_id              = "111111111111"
+github_oidc_provider_arn = "arn:aws:iam::111111111111:oidc-provider/token.actions.githubusercontent.com"
+tags = { CostCenter = "engineering", Owner = "platform", DataClassification = "confidential" }
+
