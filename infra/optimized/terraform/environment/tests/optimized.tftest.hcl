@@ -25,6 +25,14 @@ variables {
 run "single_host_cost_profile" {
   command = plan
   assert {
+    condition     = aws_cognito_user_pool.this.mfa_configuration == "OFF"
+    error_message = "The optimized profile does not enable Cognito MFA."
+  }
+  assert {
+    condition     = aws_cognito_user_pool_client.web.prevent_user_existence_errors == "ENABLED"
+    error_message = "The optimized Cognito client must avoid revealing account existence."
+  }
+  assert {
     condition     = aws_db_instance.this.multi_az == false
     error_message = "Optimized RDS must remain a single-AZ instance."
   }
@@ -51,6 +59,25 @@ run "single_host_cost_profile" {
   assert {
     condition     = aws_instance.host.metadata_options[0].http_tokens == "required"
     error_message = "The host must require IMDSv2."
+  }
+}
+
+run "branded_cognito_confirmation_email_is_opt_in" {
+  command = plan
+  variables {
+    enable_branded_cognito_email = true
+  }
+  assert {
+    condition     = aws_cognito_user_pool.this.email_configuration[0].email_sending_account == "DEVELOPER"
+    error_message = "Branded verification emails must use the optimized SES identity when explicitly enabled."
+  }
+  assert {
+    condition     = strcontains(aws_cognito_user_pool.this.verification_message_template[0].email_message, "{####}")
+    error_message = "The branded verification template must include Cognito's confirmation code placeholder."
+  }
+  assert {
+    condition     = aws_cognito_user_pool.this.verification_message_template[0].default_email_option == "CONFIRM_WITH_CODE"
+    error_message = "Branded verification must keep users in the Indus code-entry experience."
   }
 }
 

@@ -60,6 +60,28 @@ interrupts service.
    summary, then waits for approval of `optimized-production` before applying
    that saved plan. Both jobs require the optimized state bucket and key.
 
+The optimized web image uses the same `/auth` confirmation and recovery
+experience as the main application: signup codes, recoverable unconfirmed
+accounts, resend cooldowns, and password-reset codes. Cognito MFA remains off.
+The optimized pool has its own users and issuer; it does not inherit main-pool
+accounts.
+
+`enable_branded_cognito_email` defaults to `false`. Setting it to `true` in the
+private optimized Terraform variables configures Cognito to send the Indus HTML
+verification template through SES and creates the SES identity and DKIM records
+in the optimized hosted zone. Before enabling it, delegate that hosted zone in
+public DNS and confirm SES can send to arbitrary recipients in this region. SES
+may otherwise remain in its sandbox, where signup delivery is restricted. Keep
+the flag false until those prerequisites are ready; Cognito's standard sender
+continues to work meanwhile.
+
+The optimized bootstrap creates its own plan, apply, release, and host IAM
+roles. These are roles in the configured AWS account, not new human IAM users.
+An existing MFA-backed operator identity with permission to bootstrap the
+optimized stack can be reused. The account-level GitHub OIDC provider can also
+be reused if it already exists; the optimized workflow still needs its own
+GitHub environment approvals and role ARN variables.
+
 Terraform creates secret containers only. Add runtime secret values through an
 audited operator session. Do not place database, Alpaca, Gemini, Temporal, or
 Cognito migration values in Terraform, user data, source, workflow output, or

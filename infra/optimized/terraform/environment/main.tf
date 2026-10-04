@@ -312,7 +312,9 @@ resource "aws_cognito_user_pool" "this" {
     content {
       default_email_option = "CONFIRM_WITH_CODE"
       email_subject        = "Your Indus verification code"
-      email_message        = "Use code {####} to verify your email. Return to https://${var.preview_domain_name}/auth to continue."
+      email_message = templatefile("${path.module}/templates/cognito-verification.html", {
+        app_url = "https://${var.preview_domain_name}/auth"
+      })
     }
   }
   password_policy {
