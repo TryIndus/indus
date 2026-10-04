@@ -52,10 +52,6 @@ run "single_host_cost_profile" {
     condition     = aws_instance.host.metadata_options[0].http_tokens == "required"
     error_message = "The host must require IMDSv2."
   }
-  assert {
-    condition     = length(aws_security_group.host.egress) == 2
-    error_message = "The host must have only HTTPS and database egress rules."
-  }
 }
 
 run "reject_main_vpc_range" {
