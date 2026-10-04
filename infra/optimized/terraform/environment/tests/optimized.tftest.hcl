@@ -6,7 +6,7 @@ mock_provider "aws" {
   mock_data "aws_ssm_parameter" { defaults = { value = "ami-test" } }
   mock_data "aws_iam_policy_document" {
     defaults = {
-      json = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "ec2.amazonaws.com" }, Action = "sts:AssumeRole" }] })
+      json = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
     }
   }
 }
