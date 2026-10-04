@@ -32,7 +32,7 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/indus-optimized.json <<'JSON'
   }
 }
 JSON
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-  -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/indus-optimized.json
+# The release installer starts the agent only when the optimized monitoring
+# setting is enabled. Docker logs remain bounded on the host either way.
 mkdir -p /opt/indus-optimized /run/indus-optimized
 chmod 0700 /run/indus-optimized

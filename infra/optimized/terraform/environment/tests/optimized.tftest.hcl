@@ -25,6 +25,22 @@ variables {
 run "single_host_cost_profile" {
   command = plan
   assert {
+    condition     = length(aws_sns_topic.alerts) == 0 && length(aws_budgets_budget.monthly) == 0 && length(aws_route53_health_check.preview) == 0
+    error_message = "Supplementary alerts, budget notifications, and health checks must be absent by default."
+  }
+  assert {
+    condition     = length(aws_cloudwatch_metric_alarm.host_status) == 0 && length(aws_db_event_subscription.database) == 0 && length(aws_iam_role_policy_attachment.cloudwatch) == 0
+    error_message = "Optimized supplementary monitoring and agent permissions must be off by default."
+  }
+  assert {
+    condition     = aws_db_instance.this.performance_insights_enabled == false && aws_db_instance.this.backup_retention_period == 7
+    error_message = "Disable optional RDS insights without disabling database backups."
+  }
+  assert {
+    condition     = aws_ssm_parameter.supplementary_monitoring.value == "false"
+    error_message = "The host must receive the disabled monitoring setting by default."
+  }
+  assert {
     condition     = aws_cognito_user_pool.this.mfa_configuration == "OFF"
     error_message = "The optimized profile does not enable Cognito MFA."
   }
@@ -59,6 +75,25 @@ run "single_host_cost_profile" {
   assert {
     condition     = aws_instance.host.metadata_options[0].http_tokens == "required"
     error_message = "The host must require IMDSv2."
+  }
+}
+
+run "supplementary_monitoring_can_be_restored" {
+  command = plan
+  variables {
+    enable_supplementary_monitoring = true
+  }
+  assert {
+    condition     = length(aws_sns_topic.alerts) == 1 && length(aws_budgets_budget.monthly) == 1 && length(aws_route53_health_check.preview) == 1
+    error_message = "Enabling the flag must provision alerts, budget notifications, and HTTPS health checks."
+  }
+  assert {
+    condition     = length(aws_cloudwatch_metric_alarm.host_status) == 1 && length(aws_db_event_subscription.database) == 1 && length(aws_iam_role_policy_attachment.cloudwatch) == 1
+    error_message = "Enabling the flag must restore host and database monitoring."
+  }
+  assert {
+    condition     = aws_db_instance.this.performance_insights_enabled == true && aws_ssm_parameter.supplementary_monitoring.value == "true"
+    error_message = "Enabling the flag must restore RDS insights and publish the host agent setting."
   }
 }
 

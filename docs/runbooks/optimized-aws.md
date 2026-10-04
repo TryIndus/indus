@@ -82,6 +82,24 @@ optimized stack can be reused. The account-level GitHub OIDC provider can also
 be reused if it already exists; the optimized workflow still needs its own
 GitHub environment approvals and role ARN variables.
 
+`enable_supplementary_monitoring` defaults to `false`, matching the optional
+monitoring switch in the main profile. With the flag off, optimized has no
+CloudWatch alarms, SNS alert topic, RDS event subscription, Route 53 HTTPS
+health check, monthly budget notification, RDS Performance Insights, or
+CloudWatch agent metric publication. AWS basic EC2 and RDS metrics, RDS backups,
+local bounded Docker logs, and SSM host access remain available. Operators must
+check service health and spend directly while notifications are disabled.
+
+To restore supplementary monitoring, set the flag to `true` in optimized's
+private Terraform variables and apply a reviewed plan. The plan also updates
+the optimized SSM monitoring setting and host agent permission. After apply,
+run `/opt/indus-optimized/install-release.sh /opt/indus-optimized/release.env
+--reconcile-monitoring` on the optimized host through SSM with `AWS_REGION` set
+to the optimized region; this starts the CloudWatch agent without restarting the
+application. Confirm the agent is active and accept the SNS email subscription.
+Use the same procedure after setting the flag back to `false`; the host stops
+the agent. A subsequent app service start also reconciles the setting.
+
 Terraform creates secret containers only. Add runtime secret values through an
 audited operator session. Do not place database, Alpaca, Gemini, Temporal, or
 Cognito migration values in Terraform, user data, source, workflow output, or
@@ -178,7 +196,8 @@ Budget for EC2 and any burst credits, EBS, public IPv4, RDS compute/storage/
 backups/I/O, S3, Cognito and optional SES, ECR, KMS/Secrets Manager, Route 53,
 CloudWatch, data transfer, and overlap with main. The profile intentionally
 omits the large recurring EKS, Aurora, Proxy, MSK, ElastiCache, ALB, CloudFront,
-and NAT charges. It creates alarms for EC2 status, memory and disk pressure,
-RDS CPU, storage and connections, RDS backup/failure events, HTTPS readiness,
-and a tagged budget. Confirm SNS email subscriptions and alarm delivery during
-a separately authorized activation; pending email confirmations receive no alerts.
+and NAT charges. With supplementary monitoring enabled, it creates alarms for
+EC2 status, memory and disk pressure, RDS CPU, storage and connections, RDS
+backup/failure events, HTTPS readiness, and a tagged budget. Confirm SNS email
+subscriptions and alarm delivery during a separately authorized activation;
+pending email confirmations receive no alerts.

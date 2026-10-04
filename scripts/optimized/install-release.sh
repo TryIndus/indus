@@ -7,6 +7,31 @@ release_file="${1:?release manifest path is required}"
 region="${AWS_REGION:?AWS_REGION is required}"
 umask 077
 
+reconcile_monitoring() {
+  local setting
+  if ! setting="$(aws ssm get-parameter --region "$region" --name /indus-optimized/supplementary-monitoring --query Parameter.Value --output text)"; then
+    echo "could not read supplementary monitoring setting; keeping the current agent state" >&2
+    return 1
+  fi
+  case "$setting" in
+    true)
+      /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+        -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/indus-optimized.json
+      ;;
+    false)
+      systemctl disable --now amazon-cloudwatch-agent.service
+      ;;
+    *)
+      echo "invalid supplementary monitoring setting; keeping the current agent state" >&2
+      return 1
+      ;;
+  esac
+}
+if [[ "${2:-}" == "--reconcile-monitoring" ]]; then
+  reconcile_monitoring
+  exit 0
+fi
+
 [[ "$release_file" == "$release_dir"/* ]] || { echo "release manifest must be under $release_dir" >&2; exit 1; }
 for key in PLATFORM_API_IMAGE RESEARCH_WORKER_IMAGE MARKET_DATA_IMAGE WEB_IMAGE INDUS_HOSTNAME; do
   value="$(grep -E "^${key}=" "$release_file" | cut -d= -f2-)"
@@ -34,6 +59,9 @@ refresh_secrets() {
   done
 }
 refresh_secrets
+if ! reconcile_monitoring; then
+  echo "continuing the application release without changing optional monitoring" >&2
+fi
 if [[ "${2:-}" == "--refresh-secrets" ]]; then
   exit 0
 fi

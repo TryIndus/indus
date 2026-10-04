@@ -132,8 +132,27 @@ resource "aws_iam_role_policy_attachment" "ssm" {
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 resource "aws_iam_role_policy_attachment" "cloudwatch" {
+  count      = var.enable_supplementary_monitoring ? 1 : 0
   role       = aws_iam_role.host.name
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+resource "aws_ssm_parameter" "supplementary_monitoring" {
+  name  = "/indus-optimized/supplementary-monitoring"
+  type  = "String"
+  value = tostring(var.enable_supplementary_monitoring)
+  tags  = local.common_tags
+}
+resource "aws_iam_role_policy" "host_monitoring_setting" {
+  name = "read-supplementary-monitoring-setting"
+  role = aws_iam_role.host.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameter"]
+      Resource = aws_ssm_parameter.supplementary_monitoring.arn
+    }]
+  })
 }
 resource "aws_iam_instance_profile" "host" {
   name = "${local.name}-host"
@@ -228,7 +247,7 @@ resource "aws_db_instance" "this" {
   skip_final_snapshot           = false
   final_snapshot_identifier     = "${local.name}-final"
   auto_minor_version_upgrade    = true
-  performance_insights_enabled  = true
+  performance_insights_enabled  = var.enable_supplementary_monitoring
   tags                          = local.common_tags
 }
 
@@ -422,6 +441,7 @@ resource "aws_route53_zone" "preview" {
   tags = merge(local.common_tags, { Name = "${local.name}-preview-zone" })
 }
 resource "aws_sns_topic" "alerts" {
+  count             = var.enable_supplementary_monitoring ? 1 : 0
   name              = "${local.name}-alerts"
   kms_master_key_id = aws_kms_key.data.arn
   tags              = local.common_tags
@@ -430,7 +450,7 @@ data "aws_iam_policy_document" "alert_publish" {
   statement {
     effect    = "Allow"
     actions   = ["sns:*"]
-    resources = [aws_sns_topic.alerts.arn]
+    resources = var.enable_supplementary_monitoring ? [aws_sns_topic.alerts[0].arn] : []
     principals {
       type        = "AWS"
       identifiers = ["arn:${data.aws_partition.current.partition}:iam::${var.account_id}:root"]
@@ -439,7 +459,7 @@ data "aws_iam_policy_document" "alert_publish" {
   statement {
     effect    = "Allow"
     actions   = ["sns:Publish"]
-    resources = [aws_sns_topic.alerts.arn]
+    resources = var.enable_supplementary_monitoring ? [aws_sns_topic.alerts[0].arn] : []
     principals {
       type        = "Service"
       identifiers = ["events.rds.amazonaws.com", "cloudwatch.amazonaws.com", "budgets.amazonaws.com"]
@@ -452,16 +472,18 @@ data "aws_iam_policy_document" "alert_publish" {
   }
 }
 resource "aws_sns_topic_policy" "alerts" {
-  arn    = aws_sns_topic.alerts.arn
+  count  = var.enable_supplementary_monitoring ? 1 : 0
+  arn    = aws_sns_topic.alerts[0].arn
   policy = data.aws_iam_policy_document.alert_publish.json
 }
 resource "aws_sns_topic_subscription" "alerts" {
-  for_each  = var.alert_email_addresses
-  topic_arn = aws_sns_topic.alerts.arn
+  for_each  = var.enable_supplementary_monitoring ? var.alert_email_addresses : toset([])
+  topic_arn = aws_sns_topic.alerts[0].arn
   protocol  = "email"
   endpoint  = each.value
 }
 resource "aws_cloudwatch_metric_alarm" "database_cpu" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-database-cpu"
   namespace           = "AWS/RDS"
   metric_name         = "CPUUtilization"
@@ -471,11 +493,12 @@ resource "aws_cloudwatch_metric_alarm" "database_cpu" {
   period              = 300
   statistic           = "Average"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
   dimensions          = { DBInstanceIdentifier = aws_db_instance.this.identifier }
   tags                = local.common_tags
 }
 resource "aws_cloudwatch_metric_alarm" "host_status" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-host-status"
   namespace           = "AWS/EC2"
   metric_name         = "StatusCheckFailed"
@@ -485,11 +508,12 @@ resource "aws_cloudwatch_metric_alarm" "host_status" {
   period              = 60
   statistic           = "Maximum"
   treat_missing_data  = "breaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
   dimensions          = { InstanceId = aws_instance.host.id }
   tags                = local.common_tags
 }
 resource "aws_cloudwatch_metric_alarm" "host_memory" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-host-memory"
   namespace           = "Indus/Optimized"
   metric_name         = "mem_used_percent"
@@ -499,11 +523,12 @@ resource "aws_cloudwatch_metric_alarm" "host_memory" {
   period              = 60
   statistic           = "Average"
   treat_missing_data  = "breaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
   dimensions          = { InstanceId = aws_instance.host.id }
   tags                = local.common_tags
 }
 resource "aws_cloudwatch_metric_alarm" "host_disk" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-host-disk"
   namespace           = "Indus/Optimized"
   metric_name         = "disk_used_percent"
@@ -513,11 +538,12 @@ resource "aws_cloudwatch_metric_alarm" "host_disk" {
   period              = 60
   statistic           = "Average"
   treat_missing_data  = "breaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
   dimensions          = { InstanceId = aws_instance.host.id }
   tags                = local.common_tags
 }
 resource "aws_cloudwatch_metric_alarm" "database_storage" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-database-free-storage"
   namespace           = "AWS/RDS"
   metric_name         = "FreeStorageSpace"
@@ -527,11 +553,12 @@ resource "aws_cloudwatch_metric_alarm" "database_storage" {
   period              = 300
   statistic           = "Average"
   treat_missing_data  = "breaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
   dimensions          = { DBInstanceIdentifier = aws_db_instance.this.identifier }
   tags                = local.common_tags
 }
 resource "aws_cloudwatch_metric_alarm" "database_connections" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-database-connections"
   namespace           = "AWS/RDS"
   metric_name         = "DatabaseConnections"
@@ -541,13 +568,14 @@ resource "aws_cloudwatch_metric_alarm" "database_connections" {
   period              = 300
   statistic           = "Average"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
   dimensions          = { DBInstanceIdentifier = aws_db_instance.this.identifier }
   tags                = local.common_tags
 }
 resource "aws_db_event_subscription" "database" {
+  count            = var.enable_supplementary_monitoring ? 1 : 0
   name             = "${local.name}-database-events"
-  sns_topic        = aws_sns_topic.alerts.arn
+  sns_topic        = aws_sns_topic.alerts[0].arn
   source_type      = "db-instance"
   source_ids       = [aws_db_instance.this.identifier]
   event_categories = ["backup", "failure"]
@@ -555,6 +583,7 @@ resource "aws_db_event_subscription" "database" {
   depends_on       = [aws_sns_topic_policy.alerts]
 }
 resource "aws_route53_health_check" "preview" {
+  count             = var.enable_supplementary_monitoring ? 1 : 0
   fqdn              = var.preview_domain_name
   port              = 443
   type              = "HTTPS"
@@ -564,6 +593,7 @@ resource "aws_route53_health_check" "preview" {
   tags              = merge(local.common_tags, { Name = "${local.name}-https" })
 }
 resource "aws_cloudwatch_metric_alarm" "https_readiness" {
+  count               = var.enable_supplementary_monitoring ? 1 : 0
   alarm_name          = "${local.name}-https-readiness"
   namespace           = "AWS/Route53"
   metric_name         = "HealthCheckStatus"
@@ -573,11 +603,12 @@ resource "aws_cloudwatch_metric_alarm" "https_readiness" {
   period              = 60
   statistic           = "Minimum"
   treat_missing_data  = "breaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
-  dimensions          = { HealthCheckId = aws_route53_health_check.preview.id }
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  dimensions          = { HealthCheckId = aws_route53_health_check.preview[0].id }
   tags                = local.common_tags
 }
 resource "aws_budgets_budget" "monthly" {
+  count        = var.enable_supplementary_monitoring ? 1 : 0
   name         = "${local.name}-monthly"
   budget_type  = "COST"
   limit_amount = tostring(var.monthly_budget_usd)
@@ -588,7 +619,7 @@ resource "aws_budgets_budget" "monthly" {
     threshold                 = 80
     threshold_type            = "FORECASTED"
     notification_type         = "FORECASTED"
-    subscriber_sns_topic_arns = [aws_sns_topic.alerts.arn]
+    subscriber_sns_topic_arns = [aws_sns_topic.alerts[0].arn]
   }
   tags = local.common_tags
 }

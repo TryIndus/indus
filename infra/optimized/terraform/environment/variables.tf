@@ -44,6 +44,11 @@ variable "monthly_budget_usd" {
   type    = number
   default = 100
 }
+variable "enable_supplementary_monitoring" {
+  type        = bool
+  description = "Enable optional host metrics, RDS Performance Insights, health checks, alarms, SNS alerts, and budget notifications."
+  default     = false
+}
 variable "github_repository" {
   type    = string
   default = "TryIndus/indus"
