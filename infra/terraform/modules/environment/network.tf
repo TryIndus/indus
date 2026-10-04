@@ -118,7 +118,6 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_cloudwatch_log_group" "vpc_flow" {
-  count             = var.enable_supplementary_monitoring ? 1 : 0
   name              = "/aws/vpc/${local.name}/flow"
   retention_in_days = 14
 
@@ -169,7 +168,7 @@ resource "aws_iam_role_policy" "vpc_flow" {
 resource "aws_flow_log" "vpc" {
   count                    = var.enable_supplementary_monitoring ? 1 : 0
   iam_role_arn             = aws_iam_role.vpc_flow[0].arn
-  log_destination          = aws_cloudwatch_log_group.vpc_flow[0].arn
+  log_destination          = aws_cloudwatch_log_group.vpc_flow.arn
   log_destination_type     = "cloud-watch-logs"
   traffic_type             = "REJECT"
   vpc_id                   = aws_vpc.this.id

@@ -6,7 +6,6 @@ resource "aws_secretsmanager_secret" "legacy_next" {
 }
 
 resource "aws_cloudwatch_log_group" "application" {
-  count             = var.enable_supplementary_monitoring ? 1 : 0
   name              = "/indus/${var.environment}/legacy-next"
   retention_in_days = 14
 
