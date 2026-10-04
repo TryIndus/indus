@@ -345,7 +345,7 @@ resource "aws_eip_association" "host" {
 }
 resource "aws_route53_record" "preview" {
   zone_id = aws_route53_zone.preview.zone_id
-  name    = "@"
+  name    = var.preview_domain_name
   type    = "A"
   ttl     = 300
   records = [aws_eip.host.public_ip]

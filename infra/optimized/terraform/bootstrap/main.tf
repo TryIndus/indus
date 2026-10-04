@@ -18,6 +18,8 @@ locals {
   repositories = toset(["platform-api", "market-data", "research-worker", "web"])
 }
 
+data "aws_partition" "current" {}
+
 resource "aws_kms_key" "bootstrap" {
   description             = "Indus optimized state and registry encryption"
   deletion_window_in_days = 30
@@ -124,11 +126,37 @@ resource "aws_iam_role" "terraform" {
   assume_role_policy = data.aws_iam_policy_document.github_oidc_assume.json
 }
 
-resource "aws_iam_role_policy_attachment" "terraform_administrator" {
-  # The bootstrap operator must review this explicit administrative role before
-  # using it. Scope reduction follows once the optimized graph is commissioned.
-  role       = aws_iam_role.terraform.name
-  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AdministratorAccess"
+data "aws_iam_policy_document" "terraform" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "budgets:*", "cloudwatch:*", "cognito-idp:*", "ec2:*", "kms:*",
+      "rds:*", "route53:*", "s3:*", "secretsmanager:*", "sns:*",
+      "iam:AddRoleToInstanceProfile", "iam:AttachRolePolicy", "iam:CreateInstanceProfile",
+      "iam:CreateRole", "iam:DeleteInstanceProfile", "iam:DeleteRole", "iam:DeleteRolePolicy",
+      "iam:DetachRolePolicy", "iam:GetInstanceProfile", "iam:GetRole", "iam:ListInstanceProfilesForRole",
+      "iam:ListRolePolicies", "iam:ListRoles", "iam:PassRole", "iam:PutRolePolicy",
+      "iam:RemoveRoleFromInstanceProfile", "iam:TagInstanceProfile", "iam:TagRole", "iam:UntagInstanceProfile", "iam:UntagRole",
+      "sts:GetCallerIdentity"
+    ]
+    resources = ["*"]
+  }
+  statement {
+    effect    = "Deny"
+    actions   = ["ec2:Delete*", "rds:Delete*", "s3:Delete*", "kms:ScheduleKeyDeletion", "secretsmanager:DeleteSecret", "cognito-idp:Delete*", "route53:Delete*", "iam:Delete*", "iam:DetachRolePolicy", "iam:RemoveRoleFromInstanceProfile"]
+    resources = ["*"]
+    condition {
+      test     = "StringNotEquals"
+      variable = "aws:ResourceTag/Profile"
+      values   = ["optimized"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "terraform" {
+  name   = "manage-optimized-profile"
+  role   = aws_iam_role.terraform.id
+  policy = data.aws_iam_policy_document.terraform.json
 }
 
 resource "aws_iam_role" "release" {
