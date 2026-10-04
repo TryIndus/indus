@@ -123,14 +123,41 @@ resource "aws_iam_role_policy_attachment" "ssm" {
   role       = aws_iam_role.host.name
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
+resource "aws_iam_role_policy_attachment" "cloudwatch" {
+  role       = aws_iam_role.host.name
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
 resource "aws_iam_instance_profile" "host" {
   name = "${local.name}-host"
   role = aws_iam_role.host.name
+}
+data "aws_iam_policy_document" "data_key" {
+  statement {
+    sid       = "EnableAccountIAM"
+    effect    = "Allow"
+    actions   = ["kms:*"]
+    resources = ["*"]
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:${data.aws_partition.current.partition}:iam::${var.account_id}:root"]
+    }
+  }
+  statement {
+    sid       = "AllowOptimizedAlerts"
+    effect    = "Allow"
+    actions   = ["kms:GenerateDataKey", "kms:Decrypt"]
+    resources = ["*"]
+    principals {
+      type        = "Service"
+      identifiers = ["events.rds.amazonaws.com", "cloudwatch.amazonaws.com", "budgets.amazonaws.com"]
+    }
+  }
 }
 resource "aws_kms_key" "data" {
   description             = "Indus optimized data encryption"
   deletion_window_in_days = 30
   enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.data_key.json
   tags                    = local.common_tags
 }
 resource "aws_kms_alias" "data" {
@@ -356,8 +383,37 @@ resource "aws_route53_zone" "preview" {
 }
 resource "aws_sns_topic" "alerts" {
   name              = "${local.name}-alerts"
-  kms_master_key_id = "alias/aws/sns"
+  kms_master_key_id = aws_kms_key.data.arn
   tags              = local.common_tags
+}
+data "aws_iam_policy_document" "alert_publish" {
+  statement {
+    effect    = "Allow"
+    actions   = ["sns:*"]
+    resources = [aws_sns_topic.alerts.arn]
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:${data.aws_partition.current.partition}:iam::${var.account_id}:root"]
+    }
+  }
+  statement {
+    effect    = "Allow"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.alerts.arn]
+    principals {
+      type        = "Service"
+      identifiers = ["events.rds.amazonaws.com", "cloudwatch.amazonaws.com", "budgets.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+  }
+}
+resource "aws_sns_topic_policy" "alerts" {
+  arn    = aws_sns_topic.alerts.arn
+  policy = data.aws_iam_policy_document.alert_publish.json
 }
 resource "aws_sns_topic_subscription" "alerts" {
   for_each  = var.alert_email_addresses
@@ -391,6 +447,94 @@ resource "aws_cloudwatch_metric_alarm" "host_status" {
   treat_missing_data  = "breaching"
   alarm_actions       = [aws_sns_topic.alerts.arn]
   dimensions          = { InstanceId = aws_instance.host.id }
+  tags                = local.common_tags
+}
+resource "aws_cloudwatch_metric_alarm" "host_memory" {
+  alarm_name          = "${local.name}-host-memory"
+  namespace           = "Indus/Optimized"
+  metric_name         = "mem_used_percent"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 85
+  evaluation_periods  = 3
+  period              = 60
+  statistic           = "Average"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  dimensions          = { InstanceId = aws_instance.host.id }
+  tags                = local.common_tags
+}
+resource "aws_cloudwatch_metric_alarm" "host_disk" {
+  alarm_name          = "${local.name}-host-disk"
+  namespace           = "Indus/Optimized"
+  metric_name         = "disk_used_percent"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 85
+  evaluation_periods  = 3
+  period              = 60
+  statistic           = "Average"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  dimensions          = { InstanceId = aws_instance.host.id }
+  tags                = local.common_tags
+}
+resource "aws_cloudwatch_metric_alarm" "database_storage" {
+  alarm_name          = "${local.name}-database-free-storage"
+  namespace           = "AWS/RDS"
+  metric_name         = "FreeStorageSpace"
+  comparison_operator = "LessThanThreshold"
+  threshold           = 5368709120
+  evaluation_periods  = 3
+  period              = 300
+  statistic           = "Average"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  dimensions          = { DBInstanceIdentifier = aws_db_instance.this.identifier }
+  tags                = local.common_tags
+}
+resource "aws_cloudwatch_metric_alarm" "database_connections" {
+  alarm_name          = "${local.name}-database-connections"
+  namespace           = "AWS/RDS"
+  metric_name         = "DatabaseConnections"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  threshold           = 80
+  evaluation_periods  = 3
+  period              = 300
+  statistic           = "Average"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  dimensions          = { DBInstanceIdentifier = aws_db_instance.this.identifier }
+  tags                = local.common_tags
+}
+resource "aws_db_event_subscription" "database" {
+  name             = "${local.name}-database-events"
+  sns_topic        = aws_sns_topic.alerts.arn
+  source_type      = "db-instance"
+  source_ids       = [aws_db_instance.this.identifier]
+  event_categories = ["backup", "failure"]
+  tags             = local.common_tags
+  depends_on       = [aws_sns_topic_policy.alerts]
+}
+resource "aws_route53_health_check" "preview" {
+  fqdn              = var.preview_domain_name
+  port              = 443
+  type              = "HTTPS"
+  resource_path     = "/readyz"
+  request_interval  = 30
+  failure_threshold = 3
+  tags              = merge(local.common_tags, { Name = "${local.name}-https" })
+}
+resource "aws_cloudwatch_metric_alarm" "https_readiness" {
+  alarm_name          = "${local.name}-https-readiness"
+  namespace           = "AWS/Route53"
+  metric_name         = "HealthCheckStatus"
+  comparison_operator = "LessThanThreshold"
+  threshold           = 1
+  evaluation_periods  = 3
+  period              = 60
+  statistic           = "Minimum"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  dimensions          = { HealthCheckId = aws_route53_health_check.preview.id }
   tags                = local.common_tags
 }
 resource "aws_budgets_budget" "monthly" {

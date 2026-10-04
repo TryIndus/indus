@@ -156,5 +156,7 @@ Budget for EC2 and any burst credits, EBS, public IPv4, RDS compute/storage/
 backups/I/O, S3, Cognito and optional SES, ECR, KMS/Secrets Manager, Route 53,
 CloudWatch, data transfer, and overlap with main. The profile intentionally
 omits the large recurring EKS, Aurora, Proxy, MSK, ElastiCache, ALB, CloudFront,
-and NAT charges. It creates alarms for EC2 status and RDS CPU, plus a tagged
-budget. Add disk, memory, backup, and endpoint checks before accepting traffic.
+and NAT charges. It creates alarms for EC2 status, memory and disk pressure,
+RDS CPU, storage and connections, RDS backup/failure events, HTTPS readiness,
+and a tagged budget. Confirm SNS email subscriptions and alarm delivery during
+a separately authorized activation; pending email confirmations receive no alerts.
