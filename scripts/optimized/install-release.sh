@@ -68,7 +68,9 @@ fi
 
 registry="$(grep '^PLATFORM_API_IMAGE=' "$release_file" | cut -d= -f2- | cut -d/ -f1)"
 aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$registry"
-install -m 0600 "$release_file" "$release_dir/release.env"
+if [[ "$release_file" != "$release_dir/release.env" ]]; then
+  install -m 0600 "$release_file" "$release_dir/release.env"
+fi
 install -m 0644 "$release_dir/indus-optimized.service" /etc/systemd/system/indus-optimized.service
 systemctl daemon-reload
 docker compose --project-directory "$release_dir" --env-file "$release_dir/release.env" config >/dev/null
