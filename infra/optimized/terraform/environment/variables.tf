@@ -22,7 +22,7 @@ variable "alert_email_addresses" {
 }
 variable "instance_type" {
   type    = string
-  default = "t3a.medium"
+  default = "t3a.small"
 }
 variable "root_volume_size_gib" {
   type    = number
@@ -30,7 +30,7 @@ variable "root_volume_size_gib" {
 }
 variable "database_instance_class" {
   type    = string
-  default = "db.t4g.small"
+  default = "db.t4g.micro"
 }
 variable "database_allocated_storage_gib" {
   type    = number
@@ -62,6 +62,12 @@ variable "cognito_logout_urls" { type = list(string) }
 variable "enable_branded_cognito_email" {
   type    = bool
   default = false
+}
+variable "branded_email_zone_id" {
+  type        = string
+  default     = null
+  nullable    = true
+  description = "Existing Route 53 hosted-zone ID for branded Cognito email DNS records. Required only when branded email is enabled."
 }
 variable "ecr_repository_arns" {
   type        = map(string)

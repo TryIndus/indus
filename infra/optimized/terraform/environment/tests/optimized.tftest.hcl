@@ -57,8 +57,8 @@ run "single_host_cost_profile" {
     error_message = "The DB subnet group needs two AZ subnets without a standby."
   }
   assert {
-    condition     = aws_instance.host.instance_type == "t3a.medium"
-    error_message = "The initial EC2 candidate must retain 4 GiB capacity."
+    condition     = aws_instance.host.instance_type == "t3a.small" && aws_db_instance.this.instance_class == "db.t4g.micro"
+    error_message = "The minimal profile must use t3a.small compute and db.t4g.micro database capacity."
   }
   assert {
     condition     = aws_db_instance.this.publicly_accessible == false && aws_db_instance.this.storage_encrypted == true
@@ -101,6 +101,7 @@ run "branded_cognito_confirmation_email_is_opt_in" {
   command = plan
   variables {
     enable_branded_cognito_email = true
+    branded_email_zone_id         = "Z0123456789EXAMPLE"
   }
   assert {
     condition     = aws_cognito_user_pool.this.email_configuration[0].email_sending_account == "DEVELOPER"

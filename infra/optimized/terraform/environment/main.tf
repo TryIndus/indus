@@ -347,6 +347,12 @@ resource "aws_cognito_user_pool" "this" {
   }
   tags       = local.common_tags
   depends_on = [aws_ses_domain_identity_verification.cognito, aws_route53_record.cognito_dkim]
+  lifecycle {
+    precondition {
+      condition     = !var.enable_branded_cognito_email || var.branded_email_zone_id != null
+      error_message = "Set branded_email_zone_id to an existing hosted zone before enabling branded Cognito email."
+    }
+  }
 }
 resource "aws_ses_domain_identity" "cognito" {
   count  = var.enable_branded_cognito_email ? 1 : 0
@@ -354,7 +360,7 @@ resource "aws_ses_domain_identity" "cognito" {
 }
 resource "aws_route53_record" "cognito_ses_verification" {
   count   = var.enable_branded_cognito_email ? 1 : 0
-  zone_id = aws_route53_zone.preview.zone_id
+  zone_id = var.branded_email_zone_id
   name    = "_amazonses.${var.preview_domain_name}"
   type    = "TXT"
   ttl     = 300
@@ -371,7 +377,7 @@ resource "aws_ses_domain_dkim" "cognito" {
 }
 resource "aws_route53_record" "cognito_dkim" {
   count   = var.enable_branded_cognito_email ? 3 : 0
-  zone_id = aws_route53_zone.preview.zone_id
+  zone_id = var.branded_email_zone_id
   name    = "${aws_ses_domain_dkim.cognito[0].dkim_tokens[count.index]}._domainkey.${var.preview_domain_name}"
   type    = "CNAME"
   ttl     = 300
@@ -429,17 +435,6 @@ resource "aws_instance" "host" {
 resource "aws_eip_association" "host" {
   allocation_id = aws_eip.host.id
   instance_id   = aws_instance.host.id
-}
-resource "aws_route53_record" "preview" {
-  zone_id = aws_route53_zone.preview.zone_id
-  name    = var.preview_domain_name
-  type    = "A"
-  ttl     = 300
-  records = [aws_eip.host.public_ip]
-}
-resource "aws_route53_zone" "preview" {
-  name = var.preview_domain_name
-  tags = merge(local.common_tags, { Name = "${local.name}-preview-zone" })
 }
 resource "aws_sns_topic" "alerts" {
   count             = var.enable_supplementary_monitoring ? 1 : 0

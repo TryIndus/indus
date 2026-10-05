@@ -44,12 +44,12 @@ interrupts service.
    Record the bucket, KMS key, optimized ECR repositories, Terraform role, and
    release role. Do not reuse main's state bucket or state key.
 4. Copy the environment backend and variables examples to ignored files. Select
-   a VPC CIDR that does not overlap main, an independent preview hostname, two
-   AZs, and optimized bootstrap ECR ARNs. Use the second RDS subnet for the DB
-   subnet group only. Review the saved plan before apply. The environment
-   creates an optimized-owned hosted zone for that hostname; a domain owner
-   must add its NS delegation in the parent zone separately. Do not point a
-   main production hostname at this profile.
+   a VPC CIDR that does not overlap main, a branded-email domain only if that
+   optional feature will be enabled, two AZs, and optimized bootstrap ECR ARNs.
+   Use the second RDS subnet for the DB subnet group only. Review the saved
+   plan before apply. The production hostname is `tryindus.ca`, which points
+   directly to the host Elastic IP; this profile does not create or require a
+   second hosted zone or a delegated subdomain.
 5. Put the base64-encoded ignored backend and variable files in both
    environments as `OPTIMIZED_TF_BACKEND_CONFIG_B64` and
    `OPTIMIZED_TF_VARS_B64`. Set `OPTIMIZED_AWS_REGION` in both, and set the
@@ -68,12 +68,13 @@ accounts.
 
 `enable_branded_cognito_email` defaults to `false`. Setting it to `true` in the
 private optimized Terraform variables configures Cognito to send the Indus HTML
-verification template through SES and creates the SES identity and DKIM records
-in the optimized hosted zone. Before enabling it, delegate that hosted zone in
-public DNS and confirm SES can send to arbitrary recipients in this region. SES
-may otherwise remain in its sandbox, where signup delivery is restricted. Keep
-the flag false until those prerequisites are ready; Cognito's standard sender
-continues to work meanwhile.
+verification template through SES. Set `branded_email_zone_id` to the existing
+`tryindus.ca` hosted-zone ID before enabling it; Terraform then creates the SES
+identity and DKIM records there without creating a second hosted zone. Confirm
+SES can send to arbitrary recipients in this region. SES may otherwise remain
+in its sandbox, where signup delivery is restricted. Keep the flag false until
+those prerequisites are ready; Cognito's standard sender continues to work
+meanwhile.
 
 The optimized bootstrap creates its own plan, apply, release, and host IAM
 roles. These are roles in the configured AWS account, not new human IAM users.
@@ -187,10 +188,11 @@ two databases.
 
 ## Capacity, cost, and monitoring
 
-The starting `t3a.medium` and `db.t4g.small` values are candidates, not proven
+The minimal `t3a.small` and `db.t4g.micro` values are candidates, not proven
 capacity. Measure memory, CPU credits, disk, database connections, latency,
 market ingestion, and Sidekiq backlog under a representative load before
-cutover. The current process set does not support a 2-GiB host assumption.
+relying on them. A 2-GiB host has little headroom for the complete process set;
+resize the instance if memory pressure or OOM events occur.
 
 Budget for EC2 and any burst credits, EBS, public IPv4, RDS compute/storage/
 backups/I/O, S3, Cognito and optional SES, ECR, KMS/Secrets Manager, Route 53,
