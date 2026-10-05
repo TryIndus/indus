@@ -92,6 +92,10 @@ run "supplementary_monitoring_can_be_restored" {
     error_message = "Enabling the flag must restore host and database monitoring."
   }
   assert {
+    condition     = aws_route53_health_check.preview[0].fqdn == "tryindus.ca"
+    error_message = "The HTTPS health check must follow the production root domain."
+  }
+  assert {
     condition     = aws_db_instance.this.performance_insights_enabled == true && aws_ssm_parameter.supplementary_monitoring.value == "true"
     error_message = "Enabling the flag must restore RDS insights and publish the host agent setting."
   }
@@ -106,6 +110,10 @@ run "branded_cognito_confirmation_email_is_opt_in" {
   assert {
     condition     = aws_cognito_user_pool.this.email_configuration[0].email_sending_account == "DEVELOPER"
     error_message = "Branded verification emails must use the optimized SES identity when explicitly enabled."
+  }
+  assert {
+    condition     = aws_ses_domain_identity.cognito[0].domain == "tryindus.ca"
+    error_message = "Branded email must use the existing production domain."
   }
   assert {
     condition     = strcontains(aws_cognito_user_pool.this.verification_message_template[0].email_message, "{####}")

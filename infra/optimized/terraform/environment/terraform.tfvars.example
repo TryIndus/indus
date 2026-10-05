@@ -1,6 +1,7 @@
 account_id                 = "111111111111"
 vpc_cidr                   = "10.52.0.0/16"
-preview_domain_name        = "optimized.indus.example.com"
+preview_domain_name        = "optimized.indus.example.com" # Deprecated; kept only for existing private tfvars.
+public_domain_name         = "tryindus.ca"
 cognito_callback_urls     = ["https://optimized.indus.example.com/auth/callback"]
 cognito_logout_urls       = ["https://optimized.indus.example.com/auth"]
 alert_email_addresses      = ["on-call@example.com"]

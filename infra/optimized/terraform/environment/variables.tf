@@ -15,7 +15,14 @@ variable "vpc_cidr" {
   }
 }
 
-variable "preview_domain_name" { type = string }
+variable "preview_domain_name" {
+  type        = string
+  description = "Deprecated input retained while existing private tfvars are migrated."
+}
+variable "public_domain_name" {
+  type    = string
+  default = "tryindus.ca"
+}
 variable "alert_email_addresses" {
   type    = set(string)
   default = []

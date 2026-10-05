@@ -323,7 +323,7 @@ resource "aws_cognito_user_pool" "this" {
     for_each = var.enable_branded_cognito_email ? [1] : []
     content {
       email_sending_account = "DEVELOPER"
-      from_email_address    = "Indus <notifications@${var.preview_domain_name}>"
+      from_email_address    = "Indus <notifications@${var.public_domain_name}>"
       source_arn            = aws_ses_domain_identity.cognito[0].arn
     }
   }
@@ -333,7 +333,7 @@ resource "aws_cognito_user_pool" "this" {
       default_email_option = "CONFIRM_WITH_CODE"
       email_subject        = "Your Indus verification code"
       email_message = templatefile("${path.module}/templates/cognito-verification.html", {
-        app_url = "https://${var.preview_domain_name}/auth"
+        app_url = "https://${var.public_domain_name}/auth"
       })
     }
   }
@@ -356,12 +356,12 @@ resource "aws_cognito_user_pool" "this" {
 }
 resource "aws_ses_domain_identity" "cognito" {
   count  = var.enable_branded_cognito_email ? 1 : 0
-  domain = var.preview_domain_name
+  domain = var.public_domain_name
 }
 resource "aws_route53_record" "cognito_ses_verification" {
   count   = var.enable_branded_cognito_email ? 1 : 0
   zone_id = var.branded_email_zone_id
-  name    = "_amazonses.${var.preview_domain_name}"
+  name    = "_amazonses.${var.public_domain_name}"
   type    = "TXT"
   ttl     = 300
   records = [aws_ses_domain_identity.cognito[0].verification_token]
@@ -378,7 +378,7 @@ resource "aws_ses_domain_dkim" "cognito" {
 resource "aws_route53_record" "cognito_dkim" {
   count   = var.enable_branded_cognito_email ? 3 : 0
   zone_id = var.branded_email_zone_id
-  name    = "${aws_ses_domain_dkim.cognito[0].dkim_tokens[count.index]}._domainkey.${var.preview_domain_name}"
+  name    = "${aws_ses_domain_dkim.cognito[0].dkim_tokens[count.index]}._domainkey.${var.public_domain_name}"
   type    = "CNAME"
   ttl     = 300
   records = ["${aws_ses_domain_dkim.cognito[0].dkim_tokens[count.index]}.dkim.amazonses.com"]
@@ -580,7 +580,7 @@ resource "aws_db_event_subscription" "database" {
 }
 resource "aws_route53_health_check" "preview" {
   count             = var.enable_supplementary_monitoring ? 1 : 0
-  fqdn              = var.preview_domain_name
+  fqdn              = var.public_domain_name
   port              = 443
   type              = "HTTPS"
   resource_path     = "/readyz"
