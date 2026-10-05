@@ -96,10 +96,12 @@ retries the approved in-place RDS class change when AWS reports insufficient
 capacity for the desired class. It uses the optimized production GitHub OIDC
 role and Terraform state, so no repeated operator MFA is needed. Its saved-plan
 guard permits only the `aws_db_instance.this` `instance_class` update to
-`db.t4g.micro`; it does not reconcile unrelated infrastructure. The accepted
-resize interrupts database connections while RDS applies it. A successful run
-opens a GitHub issue for follow-up health verification. Scheduled capacity
-errors leave the existing database running and are retried on the next run.
+`db.t4g.micro` plus the `apply_immediately` scheduling flag; it does not
+reconcile unrelated infrastructure. It first rejects any pending RDS changes,
+since applying immediately would include those too. The accepted resize
+interrupts database connections while RDS applies it. A successful run opens a
+GitHub issue for follow-up health verification. Scheduled capacity errors leave
+the existing database running and are retried on the next run.
 
 To restore supplementary monitoring, set the flag to `true` in optimized's
 private Terraform variables and apply a reviewed plan. The plan also updates

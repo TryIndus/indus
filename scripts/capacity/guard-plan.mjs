@@ -1,13 +1,17 @@
 import { readFileSync } from 'node:fs';
 
 export function evaluatePlan(plan, target) {
+  const sideEffects = typeof target.side_effects === 'string'
+    ? JSON.parse(target.side_effects)
+    : (target.side_effects ?? {});
   const changes = (plan.resource_changes ?? []).filter(
     (resource) => resource.change.actions.some((action) => action !== 'no-op'),
   );
 
   if (changes.length === 0) {
     const resource = (plan.resource_changes ?? []).find((entry) => entry.address === target.address);
-    if (resource?.type !== target.type || resource.change.after?.[target.attribute] !== target.desired) {
+    if (resource?.type !== target.type || resource.change.after?.[target.attribute] !== target.desired
+      || Object.entries(sideEffects).some(([key, value]) => resource.change.after[key] !== value)) {
       throw new Error('The target is missing or its configured size differs from the approved value.');
     }
     return 'no-op';
@@ -35,9 +39,13 @@ export function evaluatePlan(plan, target) {
 
   const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
   for (const key of keys) {
-    if (key !== target.attribute && JSON.stringify(before[key]) !== JSON.stringify(after[key])) {
+    if (key !== target.attribute && JSON.stringify(before[key]) !== JSON.stringify(after[key])
+      && (!(key in sideEffects) || after[key] !== sideEffects[key])) {
       throw new Error(`The plan also changes ${key}.`);
     }
+  }
+  if (Object.entries(sideEffects).some(([key, value]) => after[key] !== value)) {
+    throw new Error('An approved scheduling value is missing from the plan.');
   }
   if (unknown && Object.values(unknown).some((value) => value === true)) {
     throw new Error('The plan has an unknown post-apply value.');

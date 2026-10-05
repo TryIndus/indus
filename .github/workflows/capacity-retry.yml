@@ -31,6 +31,9 @@ jobs:
             type: aws_db_instance
             attribute: instance_class
             desired: db.t4g.micro
+            side_effects: '{"apply_immediately":true}'
+            preflight_kind: rds-no-pending-modifications
+            preflight_id: indus-optimized
             retry_codes: '["InsufficientDBInstanceCapacity"]'
     environment: ${{ matrix.target.environment }}
     concurrency:
@@ -68,6 +71,8 @@ jobs:
           ROOT: ${{ matrix.target.root }}
           TARGET: ${{ toJSON(matrix.target) }}
           ADDRESS: ${{ matrix.target.address }}
+          PREFLIGHT_KIND: ${{ matrix.target.preflight_kind }}
+          PREFLIGHT_ID: ${{ matrix.target.preflight_id }}
         run: |
           set -euo pipefail
           terraform -chdir="$ROOT" init -input=false -lockfile=readonly -backend-config=backend.hcl
@@ -78,6 +83,13 @@ jobs:
             echo 'result=no-op' >> "$GITHUB_OUTPUT"
             echo 'Approved size is already present; no change was applied.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
+          fi
+          if [ "$PREFLIGHT_KIND" = rds-no-pending-modifications ]; then
+            pending=$(aws rds describe-db-instances --db-instance-identifier "$PREFLIGHT_ID" --query 'DBInstances[0].PendingModifiedValues' --output json)
+            if [ "$pending" != '{}' ]; then
+              echo 'RDS has pending modifications; refusing to apply them immediately.' >&2
+              exit 1
+            fi
           fi
           if terraform -chdir="$ROOT" apply -no-color -input=false capacity.tfplan > "$RUNNER_TEMP/capacity-apply.log" 2>&1; then
             echo 'result=applied' >> "$GITHUB_OUTPUT"

@@ -57,8 +57,8 @@ run "single_host_cost_profile" {
     error_message = "The DB subnet group needs two AZ subnets without a standby."
   }
   assert {
-    condition     = aws_instance.host.instance_type == "t3a.medium" && aws_db_instance.this.instance_class == "db.t4g.micro"
-    error_message = "The minimal profile must retain a 4-GiB host and use db.t4g.micro database capacity."
+    condition     = aws_instance.host.instance_type == "t3a.medium" && aws_db_instance.this.instance_class == "db.t4g.micro" && aws_db_instance.this.apply_immediately == true
+    error_message = "The minimal profile must retain a 4-GiB host and apply its db.t4g.micro resize immediately."
   }
   assert {
     condition     = aws_db_instance.this.publicly_accessible == false && aws_db_instance.this.storage_encrypted == true
