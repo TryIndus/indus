@@ -101,7 +101,7 @@ run "branded_cognito_confirmation_email_is_opt_in" {
   command = plan
   variables {
     enable_branded_cognito_email = true
-    branded_email_zone_id         = "Z0123456789EXAMPLE"
+    branded_email_zone_id        = "Z0123456789EXAMPLE"
   }
   assert {
     condition     = aws_cognito_user_pool.this.email_configuration[0].email_sending_account == "DEVELOPER"
