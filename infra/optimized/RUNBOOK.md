@@ -102,6 +102,8 @@ since applying immediately would include those too. The accepted resize
 interrupts database connections while RDS applies it. A successful run opens a
 GitHub issue for follow-up health verification. Scheduled capacity errors leave
 the existing database running and are retried on the next run.
+The Terraform `apply_immediately` setting also affects future RDS changes in
+this profile; inspect pending modifications before manual infrastructure applies.
 
 To restore supplementary monitoring, set the flag to `true` in optimized's
 private Terraform variables and apply a reviewed plan. The plan also updates
