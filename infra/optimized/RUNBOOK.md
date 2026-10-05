@@ -91,6 +91,16 @@ CloudWatch agent metric publication. AWS basic EC2 and RDS metrics, RDS backups,
 local bounded Docker logs, and SSM host access remain available. Operators must
 check service health and spend directly while notifications are disabled.
 
+The [capacity retry workflow](../../scripts/capacity/README.md) periodically
+retries the approved in-place RDS class change when AWS reports insufficient
+capacity for the desired class. It uses the optimized production GitHub OIDC
+role and Terraform state, so no repeated operator MFA is needed. Its saved-plan
+guard permits only the `aws_db_instance.this` `instance_class` update to
+`db.t4g.micro`; it does not reconcile unrelated infrastructure. The accepted
+resize interrupts database connections while RDS applies it. A successful run
+opens a GitHub issue for follow-up health verification. Scheduled capacity
+errors leave the existing database running and are retried on the next run.
+
 To restore supplementary monitoring, set the flag to `true` in optimized's
 private Terraform variables and apply a reviewed plan. The plan also updates
 the optimized SSM monitoring setting and host agent permission. After apply,
