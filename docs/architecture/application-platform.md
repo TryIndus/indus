@@ -17,7 +17,7 @@ Rails also owns two provider boundaries:
 
 ### Contracts
 
-`contracts/openapi` is the source of truth for browser-facing HTTP behavior. `contracts/protobuf` contains versioned event envelopes and domain events used by later Kafka and Temporal integrations. Generated clients are reproducible outputs; CI rejects stale generated files and incompatible contract changes.
+`contracts/openapi` is the source of truth for browser-facing HTTP behavior. `contracts/protobuf` contains versioned event envelopes and domain events used by Kafka and Temporal workflows. Generated clients are reproducible outputs; CI rejects stale generated files and incompatible contract changes.
 
 ## Authentication
 
@@ -57,4 +57,4 @@ Aurora remains private and TLS-required. Terraform database access modes retain 
 
 ![AWS architecture and staged database access](aws-architecture.png)
 
-The [diagram source](aws-architecture.py) shows proxy mode as the default, direct access as a staged alternative, and Kafka as an existing dependency. Render from the repository root with Graphviz installed and `diagrams==0.25.1`: `python docs/architecture/aws-architecture.py`. The diagram describes supported modes, not evidence that a production cutover has completed.
+The [diagram source](aws-architecture.py) shows proxy mode as the default database access mode, direct access as a supported alternative, and Kafka as a service dependency. Render from the repository root with Graphviz installed and `diagrams==0.25.1`: `python docs/architecture/aws-architecture.py`. The diagram describes the main infrastructure configuration; deployment state must be checked against the AWS account.
