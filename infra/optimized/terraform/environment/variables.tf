@@ -22,7 +22,7 @@ variable "alert_email_addresses" {
 }
 variable "instance_type" {
   type    = string
-  default = "t3a.small"
+  default = "t3a.medium"
 }
 variable "root_volume_size_gib" {
   type    = number

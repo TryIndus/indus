@@ -188,11 +188,11 @@ two databases.
 
 ## Capacity, cost, and monitoring
 
-The minimal `t3a.small` and `db.t4g.micro` values are candidates, not proven
-capacity. Measure memory, CPU credits, disk, database connections, latency,
-market ingestion, and Sidekiq backlog under a representative load before
-relying on them. A 2-GiB host has little headroom for the complete process set;
-resize the instance if memory pressure or OOM events occur.
+The `t3a.medium` and `db.t4g.micro` values are candidates, not proven capacity.
+Measure memory, CPU credits, disk, database connections, latency, market
+ingestion, and Sidekiq backlog under a representative load before relying on
+them. The host retains 4 GiB because a 2-GiB `t3a.small` has not been proven
+safe for the complete process set; resize only after measured headroom exists.
 
 Budget for EC2 and any burst credits, EBS, public IPv4, RDS compute/storage/
 backups/I/O, S3, Cognito and optional SES, ECR, KMS/Secrets Manager, Route 53,
