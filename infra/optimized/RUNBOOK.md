@@ -1,10 +1,10 @@
-# Optimized AWS deployment
+# Optimized AWS operations
 
 ## Purpose and topology
 
-The optimized profile is a separate AWS configuration for evaluating the same
-Indus application at a much smaller footprint. It does not alter or share
-Terraform ownership with the existing main profile.
+The optimized profile is an independent AWS configuration for the Indus
+application. It does not share Terraform state or resource ownership with the
+main configuration.
 
 ```mermaid
 flowchart LR
@@ -119,7 +119,7 @@ Alpaca credentials for market data. Never set Kafka or ElastiCache IAM
 variables in this profile. Rotate a value in Secrets Manager and restart the
 optimized systemd service to refresh its root-owned `/run` secret files.
 
-## First release and operations
+## Release and operations
 
 Set the optimized public browser variables from the optimized environment
 outputs: `OPTIMIZED_WEB_ORIGIN`, `OPTIMIZED_COGNITO_AUTHORITY`, and
@@ -147,8 +147,8 @@ reboot before starting containers. Review the saved prior manifest at
 release restores those prior image digests, but does not reverse a database
 migration.
 
-Before the first Caddy start, make the delegated preview DNS name resolve to
-the optimized Elastic IP and leave port 80 reachable so ACME can issue its
+Keep `tryindus.ca` pointed at the optimized Elastic IP and leave port 80
+reachable so ACME can issue and renew its
 certificate. Caddy redirects HTTP to HTTPS after issuance and renews the
 certificate while the hostname and port 80 remain reachable. Verify Rails
 `/readyz`, Rust `/health/ready`, authenticated `/api/v1/...`, and an
@@ -163,43 +163,28 @@ reviewed Terraform plan, restore runtime configuration and secrets, then test
 health before restoring DNS. Restore RDS from a tested backup when data repair
 is required.
 
-## Identity and data migration before any cutover
+## Identity and data recovery
 
-Provisioning optimized does not migrate existing users. Its Cognito pool has a
-different issuer and subjects, while Rails ownership is keyed by `(issuer,
-external_subject)`. Switching DNS before a deliberate identity migration would
-give returning users new Rails identities and hide their existing records.
-
-A separate cutover change must inventory source and destination accounts,
-verify a migration mapping without trusting an email claim alone, preserve each
-Rails `users.id`, handle duplicates and incomplete signups, make retries
-idempotent, create audit records, and define a rollback. Cognito's user
-migration trigger can retain passwords on first sign-in only while it can
-authenticate against the existing directory. A bulk import does not preserve
-ordinary Cognito passwords automatically.
-
-That later change must also preflight extensions, schema, storage, connection
-capacity, and source data; pause writes/workers; take a recovery point; perform
-a rehearsed logical Aurora-to-RDS export/restore; preserve UUIDs and migration
-history; compare row counts and ownership; transfer required artifacts; and run
-authentication, reports, watchlist, chart, SSE, and recovery checks. Once
-optimized accepts writes, a DNS-only rollback is unsafe without reconciling the
-two databases.
+The Cognito issuer and user subjects belong to this profile. Rails keys
+ownership by `(issuer, external_subject)`; changing identity pools or restoring
+data from another environment requires an audited subject mapping. An image
+rollback does not revert identity or database writes. Restore data from tested
+backups and reconcile any writes made after the recovery point.
 
 ## Capacity, cost, and monitoring
 
-The `t3a.medium` and `db.t4g.micro` values are candidates, not proven capacity.
+The configured `t3a.medium` and `db.t4g.micro` sizes require capacity monitoring.
 Measure memory, CPU credits, disk, database connections, latency, market
-ingestion, and Sidekiq backlog under a representative load before relying on
-them. The host retains 4 GiB because a 2-GiB `t3a.small` has not been proven
-safe for the complete process set; resize only after measured headroom exists.
+ingestion, and Sidekiq backlog under representative load. The host retains
+4 GiB because the full process set has not been demonstrated within 2 GiB;
+resize only after measuring headroom.
 
 Budget for EC2 and any burst credits, EBS, public IPv4, RDS compute/storage/
 backups/I/O, S3, Cognito and optional SES, ECR, KMS/Secrets Manager, Route 53,
-CloudWatch, data transfer, and overlap with main. The profile intentionally
+CloudWatch, and data transfer. The profile
 omits the large recurring EKS, Aurora, Proxy, MSK, ElastiCache, ALB, CloudFront,
 and NAT charges. With supplementary monitoring enabled, it creates alarms for
 EC2 status, memory and disk pressure, RDS CPU, storage and connections, RDS
 backup/failure events, HTTPS readiness, and a tagged budget. Confirm SNS email
-subscriptions and alarm delivery during a separately authorized activation;
+subscriptions and alarm delivery when notifications are enabled;
 pending email confirmations receive no alerts.

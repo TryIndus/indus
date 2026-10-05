@@ -11,7 +11,7 @@ Terraform remote-state reference to main.
 
 The runtime is deliberately single-host and single-AZ: one `t3a.medium`
 EC2 host, local persistent Valkey, and one `db.t4g.micro`
-RDS candidate. The database subnet group includes a second empty
+RDS instance. The database subnet group includes a second empty
 subnet in a second AZ because RDS requires it; it does not create a standby.
 There is no EKS, Aurora, RDS Proxy, MSK, ElastiCache, ALB, CloudFront, or NAT
 gateway.
@@ -32,7 +32,7 @@ using a reviewed `terraform init -migrate-state`; configure the environment
 backend from `environment/backend.hcl.example`. Keep all real backend and
 variable files ignored.
 
-See [the optimized AWS runbook](../../docs/runbooks/optimized-aws.md) for
-provisioning, release, migration, recovery, and cost details.
+See [the optimized AWS runbook](./RUNBOOK.md) for
+provisioning, release, recovery, and cost details.
 Use the [cost worksheet](COSTS.md) with current regional pricing and measured
-usage before any activation decision.
+usage when reviewing spend.

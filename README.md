@@ -1,48 +1,43 @@
 # Indus
 
-Indus is a financial-intelligence platform for authenticated stock and crypto
-research, live market data, model-assisted analysis, and generated reports.
+Indus is a financial intelligence platform for authenticated stock and
+cryptocurrency research, live market data, model assisted analysis, and
+generated reports.
 
-## Current deployment
+## Architecture
 
-Production runs on the independent optimized AWS profile: a single EC2 host,
-single-AZ PostgreSQL RDS instance, local Valkey, Cognito, S3, and four
-digest-pinned application images in ECR. `tryindus.ca` resolves directly to
-the host Elastic IP. There is no EKS, Aurora, RDS Proxy, MSK, ElastiCache,
-CloudFront, ALB, NAT gateway, or separate optimized subdomain deployment.
+The main AWS infrastructure configuration in [`infra/terraform`](./infra/terraform/README.md)
+is the canonical architecture and operations reference. It defines the
+network, EKS workloads, Aurora PostgreSQL, RDS Proxy, ElastiCache, MSK,
+Cognito, S3, and deployment boundaries. The checked-in application and
+contract code defines product behavior. Infrastructure code describes what a
+configuration provisions; it does not by itself prove which resources are
+currently running in an AWS account.
 
-See [the optimized infrastructure guide](./infra/optimized/README.md) and
-[runbook](./docs/runbooks/optimized-aws.md) for provisioning, release,
-recovery, and rollback procedures.
+- [`apps/web`](./apps/web/README.md) contains the React and Vite browser application.
+- [`apps/platform-api`](./apps/platform-api/README.md) contains the Rails API, authorization, reports, and provider boundaries.
+- [`services/market-data`](./services/market-data/README.md) contains Rust market ingestion, persistence, and authenticated streaming.
+- [`contracts`](./contracts) contains versioned OpenAPI and Protobuf contracts.
 
-## Application architecture
+The root Next.js and Supabase application is retained as a bounded rollback
+implementation. New product behavior belongs in the React, Rails, and Rust
+services.
 
-- `apps/web` - React 19 and Vite browser application.
-- `apps/platform-api` - Rails API, authorization, reports, and provider
-  boundaries.
-- `services/market-data` - Rust ingestion, persistence, and authenticated
-  streaming.
-- `contracts` - versioned OpenAPI and Protobuf contracts.
-- `infra/optimized` - the active low-cost AWS deployment profile.
-
-The root Next.js and Supabase application is retained only as a bounded
-rollback implementation. It is not the production deployment path.
-
-## Local development
+## Local development and verification
 
 Use the [application runbook](./docs/runbooks/local-application-platform.md)
-for Rails and React work, or the
-[distributed-platform runbook](./docs/runbooks/local-distributed-platform.md)
-for the complete local system. The repository verification contract is in
-[docs/QUALITY.md](./docs/QUALITY.md).
+for Rails and React work, and the
+[distributed platform runbook](./docs/runbooks/local-distributed-platform.md)
+for the complete local system. [Quality](./docs/QUALITY.md) defines the
+required checks for each changed boundary.
 
-## Documentation
+## Durable references
 
 - [Application platform](./docs/architecture/application-platform.md)
 - [Market data](./docs/architecture/market-data.md)
 - [Research workflows](./docs/architecture/distributed-research-workflows.md)
-- [Optimized AWS runbook](./docs/runbooks/optimized-aws.md)
-- [Rollback runbook](./docs/runbooks/rollback.md)
+- [AWS bootstrap](./docs/runbooks/aws-bootstrap.md)
+- [Rollback](./docs/runbooks/rollback.md)
 
 ## License
 

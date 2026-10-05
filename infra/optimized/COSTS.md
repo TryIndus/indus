@@ -1,8 +1,7 @@
 # Optimized profile cost worksheet
 
-Fill this worksheet with current regional AWS pricing and measured usage before
-commissioning the profile. It is an inventory, not an estimate or billing
-claim. During a migration rehearsal, include the temporary overlap with main.
+Fill this worksheet with current regional AWS pricing and measured usage when
+reviewing spend. It is an inventory, not an estimate or billing claim.
 
 | Component | Usage input to collect | Notes |
 | --- | --- | --- |
@@ -16,4 +15,3 @@ claim. During a migration rehearsal, include the temporary overlap with main.
 | Secrets Manager and KMS | secrets, API calls, KMS requests | Runtime secret containers are separate. |
 | Route 53 | one `tryindus.ca` hosted zone, queries, optional health checks | The retired optimized subdomain hosted zone is not required. |
 | Data transfer | internet egress, cross-AZ traffic, external provider traffic | EC2 and RDS remain in AZ A by design. |
-| Overlap | duration and all main plus optimized line items | Merging this configuration does not reduce current spend. |
