@@ -109,8 +109,8 @@ AWS_REGION=us-east-1 ./scripts/deploy/render-gitops-bootstrap.sh staging | \
 
 Verify the add-on and policy applications are healthy before deployment. The
 application cannot become healthy until the deployment workflow replaces its
-placeholder image digest. Only the current Next.js workload and required
-add-ons run in Phase 1.
+placeholder image digest. Install the workloads and add-ons defined by the
+selected environment's checked-in GitOps values.
 
 ## 5. Configure branch deployment
 
