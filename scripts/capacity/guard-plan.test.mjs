@@ -57,3 +57,28 @@ test('treats only a single recognized capacity error as retryable', () => {
   assert.equal(isCapacityOnlyFailure('Error: AccessDenied', codes), false);
   assert.equal(isCapacityOnlyFailure('Error: InsufficientDBInstanceCapacity\nError: AccessDenied', codes), false);
 });
+
+test('accepts a configured EC2 size update through the same guard', () => {
+  const ec2 = {
+    address: 'aws_instance.host',
+    type: 'aws_instance',
+    attribute: 'instance_type',
+    desired: 't3a.small',
+  };
+  const plan = {
+    resource_changes: [{
+      address: ec2.address,
+      type: ec2.type,
+      mode: 'managed',
+      change: {
+        actions: ['update'],
+        before: { instance_type: 't3a.medium', id: 'i-example' },
+        after: { instance_type: 't3a.small', id: 'i-example' },
+        after_unknown: {},
+      },
+    }],
+  };
+  assert.equal(evaluatePlan(plan, ec2), 'apply');
+  plan.resource_changes[0].change.actions = ['delete', 'create'];
+  assert.throws(() => evaluatePlan(plan, ec2));
+});

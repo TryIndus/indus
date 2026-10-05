@@ -90,6 +90,9 @@ jobs:
               echo 'RDS has pending modifications; refusing to apply them immediately.' >&2
               exit 1
             fi
+          elif [ -n "$PREFLIGHT_KIND" ]; then
+            echo 'Unknown target preflight; refusing to apply.' >&2
+            exit 1
           fi
           if terraform -chdir="$ROOT" apply -no-color -input=false capacity.tfplan > "$RUNNER_TEMP/capacity-apply.log" 2>&1; then
             echo 'result=applied' >> "$GITHUB_OUTPUT"

@@ -6,8 +6,10 @@ infrastructure size changes. Each entry supplies its own Terraform root, GitHub
 Environment, AWS role and region variables, backend and tfvars secrets, backend
 identity checks, resource address and type, one permitted size attribute, the
 desired value, optional scheduling attributes and preflight, and retryable
-provider error codes. New AWS resources and other Terraform roots can use the
-same plan guard by adding a reviewed matrix entry.
+provider error codes. The configured production entry currently targets RDS.
+The guard is service-agnostic: its tests also exercise an EC2 `instance_type`
+update. New AWS resources and other Terraform roots can use it by adding a
+reviewed matrix entry with access to the relevant Terraform state.
 
 For each entry, the workflow saves a targeted Terraform plan and inspects its
 JSON representation. It applies the saved plan only when **exactly one** managed
@@ -35,7 +37,11 @@ when it is not relevant.
 
 The workflow does not discover pending capacity errors automatically. Operators
 add and later remove reviewed entries as infrastructure changes are requested.
-Do not use it for database migrations, replacements, broad reconciliation,
-destruction, or changes to multiple fields. Run `node --test
+It supports a single Terraform-managed resource whose resize plans as an
+in-place update. Resources that require replacement, capacity reservations,
+multi-resource changes, or asynchronous capacity checks need a separate
+reviewed adapter; adding their names to the matrix alone is insufficient.
+Do not use it for database migrations, broad reconciliation, or destruction.
+Run `node --test
 scripts/capacity/guard-plan.test.mjs` after editing the guard, then validate the
 GitHub workflow with actionlint.
