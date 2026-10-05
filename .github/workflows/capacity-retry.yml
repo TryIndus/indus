@@ -86,7 +86,7 @@ jobs:
             echo 'result=capacity-unavailable' >> "$GITHUB_OUTPUT"
             echo 'Capacity remains unavailable; the next scheduled run will retry.' >> "$GITHUB_STEP_SUMMARY"
           else
-            tail -n 50 "$RUNNER_TEMP/capacity-apply.log" >&2
+            echo 'Terraform apply failed for a reason other than the configured capacity error.' >&2
             exit 1
           fi
       - name: Open completion notification

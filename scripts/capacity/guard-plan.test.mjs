@@ -33,6 +33,11 @@ test('accepts only the approved in-place size change', () => {
   });
   assert.equal(evaluatePlan({ resource_changes: [settled] }, target), 'no-op');
   assert.throws(() => evaluatePlan({ resource_changes: [] }, target));
+  assert.throws(() => evaluatePlan({
+    resource_changes: [change({
+      change: { ...settled.change, after: { instance_class: 'db.t4g.small' } },
+    })],
+  }, target));
 });
 
 test('rejects replacements, extra resources, and unrelated drift', () => {
