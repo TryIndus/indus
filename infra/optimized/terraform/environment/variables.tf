@@ -15,7 +15,14 @@ variable "vpc_cidr" {
   }
 }
 
-variable "preview_domain_name" { type = string }
+variable "preview_domain_name" {
+  type        = string
+  description = "Deprecated input retained while existing private tfvars are migrated."
+}
+variable "public_domain_name" {
+  type    = string
+  default = "tryindus.ca"
+}
 variable "alert_email_addresses" {
   type    = set(string)
   default = []
@@ -30,7 +37,7 @@ variable "root_volume_size_gib" {
 }
 variable "database_instance_class" {
   type    = string
-  default = "db.t4g.small"
+  default = "db.t4g.micro"
 }
 variable "database_allocated_storage_gib" {
   type    = number
@@ -62,6 +69,12 @@ variable "cognito_logout_urls" { type = list(string) }
 variable "enable_branded_cognito_email" {
   type    = bool
   default = false
+}
+variable "branded_email_zone_id" {
+  type        = string
+  default     = null
+  nullable    = true
+  description = "Existing Route 53 hosted-zone ID for branded Cognito email DNS records. Required only when branded email is enabled."
 }
 variable "ecr_repository_arns" {
   type        = map(string)

@@ -1,12 +1,10 @@
 output "deployment" {
   value = {
-    instance_id          = aws_instance.host.id
-    preview_url          = "https://${var.preview_domain_name}"
-    host_public_ip       = aws_eip.host.public_ip
-    preview_name_servers = aws_route53_zone.preview.name_servers
-    artifact_bucket      = aws_s3_bucket.artifacts.id
-    database_endpoint    = aws_db_instance.this.address
-    runtime_secret_arns  = { for name, secret in aws_secretsmanager_secret.runtime : name => secret.arn }
+    instance_id         = aws_instance.host.id
+    host_public_ip      = aws_eip.host.public_ip
+    artifact_bucket     = aws_s3_bucket.artifacts.id
+    database_endpoint   = aws_db_instance.this.address
+    runtime_secret_arns = { for name, secret in aws_secretsmanager_secret.runtime : name => secret.arn }
   }
 }
 output "identity" {
