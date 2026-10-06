@@ -33,7 +33,7 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
 RUN apt-get update \
-    && apt-get install --only-upgrade --yes libpcre2-8-0 \
+    && apt-get install --only-upgrade --yes libpcre2-8-0 perl-base \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
     && groupadd --gid 1001 indus \
