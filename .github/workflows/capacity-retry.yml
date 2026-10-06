@@ -104,14 +104,12 @@ jobs:
             echo 'Terraform apply failed for a reason other than the configured capacity error.' >&2
             exit 1
           fi
-      - name: Open completion notification
-        if: steps.retry.outputs.result == 'applied'
+      - name: Ensure completion notification
+        if: steps.retry.outputs.result == 'applied' || steps.retry.outputs.result == 'no-op'
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_ID: ${{ matrix.target.id }}
+          TARGET_DESIRED: ${{ matrix.target.desired }}
+          RESULT: ${{ steps.retry.outputs.result }}
           ASSIGNEE: ${{ vars.CAPACITY_RETRY_ASSIGNEE }}
-        run: |
-          args=(--repo "$GITHUB_REPOSITORY" --title "Capacity resize completed: $TARGET_ID"
-            --body "The approved in-place size change for $TARGET_ID was applied. Verify service health and the Terraform state. Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID")
-          if [ -n "$ASSIGNEE" ]; then args+=(--assignee "$ASSIGNEE"); fi
-          gh issue create "${args[@]}"
+        run: node scripts/capacity/notify-completion.mjs

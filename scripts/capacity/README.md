@@ -25,7 +25,9 @@ use a GitHub Environment whose OIDC role can update that resource without a
 human MFA session. The environment must be restricted to `main` and must not
 require reviewers if unattended retries are desired. Match `lock_group` to the
 manual infrastructure workflow for the same Terraform state so their applies
-cannot overlap. Successful applies open a GitHub issue linked to the run. Set
+cannot overlap. Once a target reaches its desired size, the workflow ensures one
+GitHub issue exists for that target and desired value. A later no-op run retries
+notification if issue creation failed after a successful apply. Set
 the optional `CAPACITY_RETRY_ASSIGNEE` variable in the target GitHub
 Environment to a repository collaborator to send that person an issue
 assignment notification.
