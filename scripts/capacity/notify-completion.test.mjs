@@ -28,6 +28,13 @@ test('a later no-op run recovers an existing issue without creating another', as
   });
 });
 
+test('finds an older completion issue beyond the first page', async () => {
+  const fetchImpl = async (url) => response(new URL(url).searchParams.get('page') === '1'
+    ? Array.from({ length: 100 }, (_, index) => ({ title: `Other issue ${index}` }))
+    : [{ title: 'Capacity target reached: optimized-rds-class -> db.t4g.micro', html_url: 'https://github.com/TryIndus/indus/issues/1' }]);
+  assert.equal((await ensureCompletionIssue({ ...options, fetchImpl })).status, 'existing');
+});
+
 test('recovers when issue creation succeeds but its response is lost', async () => {
   let calls = 0;
   const fetchImpl = async (url) => {

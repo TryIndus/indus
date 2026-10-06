@@ -99,9 +99,11 @@ guard permits only the `aws_db_instance.this` `instance_class` update to
 `db.t4g.micro` plus the `apply_immediately` scheduling flag; it does not
 reconcile unrelated infrastructure. It first rejects any pending RDS changes,
 since applying immediately would include those too. The accepted resize
-interrupts database connections while RDS applies it. A successful run opens a
-GitHub issue for follow-up health verification. Scheduled capacity errors leave
-the existing database running and are retried on the next run.
+interrupts database connections while RDS applies it. Once the target size is
+reached, the workflow opens a GitHub issue for follow-up health verification.
+If issue creation fails after the resize, the next no-op run retries the
+notification without resizing again. Scheduled capacity errors leave the
+existing database running and are retried on the next run.
 The Terraform `apply_immediately` setting also affects future RDS changes in
 this profile; inspect pending modifications before manual infrastructure applies.
 
