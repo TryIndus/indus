@@ -1,6 +1,6 @@
 # Capacity retry workflow
 
-`.github/workflows/capacity-retry.yml` runs every six hours on `main` and can
+`.github/workflows/capacity-retry.yml` runs every twelve hours on `main` and can
 also be dispatched manually. Its matrix is the reviewed list of pending
 infrastructure size changes. Each entry supplies its own Terraform root, GitHub
 Environment, AWS role and region variables, backend and tfvars secrets, backend
