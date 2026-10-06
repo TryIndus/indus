@@ -44,6 +44,5 @@ in-place update. Resources that require replacement, capacity reservations,
 multi-resource changes, or asynchronous capacity checks need a separate
 reviewed adapter; adding their names to the matrix alone is insufficient.
 Do not use it for database migrations, broad reconciliation, or destruction.
-Run `node --test
-scripts/capacity/guard-plan.test.mjs` after editing the guard, then validate the
+Run `node --test scripts/capacity/*.test.mjs` after editing the workflow, then validate the
 GitHub workflow with actionlint.
