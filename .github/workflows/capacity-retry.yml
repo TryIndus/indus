@@ -85,11 +85,7 @@ jobs:
             exit 0
           fi
           if [ "$PREFLIGHT_KIND" = rds-no-pending-modifications ]; then
-            pending=$(aws rds describe-db-instances --db-instance-identifier "$PREFLIGHT_ID" --query 'DBInstances[0].PendingModifiedValues' --output json)
-            if [ "$pending" != '{}' ]; then
-              echo 'RDS has pending modifications; refusing to apply them immediately.' >&2
-              exit 1
-            fi
+            aws rds describe-db-instances --db-instance-identifier "$PREFLIGHT_ID" --output json | node scripts/capacity/rds-preflight.mjs "$PREFLIGHT_ID"
           elif [ -n "$PREFLIGHT_KIND" ]; then
             echo 'Unknown target preflight; refusing to apply.' >&2
             exit 1
