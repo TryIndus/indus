@@ -5,14 +5,18 @@ on:
     paths:
       - infra/optimized/**
       - scripts/optimized/**
+      - scripts/capacity/**
       - .github/workflows/optimized-*.yml
+      - .github/workflows/capacity-retry.yml
       - apps/platform-api/bin/docker-entrypoint
   push:
     branches: [main]
     paths:
       - infra/optimized/**
       - scripts/optimized/**
+      - scripts/capacity/**
       - .github/workflows/optimized-*.yml
+      - .github/workflows/capacity-retry.yml
       - apps/platform-api/bin/docker-entrypoint
 
 permissions:
@@ -39,6 +43,7 @@ jobs:
           done
       - name: Check profile isolation and runtime configuration
         run: |
+          node --test scripts/capacity/*.test.mjs
           bash scripts/optimized/validate-isolation.sh
           docker compose --env-file infra/optimized/runtime/release.env.example -f infra/optimized/runtime/compose.yaml config >/dev/null
           docker run --rm --env INDUS_HOSTNAME=optimized.example.com --volume "$PWD/infra/optimized/runtime/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
