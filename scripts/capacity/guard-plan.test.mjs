@@ -49,6 +49,7 @@ test('rejects replacements, extra resources, and unrelated drift', () => {
   assert.throws(() => evaluatePlan(plan(change({ change: { ...change().change, after: { instance_class: 'db.t4g.small', apply_immediately: true, identifier: 'indus-optimized' } } })), target));
   assert.throws(() => evaluatePlan(plan(change({ change: { ...change().change, after: { instance_class: 'db.t4g.micro', apply_immediately: false, identifier: 'indus-optimized' } } })), target));
   assert.throws(() => evaluatePlan(plan(change({ change: { ...change().change, after_unknown: { endpoint: true } } })), target));
+  assert.throws(() => evaluatePlan(plan(change({ change: { ...change().change, after_unknown: { nested: { endpoint: true } } } })), target));
 });
 
 test('treats only a single recognized capacity error as retryable', () => {

@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
 
+const hasUnknownValue = (value) => value === true
+  || (value !== null && typeof value === 'object'
+    && Object.values(value).some(hasUnknownValue));
+
 export function evaluatePlan(plan, target) {
   const sideEffects = typeof target.side_effects === 'string'
     ? JSON.parse(target.side_effects)
@@ -47,7 +51,7 @@ export function evaluatePlan(plan, target) {
   if (Object.entries(sideEffects).some(([key, value]) => after[key] !== value)) {
     throw new Error('An approved scheduling value is missing from the plan.');
   }
-  if (unknown && Object.values(unknown).some((value) => value === true)) {
+  if (hasUnknownValue(unknown)) {
     throw new Error('The plan has an unknown post-apply value.');
   }
 
