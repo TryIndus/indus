@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 export function assertNoPendingRdsChanges(response, instanceId) {
   const instances = response?.DBInstances;
-  if (!Array.isArray(instances) || instances.length !== 1
+  if (!instanceId || !Array.isArray(instances) || instances.length !== 1
     || instances[0]?.DBInstanceIdentifier !== instanceId) {
     throw new Error('RDS did not return the expected DB instance.');
   }
