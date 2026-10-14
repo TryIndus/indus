@@ -13,7 +13,7 @@ dispatch = steps.find { |step| step["name"] == "Dispatch verification for the de
 raise "Dispatch must require an open PR" unless dispatch.fetch("if") == "steps.deployment-pr.outputs.pull-request-number != ''"
 shell = dispatch.fetch("run")
 
-%w[main staging].each do |branch|
+%w[main].each do |branch|
   head = "deploy/application-#{branch}-testsha"
   stdout, stderr, status = Open3.capture3(
     {"DEPLOYMENT_BRANCH" => head}, "bash", "-c",

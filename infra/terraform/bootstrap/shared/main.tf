@@ -7,7 +7,7 @@ locals {
     Repository  = var.github_repository
   })
   repositories = toset(["legacy-next", "platform-api", "market-data", "research-worker", "web"])
-  environments = toset(["staging", "production"])
+  environments = toset(["production"])
 }
 
 resource "aws_kms_key" "shared" {
@@ -160,7 +160,6 @@ data "aws_iam_policy_document" "github_build_assume" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repository}:environment:staging",
         "repo:${var.github_repository}:environment:production",
       ]
     }
@@ -216,7 +215,6 @@ data "aws_iam_policy_document" "github_promotion_assume" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repository}:environment:staging",
         "repo:${var.github_repository}:environment:production",
       ]
     }

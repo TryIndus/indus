@@ -5,7 +5,7 @@ variable "aws_region" {
 
 variable "project_account_id" {
   type        = string
-  description = "Dedicated Indus member account ID that owns shared services and both environments."
+  description = "Dedicated Indus member account ID that owns shared services."
 }
 
 variable "github_repository" {
@@ -22,9 +22,9 @@ variable "terraform_execution_role_arns" {
   validation {
     condition = alltrue([
       for environment, arn in var.terraform_execution_role_arns :
-      contains(["staging", "production"], environment) && can(regex("^arn:aws:iam::${var.project_account_id}:role/.+$", arn))
+      environment == "production" && can(regex("^arn:aws:iam::${var.project_account_id}:role/.+$", arn))
     ])
-    error_message = "Use staging or production keys and role ARNs from the dedicated Indus account."
+    error_message = "Use the production key and role ARN from the dedicated Indus account."
   }
 }
 

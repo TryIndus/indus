@@ -16,16 +16,17 @@ raise "Branded email must use the verified SES sender" unless identity.include?(
 workflow = YAML.load_file(File.expand_path("../../.github/workflows/deploy-infrastructure.yml", __dir__))
 target = workflow.fetch("jobs").fetch("target").fetch("steps").first.fetch("run")
 cases = [
-  ["staging", "tear-down", "tear-down-staging", true],
-  ["staging", "tear-up", "", true],
-  ["staging", "destroy", "destroy-staging", true],
+  ["main", "plan", "", true],
   ["main", "apply", "", true],
-  ["main", "tear-down", "tear-down-staging", false],
-  ["main", "tear-up", "", false],
-  ["main", "destroy", "destroy-staging", false],
+  ["main", "plan-destroy-production", "destroy-production", true],
+  ["main", "destroy-production", "destroy-production", true],
+  ["main", "plan-destroy-production", "", false],
+  ["main", "destroy-production", "", false],
+  ["staging", "plan", "", false],
+  ["staging", "apply", "", false],
   ["feature/test", "apply", "", false],
-  ["staging", "unexpected", "", false],
-  ["staging", "tear-down", "$(printf INJECTION >&2)", false],
+  ["main", "unexpected", "", false],
+  ["main", "apply", "$(printf INJECTION >&2)", true],
 ]
 
 cases.each do |branch, operation, confirmation, expected|
@@ -40,26 +41,18 @@ end
 
 plan = workflow.fetch("jobs").fetch("terraform").fetch("steps")
   .find { |step| step["name"] == "Plan" }.fetch("run")
-plan = plan.gsub('${{ needs.target.outputs.environment }}', "staging")
+plan = plan.gsub('${{ needs.target.outputs.environment }}', "production")
 plan = "terraform() { printf '%s\\n' \"$*\"; }\n" + plan
 
-%w[tear-down tear-up destroy].each do |operation|
+%w[apply plan-destroy-production destroy-production].each do |operation|
   stdout, stderr, status = Open3.capture3({"OPERATION" => operation}, "bash", "-c", plan)
   raise stderr unless status.success?
   commands = stdout.lines
   raise "Terraform init was not called" unless commands.first.include?(" init ")
   case operation
-  when "tear-down"
-    raise "Expected targeted destroy" unless commands.last.include?("plan -destroy")
-    %w[aws_rds_cluster_instance.data aws_db_proxy.data aws_eks_cluster.this aws_nat_gateway.primary aws_lb_listener_rule.cloudfront_origin].each do |resource|
-      raise "Runtime resource was retained: #{resource}" unless commands.last.include?("-target=module.environment.#{resource}")
-    end
-    %w[aws_rds_cluster.data aws_backup_selection.primary aws_s3_bucket.data aws_cognito_user_pool.this aws_kms_key.data].each do |resource|
-      raise "Durable resource targeted: #{resource}" if commands.last.include?("-target=module.environment.#{resource}")
-    end
-  when "tear-up"
+  when "apply"
     raise "Expected complete restore plan" if commands.last.include?("-destroy") || commands.last.include?("-target")
-  when "destroy"
+  when "plan-destroy-production", "destroy-production"
     raise "Expected complete destroy plan" unless commands.last.include?("plan -destroy") && !commands.last.include?("-target")
   end
 end

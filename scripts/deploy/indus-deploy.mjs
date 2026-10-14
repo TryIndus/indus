@@ -13,14 +13,14 @@ function run(commandName, args, options = {}) {
 }
 
 if (command !== "deploy" || !["app", "infra"].includes(component)) {
-	fail("Usage: indus deploy app staging [--replacement] | production or indus deploy infra staging | production plan | apply | tear-up | tear-down | destroy [--confirm]");
+	fail("Usage: indus deploy app production [--replacement] | indus deploy infra production <plan|apply|plan-destroy-production|destroy-production> [--confirm]");
 }
 
-if (! ["staging", "production"].includes(operation)) {
-	fail("Choose staging or production.");
+if (operation !== "production") {
+	fail("Only production deployment is supported.");
 }
 
-const branch = operation === "staging" ? "staging" : "main";
+const branch = "main";
 const currentBranch = run("git", ["branch", "--show-current"]);
 if (currentBranch !== branch) {
 	fail(`Run this command from ${branch}; current branch is ${currentBranch || "detached HEAD"}.`);
@@ -40,12 +40,16 @@ if (component === "app") {
 	process.exit(0);
 }
 
-if (! ["plan", "apply", "tear-up", "tear-down", "destroy"].includes(confirmation)) {
-	fail("Infrastructure deployment requires plan, apply, tear-up, tear-down, or destroy.");
+if (!["plan", "apply", "plan-destroy-production", "destroy-production"].includes(confirmation)) {
+	fail("Infrastructure deployment requires plan, apply, plan-destroy-production, or destroy-production.");
 }
 
-if (operation === "production" && ["tear-up", "tear-down", "destroy"].includes(confirmation)) {
-	fail("Production lifecycle operations are not implemented.");
+const requiresConfirmation = ["plan-destroy-production", "destroy-production"].includes(confirmation);
+if (requiresConfirmation && process.argv[6] !== "--confirm") {
+	fail(`${confirmation} requires --confirm.`);
+}
+if (!requiresConfirmation && process.argv[6] !== undefined) {
+	fail(`${confirmation} does not accept --confirm.`);
 }
 
 const args = [
@@ -58,11 +62,8 @@ const args = [
 	`operation=${confirmation}`,
 ];
 
-if (["tear-down", "destroy"].includes(confirmation)) {
-	if (process.argv[6] !== "--confirm") {
-		fail(`Staging ${confirmation} requires --confirm.`);
-	}
-	args.push("-f", `confirmation=${confirmation}-staging`);
+if (requiresConfirmation) {
+	args.push("-f", "confirmation=destroy-production");
 }
 
 run("gh", args, { stdio: "inherit" });
