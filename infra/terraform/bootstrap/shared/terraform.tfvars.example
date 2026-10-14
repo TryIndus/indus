@@ -3,7 +3,11 @@ project_account_id = "111111111111"
 # Populate after the account administrator creates these execution roles.
 # terraform_execution_role_arns = {
 #   production = "arn:aws:iam::111111111111:role/indus-production-terraform"
+#   staging    = "arn:aws:iam::111111111111:role/indus-staging-terraform" # Only when enable_staging = true.
 # }
+
+# Keep staging shared-state access and OIDC trust dormant unless reactivating it.
+# enable_staging = true
 
 tags = {
   CostCenter = "engineering"

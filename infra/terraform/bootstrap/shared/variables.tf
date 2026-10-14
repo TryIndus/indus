@@ -14,6 +14,12 @@ variable "github_repository" {
   default     = "TryIndus/indus"
 }
 
+variable "enable_staging" {
+  type        = bool
+  description = "Recreate staging shared-state access and GitHub OIDC trust after a reviewed staging reactivation."
+  default     = false
+}
+
 variable "terraform_execution_role_arns" {
   type        = map(string)
   description = "Pre-provisioned environment Actions roles allowed to assume their shared state role without MFA."
@@ -22,9 +28,9 @@ variable "terraform_execution_role_arns" {
   validation {
     condition = alltrue([
       for environment, arn in var.terraform_execution_role_arns :
-      environment == "production" && can(regex("^arn:aws:iam::${var.project_account_id}:role/.+$", arn))
+      contains(["staging", "production"], environment) && can(regex("^arn:aws:iam::${var.project_account_id}:role/.+$", arn))
     ])
-    error_message = "Use the production key and role ARN from the dedicated Indus account."
+    error_message = "Use staging or production keys and role ARNs from the dedicated Indus account."
   }
 }
 

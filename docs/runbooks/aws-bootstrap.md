@@ -29,6 +29,8 @@ Indus member account. Review the exact plan before applying it:
 Set `terraform_execution_role_arns` to the pre-provisioned production
 execution-role ARN. This grants that role access to its shared state role
 without the operator-only MFA condition.
+The shared module keeps staging access code behind `enable_staging = false`.
+Only set it to `true` as part of a reviewed staging reactivation.
 
 ```bash
 terraform -chdir=infra/terraform/bootstrap/shared init
@@ -152,6 +154,7 @@ staging as retired, inspect its Terraform state and AWS resources, the GitHub
 `staging` branch and Environment, and any credentials or OIDC trust that could
 still allow deployment. Retiring live resources or access requires a separate
 reviewed operation; merging this change does not remove them. To reactivate
-staging later, create or update its branch and deployment workflow, the required IAM and
-OIDC boundaries, private configuration, and GitOps bootstrap; review a new
-Terraform plan and validate the resulting deployment.
+staging later, create or update its branch and deployment workflow, the required
+IAM and OIDC boundaries (`enable_staging = true` in shared Terraform), private
+configuration, and GitOps bootstrap; review a new Terraform plan and validate
+the resulting deployment.
