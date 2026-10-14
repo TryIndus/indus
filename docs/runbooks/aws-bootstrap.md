@@ -7,18 +7,18 @@ values in GitHub, Terraform variables, plans, state, or Git.
 ## Prerequisites
 
 - An AWS Organization whose management account contains no Indus workloads, and
-  one dedicated member account containing shared services, staging, and production.
+  one dedicated member account for shared services and production. Staging
+  remains in source control for possible reactivation.
 - Route 53 hosted zones that match the checked-in environment inputs.
 - Terraform, AWS CLI, Helm, and kubectl installed locally.
 - MFA-backed roles that can apply the reviewed shared and environment plans.
 - For workflow-driven Terraform, an execution role and GitHub OIDC provider
   provisioned by the account administrator in the Indus member account. Trust must
   require audience `sts.amazonaws.com` and subject
-  `repo:TryIndus/indus:environment:staging` or
-  `repo:TryIndus/indus:environment:production`, respectively. The role needs
+  `repo:TryIndus/indus:environment:production`. The role needs
   permissions to manage the environment resources and assume its shared state
   role. These administrator-managed execution roles are not created by the
-  environment stack, so staging destroy cannot delete its own credentials.
+  environment stack, so the environment cannot delete its own credentials.
 
 ## 1. Bootstrap shared services
 
@@ -26,9 +26,9 @@ Copy `infra/terraform/bootstrap/shared/terraform.tfvars.example` to ignored
 `terraform.tfvars`, replace the project account ID, and authenticate to the
 Indus member account. Review the exact plan before applying it:
 
-Set `terraform_execution_role_arns` to the pre-provisioned staging and production
-execution-role ARNs. This grants those exact roles access to their shared state
-role without the operator-only MFA condition.
+Set `terraform_execution_role_arns` to the pre-provisioned production
+execution-role ARN. This grants that role access to its shared state role
+without the operator-only MFA condition.
 
 ```bash
 terraform -chdir=infra/terraform/bootstrap/shared init
@@ -42,26 +42,25 @@ repository variables from its outputs:
 - `AWS_SHARED_REGION=us-east-1`
 - `AWS_BUILD_ROLE_ARN`
 
-Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in each
-GitHub Environment to that environment's public Supabase build configuration.
+Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in the
+production GitHub Environment to its public Supabase build configuration.
 
-## 2. Provision an environment
+## 2. Provision production
 
-Copy the checked-in staging examples to ignored local files and replace every
+Copy the checked-in production examples to ignored local files and replace every
 placeholder with shared bootstrap outputs, the Indus member account ID, and
 Route 53 zone. Run:
 
 ```bash
-terraform -chdir=infra/terraform/environments/staging init \
+terraform -chdir=infra/terraform/environments/production init \
   -backend-config=backend.hcl
-terraform -chdir=infra/terraform/environments/staging plan \
-  -out=staging.tfplan
-terraform -chdir=infra/terraform/environments/staging show staging.tfplan
+terraform -chdir=infra/terraform/environments/production plan \
+  -out=production.tfplan
+terraform -chdir=infra/terraform/environments/production show production.tfplan
 ```
 
-Apply only the reviewed saved plan. Use the corresponding `production` paths
-for production. Staging is optional developer infrastructure. Before production
-traffic cutover, verify deployment, authentication, provider, and rollback behavior. Restrict
+Apply only the reviewed saved plan. Before production traffic cutover, verify
+deployment, authentication, provider, and rollback behavior. Restrict
 EKS API access to the approved operator network before cluster bootstrap.
 
 Set `cluster_public_access_cidrs` in the ignored environment `terraform.tfvars`
@@ -97,13 +96,13 @@ matching cluster. Leave the zero digest until the deployment workflow opens its
 first deployment PR.
 
 ```bash
-aws eks update-kubeconfig --region us-east-1 --name indus-staging
+aws eks update-kubeconfig --region us-east-1 --name indus-production
 kubectl apply -f infra/gitops/bootstrap/namespaces.yaml
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update argo
 helm upgrade --install argocd argo/argo-cd \
   --version 10.9.1 --namespace argocd --wait --timeout 10m
-AWS_REGION=us-east-1 ./scripts/deploy/render-gitops-bootstrap.sh staging | \
+AWS_REGION=us-east-1 ./scripts/deploy/render-gitops-bootstrap.sh production | \
   kubectl apply -f -
 ```
 
@@ -112,18 +111,16 @@ application cannot become healthy until the deployment workflow replaces its
 placeholder image digest. Install the workloads and add-ons defined by the
 selected environment's checked-in GitOps values.
 
-## 5. Configure branch deployment
+## 5. Configure production deployment
 
-When developers need a shared deployed environment, create `staging` from
-`main`. Configure GitHub Environment variables `AWS_TERRAFORM_ROLE_ARN` and
+Configure GitHub Environment variables `AWS_TERRAFORM_ROLE_ARN` and
 `AWS_TERRAFORM_REGION`, plus base64 secrets `TF_BACKEND_CONFIG_B64` and
-`TF_VARS_B64`, in each environment. The encoded files are the environment's
-ignored `backend.hcl` and `terraform.tfvars`.
+`TF_VARS_B64`, in the production environment. The encoded files are the
+environment's ignored `backend.hcl` and `terraform.tfvars`.
 
-Restrict the staging GitHub Environment to branch `staging` and production to
-branch `main`; the AWS trust policies use environment subjects. Set each
-environment's `AWS_TERRAFORM_ROLE_ARN` to its administrator-provisioned execution
-role. In the organization's Settings > Actions > General > Workflow permissions,
+Restrict the production GitHub Environment to branch `main`; the AWS trust
+policy uses its environment subject. Set its `AWS_TERRAFORM_ROLE_ARN` to the
+administrator-provisioned execution role. In the organization's Settings > Actions > General > Workflow permissions,
 enable **Allow GitHub Actions to create and approve pull requests**, then enable
 the corresponding option in this repository's Actions settings. Keep the default
 token permissions read-only; the deployment job explicitly requests the write
@@ -135,23 +132,26 @@ with this token do not automatically start `pull_request` checks. Checks
 run against that branch's commit before the PR is merged. The workflow does not
 approve or merge its own PRs.
 
-Use `./bin/indus deploy app staging` from `staging` or
-`./bin/indus deploy app production` from `main`. For replacement images, follow the
-[staging replacement publishing runbook](staging-replacement.md).
-Infrastructure is dispatched
-with `./bin/indus deploy infra <staging|production> <plan|apply|tear-up|tear-down|destroy>`.
-`tear-down` removes EKS, Aurora instances, RDS Proxy, CloudFront, ALB, NAT,
-application DNS records, and their dependent routes and workload IAM resources.
-It retains the Aurora cluster volume, Cognito, DNS zone, VPC/subnets, secrets,
-buckets, and backups. Retained storage and services can still incur charges.
-`tear-up` restores the runtime. After a tear-up, update the recreated resource
-outputs in GitOps values and repeat the Argo CD installation and bootstrap commands in step 4
-before deploying the application. Both staging tear-down and full staging
-destroy require `--confirm`; production lifecycle operations are not available.
-Full `destroy` also deletes staging database contents and bucket objects; it is
-not the operation for pausing an unused developer environment.
-If the backup vault contains recovery points, AWS refuses its deletion until an
-operator explicitly removes them or waits for retention expiry.
+Use `./bin/indus deploy app production` and
+`./bin/indus deploy infra production <plan|apply|plan-destroy-production|destroy-production>`
+from `main`. Production destruction requires its explicit confirmation. If the
+backup vault contains recovery points, AWS refuses its deletion until an operator
+explicitly removes them or waits for retention expiry.
 
 Merge reviewed feature pull requests into `main` before production deployment.
-Use `staging` only when developers need a shared deployed environment.
+
+## Dormant staging configuration
+
+The repository retains `infra/terraform/environments/staging`, its GitOps
+values, and image-publishing tooling as a dormant configuration. CI still
+validates these files, but deployment workflows on `main` accept only
+production. Staging is not required before merging to `main`.
+
+Do not infer the live AWS or GitHub state from this repository. Before treating
+staging as retired, inspect its Terraform state and AWS resources, the GitHub
+`staging` branch and Environment, and any credentials or OIDC trust that could
+still allow deployment. Retiring live resources or access requires a separate
+reviewed operation; merging this change does not remove them. To reactivate
+staging later, create or update its branch and deployment workflow, the required IAM and
+OIDC boundaries, private configuration, and GitOps bootstrap; review a new
+Terraform plan and validate the resulting deployment.

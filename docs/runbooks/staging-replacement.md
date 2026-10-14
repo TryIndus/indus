@@ -1,28 +1,33 @@
-# Staging replacement image publishing
+# Dormant staging replacement configuration
 
-From the `staging` branch, run `./bin/indus deploy app staging --replacement`.
-The existing application workflow builds Rails (also used by Sidekiq, outbox,
-report consumers, migrations, and research workers), Rust market data, and the
-React static web publisher. Replacement publishing rejects every other branch.
-The default legacy deployment remains available without the flag.
+This file records the retained staging replacement configuration. Staging is
+not a prerequisite for merging to `main`. Deployment workflows on `main` do
+not support publishing a staging deployment; inspect AWS and GitHub separately
+to determine whether any older staging resources or workflow entry points
+still exist.
 
-Configure these public GitHub staging Environment variables before dispatch:
+To reactivate it, make a reviewed infrastructure change that creates or updates
+the staging branch and workflow boundary, GitHub Environment and OIDC trust,
+private Terraform configuration, GitOps bootstrap, and image publication
+path. Then validate the newly provisioned environment before using it for
+release evidence.
 
-- `STAGING_WEB_ORIGIN`: the HTTPS public origin, without a trailing slash.
-- `STAGING_COGNITO_AUTHORITY`: the Cognito user-pool issuer URL
+If staging is deliberately reactivated, configure these public GitHub staging
+Environment variables before dispatch:
+
+- `WEB_ORIGIN`: the HTTPS public origin, without a trailing slash.
+- `COGNITO_AUTHORITY`: the Cognito user-pool issuer URL
   (`https://cognito-idp.us-east-1.amazonaws.com/<pool-id>`), used to identify the user pool.
-- `STAGING_COGNITO_CLIENT_ID`: the public web client ID.
+- `COGNITO_CLIENT_ID`: the public web client ID.
 
 Existing repository build-role and region variables are also required.
 These values are public browser configuration; never supply provider keys here.
 
-All four images must pass vulnerability scans before any image is pushed.
-Each published digest receives a signature and SBOM attestation. A PR targeting
-staging updates only image references and the web release identifier; both
-verification workflows are explicitly dispatched on that PR's branch.
-Publishing does not enable Argo applications, apply infrastructure, migrate
-databases, or change traffic. Partial publication may leave unused immutable
-images; a failed publication does not update deployment references.
+All four images must pass vulnerability scans before any image is pushed. Each
+published digest receives a signature and SBOM attestation. Publishing must not
+enable Argo applications, apply infrastructure, migrate databases, or change
+traffic. Partial publication may leave unused immutable images; a failed
+publication must not update deployment references.
 
 Before activating the platform, provision its stateful dependencies, workload
 roles, target groups, secrets, and private configuration. Verify a database

@@ -45,6 +45,16 @@ The default Compose profile starts PostgreSQL and Redis on loopback-only ports w
 
 Kafka, Temporal, and the Rust service run alongside the application profile. Managed AWS services use the same contracts as local adapters.
 
+## Deployment boundary
+
+Reviewed changes merge into `main`; application and infrastructure deployment
+workflows on that branch target production only. The staging Terraform, Helm,
+GitOps, and image configuration stays in the repository as a dormant option and
+is validated by CI. It is not a required release gate. Restoring staging as a
+deployed environment requires a separate review of its workflow, identity,
+state, and infrastructure boundaries. The repository does not establish whether
+older staging resources still exist in AWS.
+
 ## Rollback
 
 For local recovery, stop the affected Compose profile and remove only disposable data volumes when necessary. Production rollback uses traffic, image, workflow, and forward-only database controls. Never restore a shared database by checking out an older migration.

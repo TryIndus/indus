@@ -5,11 +5,12 @@ Replace each checked-in `replace-*` placeholder in the corresponding control
 plane and workload values before bootstrapping that environment. Secret values
 are never stored here.
 
-Argo CD owns add-ons, admission policies, and application workloads. The
-staging cluster watches `staging`; the production cluster watches `main`.
-`./bin/indus deploy app staging` and `./bin/indus deploy app production`
-publish immutable images and open a digest-only pull request against the
-corresponding deployment branch. Argo CD reconciles the exact merged digest.
+Argo CD owns add-ons, admission policies, and application workloads. The active
+production cluster watches `main`; `./bin/indus deploy app production` publishes
+immutable images and opens a digest-only pull request against that deployment
+branch. Argo CD reconciles the exact merged digest. The checked-in staging
+values are dormant reference material; inspect AWS and any older staging
+branch before assuming its cluster or deployment path has been retired.
 
 The only imperative bootstrap is the pinned Argo CD installation described in
 `docs/runbooks/aws-bootstrap.md`. After the root application is submitted,
