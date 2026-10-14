@@ -7,7 +7,7 @@ locals {
     Repository  = var.github_repository
   })
   repositories = toset(["legacy-next", "platform-api", "market-data", "research-worker", "web"])
-  environments = toset(["staging", "production"])
+  environments = toset(var.enable_staging ? ["staging", "production"] : ["production"])
 }
 
 resource "aws_kms_key" "shared" {
@@ -159,10 +159,10 @@ data "aws_iam_policy_document" "github_build_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${var.github_repository}:environment:staging",
-        "repo:${var.github_repository}:environment:production",
-      ]
+      values = concat(
+        ["repo:${var.github_repository}:environment:production"],
+        var.enable_staging ? ["repo:${var.github_repository}:environment:staging"] : [],
+      )
     }
   }
 }
@@ -215,10 +215,10 @@ data "aws_iam_policy_document" "github_promotion_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${var.github_repository}:environment:staging",
-        "repo:${var.github_repository}:environment:production",
-      ]
+      values = concat(
+        ["repo:${var.github_repository}:environment:production"],
+        var.enable_staging ? ["repo:${var.github_repository}:environment:staging"] : [],
+      )
     }
   }
 }

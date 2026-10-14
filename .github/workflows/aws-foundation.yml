@@ -13,7 +13,7 @@ on:
       - .github/workflows/deploy-application.yml
       - .github/workflows/deploy-infrastructure.yml
   push:
-    branches: [staging, main]
+    branches: [main]
     paths:
       - Dockerfile
       - .dockerignore
@@ -49,7 +49,9 @@ jobs:
           ruby scripts/deploy/test-infrastructure.rb
           ruby scripts/deploy/test-application.rb
           ruby scripts/deploy/test-database-bootstrap.rb
+          node --test scripts/deploy/test-indus-deploy.mjs
           node --test scripts/deploy/test-staging-images.mjs
+          node --test scripts/deploy/test-production-images.mjs
 
       - name: Validate Terraform formatting and environments
         shell: bash

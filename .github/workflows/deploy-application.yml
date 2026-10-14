@@ -33,9 +33,8 @@ jobs:
         run: |
           set -euo pipefail
           case "$GITHUB_REF_NAME" in
-            staging) echo "environment=staging" >> "$GITHUB_OUTPUT" ;;
             main) echo "environment=production" >> "$GITHUB_OUTPUT" ;;
-            *) echo "Deployments must run from staging or main." >&2; exit 1 ;;
+            *) echo "Deployments must run from main." >&2; exit 1 ;;
           esac
 
   deploy:
@@ -293,7 +292,7 @@ jobs:
             printf '%s\n' "$image" > "$name.image"
           done
       - name: Update image references
-        run: node scripts/deploy/update-staging-images.mjs
+        run: node scripts/deploy/update-production-images.mjs
       - name: Open deployment PR
         id: platform-pr
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1

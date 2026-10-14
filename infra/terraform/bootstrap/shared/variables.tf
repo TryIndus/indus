@@ -5,13 +5,19 @@ variable "aws_region" {
 
 variable "project_account_id" {
   type        = string
-  description = "Dedicated Indus member account ID that owns shared services and both environments."
+  description = "Dedicated Indus member account ID that owns shared services."
 }
 
 variable "github_repository" {
   type        = string
   description = "GitHub owner/repository bound into OIDC subject conditions."
   default     = "TryIndus/indus"
+}
+
+variable "enable_staging" {
+  type        = bool
+  description = "Recreate staging shared-state access and GitHub OIDC trust after a reviewed staging reactivation."
+  default     = false
 }
 
 variable "terraform_execution_role_arns" {

@@ -10,9 +10,9 @@ Cognito's verification template accepts one email body and does not expose a sep
 
 `enable_branded_cognito_email` defaults to `false` in each Terraform environment. Before changing it, confirm that the environment's SES account in `us-east-1` can send to unverified recipients. SES sandbox accounts cannot deliver signup codes to arbitrary users. Check the current SES plan and sending limits; the Essentials plan has usage charges but no fixed monthly plan fee. Do not enable paid SES add-ons as part of this change.
 
-Set `enable_branded_cognito_email = true` in the target environment's private Terraform variables and review its plan. Terraform creates an SES identity for `domain_name`, publishes the ownership and DKIM DNS records in the existing Route 53 zone, waits for identity verification, then configures the Cognito user pool to send the HTML code template from `Indus <notifications@domain_name>`. Apply through the established infrastructure workflow, staging first. Verify the SES identity and DKIM status after apply.
+Set `enable_branded_cognito_email = true` in the target environment's private Terraform variables and review its plan. Terraform creates an SES identity for `domain_name`, publishes the ownership and DKIM DNS records in the existing Route 53 zone, waits for identity verification, then configures the Cognito user pool to send the HTML code template from `Indus <notifications@domain_name>`. Apply through the established production infrastructure workflow. Verify the SES identity and DKIM status after apply.
 
-In staging, complete signup, wrong-code, expired-code, resend, unconfirmed sign-in, and password-reset checks with a real mailbox that is not an SES verified identity. Check delivery time, inbox and spam placement, sender domain, and the email layout in desktop and mobile clients. Confirm Rails accepts the account after verification. Repeat the smoke check in production during an approved deployment window.
+During an approved production deployment window, complete signup, wrong-code, expired-code, resend, unconfirmed sign-in, and password-reset checks with a real mailbox that is not an SES verified identity. Check delivery time, inbox and spam placement, sender domain, and the email layout in desktop and mobile clients. Confirm Rails accepts the account after verification.
 
 ## Recovery
 

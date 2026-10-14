@@ -15,16 +15,14 @@ from reaching the pod.
 
 ## Cutover and rollback
 
-1. Optionally rehearse the deployment in the developer environment by running
-   infrastructure and application deployment from `staging`.
-2. Store the five required values in the production `legacy-next` secret and
+1. Store the five required values in the production `legacy-next` secret and
    confirm the pod role can read only it.
-3. Merge the reviewed feature pull request into `main`, then deploy the
+2. Merge the reviewed feature pull request into `main`, then deploy the
    application and infrastructure explicitly from `main`. Wait for Argo CD,
    CloudFront, ALB target health, authenticated browser smoke tests, and
    accessibility tests.
-4. Increase Route 53 `aws_traffic_weight` gradually from the Vercel origin to
+3. Increase Route 53 `aws_traffic_weight` gradually from the Vercel origin to
    CloudFront. Stop if readiness, authentication, provider errors, or client
    error rates regress.
-5. Roll back by returning DNS weight to Vercel or restoring the previous
+4. Roll back by returning DNS weight to Vercel or restoring the previous
    signed image.
