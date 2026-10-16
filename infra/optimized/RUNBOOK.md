@@ -189,11 +189,30 @@ backups and reconcile any writes made after the recovery point.
 
 ## Capacity, cost, and monitoring
 
-The configured `t3a.medium` and `db.t4g.micro` sizes require capacity monitoring.
-Measure memory, CPU credits, disk, database connections, latency, market
-ingestion, and Sidekiq backlog under representative load. The host retains
-4 GiB because the full process set has not been demonstrated within 2 GiB;
-resize only after measuring headroom.
+The target `t3a.small` host has 2 GiB of memory; the database remains
+`db.t4g.micro`. This repository change does not resize a running instance.
+First deploy an application release with working Valkey access. Confirm that
+Sidekiq stays running and a research report finishes. Then sample host
+`MemTotal` and `MemAvailable`, container memory, swap use, and OOM events
+through Systems Manager for at least 24 hours, including a report run. Keep
+the current 4 GiB host if peak `MemTotal - MemAvailable` exceeds 1.5 GiB,
+any process is OOM killed, or Sidekiq fails to drain. This preserves at least
+512 MiB of estimated headroom on a 2 GiB host. Check CPU credits, disk,
+database connections, market ingestion, and health endpoints as well.
+
+Only after those checks, dispatch `optimized-infrastructure` with `plan` from
+`main`. Verify the saved plan changes `aws_instance.host.instance_type` in
+place from `t3a.medium` to `t3a.small` and has no unrelated changes. A private
+`terraform.tfvars` value for `instance_type` overrides the repository default;
+update the private optimized Terraform variable file and its GitHub
+Environment secret if it still pins `t3a.medium`, then plan again. Dispatch
+`apply` and review its saved plan before approving the production environment.
+The instance type update stops and starts the EC2 host, causing downtime;
+the Elastic IP and EBS-backed Valkey volume remain attached to the host.
+After it starts, verify the instance type, systemd service, containers, report
+creation, and health endpoints. If memory pressure or OOM kills appear,
+restore `t3a.medium` in the optimized Terraform configuration and apply a
+reviewed rollback plan. The same stop/start downtime applies to rollback.
 
 Budget for EC2 and any burst credits, EBS, public IPv4, RDS compute/storage/
 backups/I/O, S3, Cognito and optional SES, ECR, KMS/Secrets Manager, Route 53,
