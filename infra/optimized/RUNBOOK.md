@@ -55,9 +55,11 @@ interrupts service.
    optimized plan and apply role ARNs as `OPTIMIZED_PLAN_ROLE_ARN` and
    `OPTIMIZED_TERRAFORM_ROLE_ARN` respectively. Dispatch the manual
    `optimized-infrastructure` workflow from `main`. `plan` only reviews;
-   `apply` first saves an exact plan, publishes its readable form in the job
-   summary, then waits for approval of `optimized-production` before applying
-   that saved plan. Both jobs require the optimized state bucket and key.
+   `prepare-email` plans and applies only the SES identity and DNS dependencies;
+   `apply` reconciles the full environment after SES is ready. Both mutations
+   save an exact plan, publish its readable form in the job summary, and wait
+   for approval of `optimized-production` before applying it. Both jobs require
+   the optimized state bucket and key.
 
 The optimized web image uses the same `/auth` confirmation and recovery
 experience as the main application: signup codes, recoverable unconfirmed
@@ -69,12 +71,12 @@ accounts.
 profile and overrides any older `enable_branded_cognito_email = false` in the
 private `terraform.tfvars`. Terraform looks up the existing public `tryindus.ca`
 hosted zone and creates the SES identity, ownership, DKIM, DMARC, and aligned
-MAIL FROM records there. The bootstrap Terraform role must be updated first to grant SES identity
-management and Cognito email service-role creation. Request SES production
-access in `us-east-1` before applying the environment plan: the apply workflow
-checks `ProductionAccessEnabled` and stops before applying the saved plan if
-the account remains in the SES sandbox. The default Cognito sender remains
-active until the approved environment apply succeeds. See the
+MAIL FROM records there. Update the bootstrap Terraform role first, then run
+`prepare-email` and wait for the domain identity, DKIM, and MAIL FROM status to
+be successful. Request SES production access in `us-east-1` with the verified
+domain. The full `apply` checks those statuses and `ProductionAccessEnabled`
+before switching Cognito. The default Cognito sender remains active until the
+approved full environment apply succeeds. See the
 [email runbook](../../docs/runbooks/cognito-email.md) for verification and rollback.
 
 The optimized bootstrap creates its own plan, apply, release, and host IAM

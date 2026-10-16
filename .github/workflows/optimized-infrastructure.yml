@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Plan only, or plan and request approval to apply
+        description: Plan only, prepare SES DNS, or plan and request approval to apply
         required: true
         type: choice
-        options: [plan, apply]
+        options: [plan, prepare-email, apply]
 
 concurrency:
   group: optimized-infrastructure
@@ -47,10 +47,19 @@ jobs:
         run: |
           set -euo pipefail
           terraform -chdir=infra/optimized/terraform/environment init -input=false -lockfile=readonly -backend-config=backend.hcl
-          terraform -chdir=infra/optimized/terraform/environment plan -input=false -out=approved.tfplan
+          if [ "${{ inputs.operation }}" = 'prepare-email' ]; then
+            terraform -chdir=infra/optimized/terraform/environment plan -input=false -out=approved.tfplan \
+              -target=aws_ses_domain_identity_verification.cognito \
+              -target=aws_route53_record.cognito_dkim \
+              -target=aws_route53_record.cognito_mail_from_mx \
+              -target=aws_route53_record.cognito_mail_from_spf \
+              -target=aws_route53_record.cognito_dmarc
+          else
+            terraform -chdir=infra/optimized/terraform/environment plan -input=false -out=approved.tfplan
+          fi
           terraform -chdir=infra/optimized/terraform/environment show -no-color approved.tfplan >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve exact plan for approved apply
-        if: inputs.operation == 'apply'
+        if: inputs.operation == 'apply' || inputs.operation == 'prepare-email'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: optimized-approved-plan
@@ -59,11 +68,11 @@ jobs:
           retention-days: 7
 
   apply:
-    if: inputs.operation == 'apply' && github.ref == 'refs/heads/main'
+    if: (inputs.operation == 'apply' || inputs.operation == 'prepare-email') && github.ref == 'refs/heads/main'
     needs: plan
     environment: optimized-production
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
@@ -88,18 +97,30 @@ jobs:
           path: infra/optimized/terraform/environment
       - name: Initialize optimized Terraform
         run: terraform -chdir=infra/optimized/terraform/environment init -input=false -lockfile=readonly -backend-config=backend.hcl
-      - name: Require production sending for SES plans
+      - name: Check the approved email rollout stage
         run: |
           set -euo pipefail
-          ses_sender="$(terraform -chdir=infra/optimized/terraform/environment show -json approved.tfplan | jq -er '.planned_values.root_module.resources[] | select(.address == "aws_cognito_user_pool.this") | .values.email_configuration[0].email_sending_account // "COGNITO_DEFAULT"')"
-          if [ "$ses_sender" = 'DEVELOPER' ]; then
-            test "$(aws sesv2 get-account --region "${{ vars.OPTIMIZED_AWS_REGION }}" --query 'ProductionAccessEnabled' --output text)" = 'True' || {
-              echo 'SES production access is required before switching Cognito to the branded sender.' >&2
+          if [ "${{ inputs.operation }}" = 'prepare-email' ]; then
+            terraform -chdir=infra/optimized/terraform/environment show -json approved.tfplan | jq -e 'all(.resource_changes[]?; .address != "aws_cognito_user_pool.this" or .change.actions == ["no-op"])' >/dev/null
+          else
+            ses_sender="$(terraform -chdir=infra/optimized/terraform/environment show -json approved.tfplan | jq -er '.planned_values.root_module.resources[] | select(.address == "aws_cognito_user_pool.this") | .values.email_configuration[0].email_sending_account // "COGNITO_DEFAULT"')"
+            if [ "$ses_sender" = 'DEVELOPER' ]; then
+              test "$(aws sesv2 get-account --region "${{ vars.OPTIMIZED_AWS_REGION }}" --query 'ProductionAccessEnabled' --output text)" = 'True' || {
+                echo 'SES production access is required before switching Cognito to the branded sender.' >&2
+                exit 1
+              }
+              test "$(aws ses get-identity-dkim-attributes --region "${{ vars.OPTIMIZED_AWS_REGION }}" --identities tryindus.ca --query 'DkimAttributes."tryindus.ca".DkimVerificationStatus' --output text)" = 'Success' || {
+                echo 'The tryindus.ca SES DKIM identity must be verified before switching Cognito.' >&2
+                exit 1
+              }
+              test "$(aws ses get-identity-mail-from-domain-attributes --region "${{ vars.OPTIMIZED_AWS_REGION }}" --identities tryindus.ca --query 'MailFromDomainAttributes."tryindus.ca".MailFromDomainStatus' --output text)" = 'Success' || {
+                echo 'The bounce.tryindus.ca MAIL FROM domain must be verified before switching Cognito.' >&2
+                exit 1
+              }
+            elif [ "$ses_sender" != 'COGNITO_DEFAULT' ]; then
+              echo "Unexpected Cognito sender in saved plan: $ses_sender" >&2
               exit 1
-            }
-          elif [ "$ses_sender" != 'COGNITO_DEFAULT' ]; then
-            echo "Unexpected Cognito sender in saved plan: $ses_sender" >&2
-            exit 1
+            fi
           fi
       - name: Apply approved saved plan
         run: |
