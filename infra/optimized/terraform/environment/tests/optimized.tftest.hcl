@@ -4,6 +4,7 @@ mock_provider "aws" {
   mock_data "aws_partition" { defaults = { partition = "aws" } }
   mock_data "aws_caller_identity" { defaults = { account_id = "111111111111" } }
   mock_data "aws_ssm_parameter" { defaults = { value = "ami-test" } }
+  mock_data "aws_route53_zone" { defaults = { zone_id = "Z0123456789EXAMPLE" } }
   mock_data "aws_iam_policy_document" {
     defaults = {
       json = "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
@@ -101,11 +102,10 @@ run "supplementary_monitoring_can_be_restored" {
   }
 }
 
-run "branded_cognito_confirmation_email_is_opt_in" {
+run "branded_cognito_confirmation_email_uses_ses" {
   command = plan
   variables {
     enable_branded_cognito_email = true
-    branded_email_zone_id        = "Z0123456789EXAMPLE"
   }
   assert {
     condition     = aws_cognito_user_pool.this.email_configuration[0].email_sending_account == "DEVELOPER"
@@ -116,12 +116,31 @@ run "branded_cognito_confirmation_email_is_opt_in" {
     error_message = "Branded email must use the existing production domain."
   }
   assert {
+    condition     = aws_route53_record.cognito_ses_verification[0].zone_id == data.aws_route53_zone.branded_email[0].zone_id
+    error_message = "SES verification must use the existing public hosted zone."
+  }
+  assert {
+    condition     = contains(aws_route53_record.cognito_dmarc[0].records, "v=DMARC1; p=none")
+    error_message = "The sender domain must publish a monitoring-only DMARC policy."
+  }
+  assert {
     condition     = strcontains(aws_cognito_user_pool.this.verification_message_template[0].email_message, "{####}")
     error_message = "The branded verification template must include Cognito's confirmation code placeholder."
   }
   assert {
     condition     = aws_cognito_user_pool.this.verification_message_template[0].default_email_option == "CONFIRM_WITH_CODE"
     error_message = "Branded verification must keep users in the Indus code-entry experience."
+  }
+}
+
+run "default_cognito_sender_can_be_restored" {
+  command = plan
+  variables {
+    enable_branded_cognito_email = false
+  }
+  assert {
+    condition     = length(aws_cognito_user_pool.this.email_configuration) == 0 && length(aws_ses_domain_identity.cognito) == 0
+    error_message = "Disabling the production switch must restore Cognito's default sender."
   }
 }
 

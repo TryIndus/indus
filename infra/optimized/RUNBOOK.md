@@ -44,8 +44,7 @@ interrupts service.
    Record the bucket, KMS key, optimized ECR repositories, Terraform role, and
    release role. Do not reuse main's state bucket or state key.
 4. Copy the environment backend and variables examples to ignored files. Select
-   a VPC CIDR that does not overlap main, a branded-email domain only if that
-   optional feature will be enabled, two AZs, and optimized bootstrap ECR ARNs.
+   a VPC CIDR that does not overlap main, two AZs, and optimized bootstrap ECR ARNs.
    Use the second RDS subnet for the DB subnet group only. Review the saved
    plan before apply. The production hostname is `tryindus.ca`, which points
    directly to the host Elastic IP; this profile does not create or require a
@@ -66,15 +65,17 @@ accounts, resend cooldowns, and password-reset codes. Cognito MFA remains off.
 The optimized pool has its own users and issuer; it does not inherit main-pool
 accounts.
 
-`enable_branded_cognito_email` defaults to `false`. Setting it to `true` in the
-private optimized Terraform variables configures Cognito to send the Indus HTML
-verification template through SES. Set `branded_email_zone_id` to the existing
-`tryindus.ca` hosted-zone ID before enabling it; Terraform then creates the SES
-identity and DKIM records there without creating a second hosted zone. Confirm
-SES can send to arbitrary recipients in this region. SES may otherwise remain
-in its sandbox, where signup delivery is restricted. Keep the flag false until
-those prerequisites are ready; Cognito's standard sender continues to work
-meanwhile.
+`production-email.auto.tfvars` enables branded Cognito email for this production
+profile and overrides any older `enable_branded_cognito_email = false` in the
+private `terraform.tfvars`. Terraform looks up the existing public `tryindus.ca`
+hosted zone and creates the SES identity, ownership, DKIM, and DMARC records
+there. The bootstrap Terraform role must be updated first to grant SES identity
+management and Cognito email service-role creation. Request SES production
+access in `us-east-1` before applying the environment plan: the apply workflow
+checks `ProductionAccessEnabled` and stops before applying the saved plan if
+the account remains in the SES sandbox. The default Cognito sender remains
+active until the approved environment apply succeeds. See the
+[email runbook](../../docs/runbooks/cognito-email.md) for verification and rollback.
 
 The optimized bootstrap creates its own plan, apply, release, and host IAM
 roles. These are roles in the configured AWS account, not new human IAM users.

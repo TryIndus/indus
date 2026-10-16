@@ -22,9 +22,8 @@ approved load test.
 
 The host retains an Elastic IP because the production apex record points
 directly to it. There is no separate `optimized.tryindus.ca` hosted zone or
-endpoint. If branded Cognito email is enabled later, supply the existing
-`tryindus.ca` hosted-zone ID through `branded_email_zone_id`; do not create a
-second hosted zone.
+endpoint. Branded Cognito email uses a Route 53 lookup of the existing
+`tryindus.ca` public hosted zone; it does not create a second hosted zone.
 
 Bootstrap starts with local state because it creates the backend bucket. After
 an operator has reviewed and applied it, migrate bootstrap state to the bucket

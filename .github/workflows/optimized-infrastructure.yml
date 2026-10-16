@@ -86,7 +86,17 @@ jobs:
         with:
           name: optimized-approved-plan
           path: infra/optimized/terraform/environment
+      - name: Initialize optimized Terraform
+        run: terraform -chdir=infra/optimized/terraform/environment init -input=false -lockfile=readonly -backend-config=backend.hcl
+      - name: Require production sending for SES plans
+        run: |
+          set -euo pipefail
+          if terraform -chdir=infra/optimized/terraform/environment show -json approved.tfplan | jq -e '.planned_values.root_module.resources[] | select(.address == "aws_cognito_user_pool.this") | .values.email_configuration[0].email_sending_account == "DEVELOPER"' >/dev/null; then
+            if [ "$(aws sesv2 get-account --region "${{ vars.OPTIMIZED_AWS_REGION }}" --query 'ProductionAccessEnabled' --output text)" != "True" ]; then
+              echo 'SES production access is required before switching Cognito to the branded sender.' >&2
+              exit 1
+            fi
+          fi
       - name: Apply approved saved plan
         run: |
-          terraform -chdir=infra/optimized/terraform/environment init -input=false -lockfile=readonly -backend-config=backend.hcl
           terraform -chdir=infra/optimized/terraform/environment apply -input=false approved.tfplan
