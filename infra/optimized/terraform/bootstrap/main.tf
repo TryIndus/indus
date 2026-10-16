@@ -194,6 +194,30 @@ data "aws_iam_policy_document" "terraform" {
   statement {
     effect = "Allow"
     actions = [
+      "ses:VerifyDomainIdentity", "ses:VerifyDomainDkim",
+      "ses:GetIdentityVerificationAttributes", "ses:GetIdentityDkimAttributes",
+      "ses:DeleteIdentity", "ses:GetAccount"
+    ]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = [var.aws_region]
+    }
+  }
+  statement {
+    effect    = "Allow"
+    actions   = ["iam:CreateServiceLinkedRole"]
+    resources = ["arn:${data.aws_partition.current.partition}:iam::${var.account_id}:role/aws-service-role/email.cognito-idp.amazonaws.com/AWSServiceRoleForAmazonCognitoIdpEmailService"]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:AWSServiceName"
+      values   = ["email.cognito-idp.amazonaws.com"]
+    }
+  }
+  statement {
+    effect = "Allow"
+    actions = [
       "iam:AddRoleToInstanceProfile", "iam:AttachRolePolicy", "iam:CreateInstanceProfile",
       "iam:CreateRole", "iam:DeleteInstanceProfile", "iam:DeleteRole", "iam:DeleteRolePolicy",
       "iam:DetachRolePolicy", "iam:GetInstanceProfile", "iam:GetRole", "iam:GetRolePolicy", "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole",
