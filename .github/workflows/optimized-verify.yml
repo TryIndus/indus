@@ -48,3 +48,18 @@ jobs:
           docker compose --env-file infra/optimized/runtime/release.env.example -f infra/optimized/runtime/compose.yaml config >/dev/null
           docker run --rm --env INDUS_HOSTNAME=optimized.example.com --volume "$PWD/infra/optimized/runtime/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           bash -n scripts/optimized/install-release.sh infra/optimized/runtime/bootstrap.sh
+      - name: Check optional Temporal worker and Valkey access
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file infra/optimized/runtime/release.env.example -f infra/optimized/runtime/compose.yaml)
+          default_services="$(env -u COMPOSE_PROFILES "${compose[@]}" config --services)"
+          if grep -qx research-worker <<< "$default_services"; then
+            echo "Temporal worker must stay disabled by default" >&2
+            exit 1
+          fi
+          COMPOSE_PROFILES=temporal "${compose[@]}" config --services | grep -qx research-worker
+          "${compose[@]}" config --format json | jq -e '(.services.valkey.ports // []) | length == 0' >/dev/null
+          trap '"${compose[@]}" down --volumes' EXIT
+          "${compose[@]}" up --detach --wait valkey
+          [[ "$("${compose[@]}" run --rm --no-deps --entrypoint valkey-cli valkey -h valkey ping)" == PONG ]]

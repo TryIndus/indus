@@ -82,6 +82,7 @@ services:
     restart: unless-stopped
 
   research-worker:
+    profiles: [temporal]
     image: ${RESEARCH_WORKER_IMAGE:?Set RESEARCH_WORKER_IMAGE to a digest-pinned image}
     command: ["./bin/research-worker"]
     env_file:

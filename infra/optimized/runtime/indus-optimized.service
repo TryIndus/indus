@@ -10,7 +10,7 @@ WorkingDirectory=/opt/indus-optimized
 EnvironmentFile=/opt/indus-optimized/host.env
 ExecStartPre=/opt/indus-optimized/install-release.sh /opt/indus-optimized/release.env --refresh-secrets
 ExecStart=/usr/bin/docker compose --env-file /opt/indus-optimized/release.env up --detach --remove-orphans
-ExecStop=/usr/bin/docker compose --env-file /opt/indus-optimized/release.env down
+ExecStop=/usr/bin/docker compose --profile temporal --env-file /opt/indus-optimized/release.env down --remove-orphans
 TimeoutStartSec=10min
 
 [Install]
