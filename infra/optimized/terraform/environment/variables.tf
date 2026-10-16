@@ -70,12 +70,6 @@ variable "enable_branded_cognito_email" {
   type    = bool
   default = false
 }
-variable "branded_email_zone_id" {
-  type        = string
-  default     = null
-  nullable    = true
-  description = "Existing Route 53 hosted-zone ID for branded Cognito email DNS records. Required only when branded email is enabled."
-}
 variable "ecr_repository_arns" {
   type        = map(string)
   description = "Optimized bootstrap ECR repository ARNs. Supply as plain, non-secret configuration."

@@ -44,8 +44,7 @@ interrupts service.
    Record the bucket, KMS key, optimized ECR repositories, Terraform role, and
    release role. Do not reuse main's state bucket or state key.
 4. Copy the environment backend and variables examples to ignored files. Select
-   a VPC CIDR that does not overlap main, a branded-email domain only if that
-   optional feature will be enabled, two AZs, and optimized bootstrap ECR ARNs.
+   a VPC CIDR that does not overlap main, two AZs, and optimized bootstrap ECR ARNs.
    Use the second RDS subnet for the DB subnet group only. Review the saved
    plan before apply. The production hostname is `tryindus.ca`, which points
    directly to the host Elastic IP; this profile does not create or require a
@@ -56,9 +55,11 @@ interrupts service.
    optimized plan and apply role ARNs as `OPTIMIZED_PLAN_ROLE_ARN` and
    `OPTIMIZED_TERRAFORM_ROLE_ARN` respectively. Dispatch the manual
    `optimized-infrastructure` workflow from `main`. `plan` only reviews;
-   `apply` first saves an exact plan, publishes its readable form in the job
-   summary, then waits for approval of `optimized-production` before applying
-   that saved plan. Both jobs require the optimized state bucket and key.
+   `prepare-email` plans and applies only the SES identity and DNS dependencies;
+   `apply` reconciles the full environment after SES is ready. Both mutations
+   save an exact plan, publish its readable form in the job summary, and wait
+   for approval of `optimized-production` before applying it. Both jobs require
+   the optimized state bucket and key.
 
 The optimized web image uses the same `/auth` confirmation and recovery
 experience as the main application: signup codes, recoverable unconfirmed
@@ -66,15 +67,17 @@ accounts, resend cooldowns, and password-reset codes. Cognito MFA remains off.
 The optimized pool has its own users and issuer; it does not inherit main-pool
 accounts.
 
-`enable_branded_cognito_email` defaults to `false`. Setting it to `true` in the
-private optimized Terraform variables configures Cognito to send the Indus HTML
-verification template through SES. Set `branded_email_zone_id` to the existing
-`tryindus.ca` hosted-zone ID before enabling it; Terraform then creates the SES
-identity and DKIM records there without creating a second hosted zone. Confirm
-SES can send to arbitrary recipients in this region. SES may otherwise remain
-in its sandbox, where signup delivery is restricted. Keep the flag false until
-those prerequisites are ready; Cognito's standard sender continues to work
-meanwhile.
+`production-email.auto.tfvars` enables branded Cognito email for this production
+profile and overrides any older `enable_branded_cognito_email = false` in the
+private `terraform.tfvars`. Terraform looks up the existing public `tryindus.ca`
+hosted zone and creates the SES identity, ownership, DKIM, DMARC, and aligned
+MAIL FROM records there. Update the bootstrap Terraform role first, then run
+`prepare-email` and wait for the domain identity, DKIM, and MAIL FROM status to
+be successful. Request SES production access in `us-east-1` with the verified
+domain. The full `apply` checks those statuses and `ProductionAccessEnabled`
+before switching Cognito. The default Cognito sender remains active until the
+approved full environment apply succeeds. See the
+[email runbook](../../docs/runbooks/cognito-email.md) for verification and rollback.
 
 The optimized bootstrap creates its own plan, apply, release, and host IAM
 roles. These are roles in the configured AWS account, not new human IAM users.
