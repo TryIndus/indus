@@ -68,8 +68,8 @@ accounts.
 `production-email.auto.tfvars` enables branded Cognito email for this production
 profile and overrides any older `enable_branded_cognito_email = false` in the
 private `terraform.tfvars`. Terraform looks up the existing public `tryindus.ca`
-hosted zone and creates the SES identity, ownership, DKIM, and DMARC records
-there. The bootstrap Terraform role must be updated first to grant SES identity
+hosted zone and creates the SES identity, ownership, DKIM, DMARC, and aligned
+MAIL FROM records there. The bootstrap Terraform role must be updated first to grant SES identity
 management and Cognito email service-role creation. Request SES production
 access in `us-east-1` before applying the environment plan: the apply workflow
 checks `ProductionAccessEnabled` and stops before applying the saved plan if

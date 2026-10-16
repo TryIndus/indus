@@ -91,11 +91,15 @@ jobs:
       - name: Require production sending for SES plans
         run: |
           set -euo pipefail
-          if terraform -chdir=infra/optimized/terraform/environment show -json approved.tfplan | jq -e '.planned_values.root_module.resources[] | select(.address == "aws_cognito_user_pool.this") | .values.email_configuration[0].email_sending_account == "DEVELOPER"' >/dev/null; then
-            if [ "$(aws sesv2 get-account --region "${{ vars.OPTIMIZED_AWS_REGION }}" --query 'ProductionAccessEnabled' --output text)" != "True" ]; then
+          ses_sender="$(terraform -chdir=infra/optimized/terraform/environment show -json approved.tfplan | jq -er '.planned_values.root_module.resources[] | select(.address == "aws_cognito_user_pool.this") | .values.email_configuration[0].email_sending_account // "COGNITO_DEFAULT"')"
+          if [ "$ses_sender" = 'DEVELOPER' ]; then
+            test "$(aws sesv2 get-account --region "${{ vars.OPTIMIZED_AWS_REGION }}" --query 'ProductionAccessEnabled' --output text)" = 'True' || {
               echo 'SES production access is required before switching Cognito to the branded sender.' >&2
               exit 1
-            fi
+            }
+          elif [ "$ses_sender" != 'COGNITO_DEFAULT' ]; then
+            echo "Unexpected Cognito sender in saved plan: $ses_sender" >&2
+            exit 1
           fi
       - name: Apply approved saved plan
         run: |

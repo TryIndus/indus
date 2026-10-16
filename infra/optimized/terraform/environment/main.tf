@@ -347,7 +347,7 @@ resource "aws_cognito_user_pool" "this" {
     temporary_password_validity_days = 3
   }
   tags       = local.common_tags
-  depends_on = [aws_ses_domain_identity_verification.cognito, aws_route53_record.cognito_dkim]
+  depends_on = [aws_ses_domain_identity_verification.cognito, aws_route53_record.cognito_dkim, aws_route53_record.cognito_mail_from_mx, aws_route53_record.cognito_mail_from_spf]
 }
 data "aws_route53_zone" "branded_email" {
   count        = var.enable_branded_cognito_email ? 1 : 0
@@ -374,6 +374,29 @@ resource "aws_ses_domain_identity_verification" "cognito" {
 resource "aws_ses_domain_dkim" "cognito" {
   count  = var.enable_branded_cognito_email ? 1 : 0
   domain = aws_ses_domain_identity.cognito[0].domain
+}
+resource "aws_ses_domain_mail_from" "cognito" {
+  count                  = var.enable_branded_cognito_email ? 1 : 0
+  domain                 = aws_ses_domain_identity.cognito[0].domain
+  mail_from_domain       = "bounce.${var.public_domain_name}"
+  behavior_on_mx_failure = "UseDefaultValue"
+  depends_on             = [aws_ses_domain_identity_verification.cognito]
+}
+resource "aws_route53_record" "cognito_mail_from_mx" {
+  count   = var.enable_branded_cognito_email ? 1 : 0
+  zone_id = data.aws_route53_zone.branded_email[0].zone_id
+  name    = aws_ses_domain_mail_from.cognito[0].mail_from_domain
+  type    = "MX"
+  ttl     = 300
+  records = ["10 feedback-smtp.${var.aws_region}.amazonses.com"]
+}
+resource "aws_route53_record" "cognito_mail_from_spf" {
+  count   = var.enable_branded_cognito_email ? 1 : 0
+  zone_id = data.aws_route53_zone.branded_email[0].zone_id
+  name    = aws_ses_domain_mail_from.cognito[0].mail_from_domain
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=spf1 include:amazonses.com ~all"]
 }
 resource "aws_route53_record" "cognito_dkim" {
   count   = var.enable_branded_cognito_email ? 3 : 0

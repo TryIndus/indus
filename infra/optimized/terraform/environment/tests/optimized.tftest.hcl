@@ -124,6 +124,10 @@ run "branded_cognito_confirmation_email_uses_ses" {
     error_message = "The sender domain must publish a monitoring-only DMARC policy."
   }
   assert {
+    condition     = aws_ses_domain_mail_from.cognito[0].mail_from_domain == "bounce.tryindus.ca" && contains(aws_route53_record.cognito_mail_from_spf[0].records, "v=spf1 include:amazonses.com ~all")
+    error_message = "The sender must use an aligned custom MAIL FROM domain with SES SPF."
+  }
+  assert {
     condition     = strcontains(aws_cognito_user_pool.this.verification_message_template[0].email_message, "{####}")
     error_message = "The branded verification template must include Cognito's confirmation code placeholder."
   }
@@ -139,7 +143,7 @@ run "default_cognito_sender_can_be_restored" {
     enable_branded_cognito_email = false
   }
   assert {
-    condition     = length(aws_cognito_user_pool.this.email_configuration) == 0 && length(aws_ses_domain_identity.cognito) == 0
+    condition     = length(aws_cognito_user_pool.this.email_configuration) == 0 && length(aws_ses_domain_identity.cognito) == 0 && length(aws_ses_domain_mail_from.cognito) == 0
     error_message = "Disabling the production switch must restore Cognito's default sender."
   }
 }

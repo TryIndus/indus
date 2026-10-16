@@ -196,6 +196,7 @@ data "aws_iam_policy_document" "terraform" {
     actions = [
       "ses:VerifyDomainIdentity", "ses:VerifyDomainDkim",
       "ses:GetIdentityVerificationAttributes", "ses:GetIdentityDkimAttributes",
+      "ses:SetIdentityMailFromDomain", "ses:GetIdentityMailFromDomainAttributes",
       "ses:DeleteIdentity", "ses:GetAccount"
     ]
     resources = ["*"]
