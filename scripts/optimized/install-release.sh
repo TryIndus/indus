@@ -46,7 +46,7 @@ install -d -m 0700 "$runtime_dir"
 available_kib="$(df -Pk "$release_dir" | awk 'NR == 2 { print $4 }')"
 [[ "$available_kib" =~ ^[0-9]+$ && "$available_kib" -ge 5242880 ]] || { echo "need at least 5 GiB free disk" >&2; exit 1; }
 memory_kib="$(awk '/MemTotal:/ { print $2 }' /proc/meminfo)"
-[[ "$memory_kib" =~ ^[0-9]+$ && "$memory_kib" -ge 3670016 ]] || { echo "need at least 3.5 GiB memory" >&2; exit 1; }
+[[ "$memory_kib" =~ ^[0-9]+$ && "$memory_kib" -ge 1835008 ]] || { echo "need at least 1.75 GiB memory" >&2; exit 1; }
 refresh_secrets() {
   for secret in platform-api market-data research-worker; do
     arn_file="$release_dir/${secret}.secret-arn"

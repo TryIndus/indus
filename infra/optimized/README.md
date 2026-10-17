@@ -9,16 +9,16 @@ repositories, VPC, EC2 host, standard RDS PostgreSQL database, S3 artifact
 bucket, Cognito pool, secrets, and deployment workflow. It never uses a
 Terraform remote-state reference to main.
 
-The runtime is deliberately single-host and single-AZ: one `t3a.medium`
+The runtime is deliberately single-host and single-AZ: one `t3a.small`
 EC2 host, local persistent Valkey, and one `db.t4g.micro`
 RDS instance. The database subnet group includes a second empty
 subnet in a second AZ because RDS requires it; it does not create a standby.
 There is no EKS, Aurora, RDS Proxy, MSK, ElastiCache, ALB, CloudFront, or NAT
 gateway.
 
-The host keeps 4 GiB of memory for the complete multi-process container set.
-Do not reduce it to `t3a.small` without measured memory headroom and an
-approved load test.
+The host target is 2 GiB. Apply the resize only after deploying an application
+release with working Valkey access, completing a report, and measuring host and
+container memory for 24 hours as described in the [runbook](./RUNBOOK.md).
 
 The host retains an Elastic IP because the production apex record points
 directly to it. There is no separate `optimized.tryindus.ca` hosted zone or
