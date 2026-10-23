@@ -185,6 +185,11 @@ preserving the request path and query string. DNS caches can retain a replaced
 record until its previous TTL expires; certificate issuance can retry during
 that interval. Verify HTTPS without bypassing certificate validation.
 
+Run `node --test scripts/optimized/web-proxy.test.mjs` with Docker available
+to verify the redirect and canonical SPA routing locally. The test uses the
+production-pinned Caddy image with a disposable local CA; it does not contact
+AWS or request public certificates.
+
 For a live repair before a replacement web image is available, preserve the
 running Caddyfile under `/opt/indus-optimized/ops-backups/`, validate the updated
 file with the running Caddy binary, and install it as
