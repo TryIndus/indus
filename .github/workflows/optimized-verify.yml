@@ -46,6 +46,15 @@ jobs:
           node --test scripts/capacity/*.test.mjs
           bash scripts/optimized/validate-isolation.sh
           docker compose --env-file infra/optimized/runtime/release.env.example -f infra/optimized/runtime/compose.yaml config >/dev/null
-          docker run --rm --env INDUS_HOSTNAME=optimized.example.com --volume "$PWD/infra/optimized/runtime/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker build --target proxy-runtime --tag indus-optimized-proxy:ci --file infra/optimized/images/web/Dockerfile .
+          docker run --rm --env INDUS_HOSTNAME=optimized.example.com indus-optimized-proxy:ci caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           node --test scripts/optimized/*.test.mjs
           bash -n scripts/optimized/install-release.sh infra/optimized/runtime/bootstrap.sh
+      - name: Scan optimized proxy runtime
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: indus-optimized-proxy:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH

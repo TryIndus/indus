@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const docker = (...args) => execFileSync('docker', args, {
-  cwd: root, encoding: 'utf8', timeout: 120_000, stdio: ['ignore', 'pipe', 'pipe'],
+  cwd: root, encoding: 'utf8', timeout: args[0] === 'build' ? 480_000 : 120_000,
+  stdio: ['ignore', 'pipe', 'pipe'],
 }).trim();
 
 function request({ port, host, path = '/', ca, method = 'GET' }) {
@@ -35,7 +36,7 @@ function request({ port, host, path = '/', ca, method = 'GET' }) {
   });
 }
 
-test('optimized proxy hostname routing over HTTP and verified HTTPS', { timeout: 180_000 }, async (t) => {
+test('optimized proxy hostname routing over HTTP and verified HTTPS', { timeout: 600_000 }, async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'indus-web-proxy-'));
   let container;
   t.after(() => {
@@ -48,9 +49,9 @@ test('optimized proxy hostname routing over HTTP and verified HTTPS', { timeout:
 
   // Exercise the checked-in routing with the production image. Only certificate
   // issuance is changed: a disposable local CA replaces public ACME services.
-  const dockerfile = readFileSync(join(root, 'infra/optimized/images/web/Dockerfile'), 'utf8');
-  const image = dockerfile.match(/^FROM (caddy:\S+@sha256:[a-f0-9]{64})$/m)?.[1];
-  assert.ok(image, 'the production web image must pin Caddy by digest');
+  const image = docker('build', '--quiet', '--target', 'proxy-runtime',
+    '--file', 'infra/optimized/images/web/Dockerfile', '.');
+  assert.match(image, /^sha256:[a-f0-9]{64}$/, 'test the built production proxy runtime');
   const config = readFileSync(join(root, 'infra/optimized/runtime/Caddyfile'), 'utf8');
   writeFileSync(join(directory, 'Caddyfile'), `{\n  local_certs\n  admin off\n}\n\n${config}`);
   mkdirSync(join(directory, 'site'));
