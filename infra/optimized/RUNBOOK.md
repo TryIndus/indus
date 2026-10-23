@@ -1,244 +1,167 @@
 # Optimized AWS operations
 
-## Purpose and topology
+This runbook covers `infra/optimized`. See the [profile overview](README.md)
+for topology and the [cost worksheet](COSTS.md) for sizing and spend. Use
+reviewed plans and explicit authorization for applies, releases, DNS changes,
+and data recovery.
 
-The optimized profile is an independent AWS configuration for the Indus
-application. It does not share Terraform state or resource ownership with the
-main configuration.
+## Operating constraints
 
-```mermaid
-flowchart LR
-  User -->|HTTPS| EC2[EC2 host in AZ A]
-  EC2 --> Caddy
-  Caddy --> Rails
-  Caddy --> Rust[Market data / SSE]
-  Rails --> Valkey[Local persistent Valkey]
-  Rails --> RDS[(Single-AZ RDS PostgreSQL)]
-  Rust --> RDS
-  RDS --- DBSubnetA[Private DB subnet A]
-  RDS --- DBSubnetB[Empty private DB subnet B]
-  Rails --> S3[Optimized report artifacts]
-  Rails --> Cognito[Optimized Cognito pool]
+- One application host and one private RDS instance run in one AZ. Host or AZ
+  failure interrupts service. The second database subnet provides no standby.
+- Access the host through SSM; only HTTP and HTTPS are exposed publicly.
+- Keep optimized state, resources, IAM roles, secrets, and Cognito identities
+  separate from the main profile. The account-level OIDC provider and an
+  authorized operator identity can be reused.
+- Valkey persists to EBS, but abrupt host loss can lose recent queue work.
+- Monitor memory, CPU credits, disk, database connections, latency, ingestion,
+  and Sidekiq backlog. Retain 4 GiB host memory until a load test supports less.
+
+## Provision
+
+1. Create GitHub Environments `optimized-production-plan` and
+   `optimized-production`, restricted to `main`. Require approval on the latter.
+2. Copy the [bootstrap variables example](terraform/bootstrap/terraform.tfvars.example)
+   to its ignored counterpart. Supply the account ID and existing OIDC provider
+   ARN. Initialize Terraform, review a saved plan, and apply the bootstrap.
+3. Migrate bootstrap state into the new optimized backend with a reviewed
+   `terraform init -migrate-state`. Record the backend bucket, KMS key, ECR
+   repositories, and role ARNs. Do not reuse the main profile's state.
+4. Configure ignored files from the environment
+   [backend](terraform/environment/backend.hcl.example) and
+   [variables](terraform/environment/terraform.tfvars.example) examples. Choose
+   a nonoverlapping VPC CIDR, two AZs, and optimized ECR ARNs. The second AZ
+   needs only the private subnet required by the RDS subnet group.
+5. Configure these settings in both GitHub Environments:
+
+   | Setting | Value |
+   | --- | --- |
+   | `OPTIMIZED_TF_BACKEND_CONFIG_B64` | Base64-encoded private backend file |
+   | `OPTIMIZED_TF_VARS_B64` | Base64-encoded private variables file |
+   | `OPTIMIZED_AWS_REGION` | Optimized region |
+   | `OPTIMIZED_PLAN_ROLE_ARN` | Optimized plan role |
+   | `OPTIMIZED_TERRAFORM_ROLE_ARN` | Optimized apply role |
+
+6. Dispatch `optimized-infrastructure` from `main`. `plan` previews changes;
+   `apply` saves a plan and publishes its summary, then waits for approval
+   before applying that exact plan.
+
+RDS uses `apply_immediately`: inspect pending modifications before every apply.
+The [capacity retry workflow](../../scripts/capacity/README.md) permits only its
+approved resize, rejects pending changes, and retries capacity errors. A
+successful resize interrupts connections and opens a follow-up issue.
+
+## Secrets and identity
+
+Terraform creates secret containers; an audited operator supplies their values
+in Docker env-file format (`KEY=value`, one per line). Keep credentials out of
+Terraform, user data, release manifests, and workflow output.
+
+| Service | Configuration |
+| --- | --- |
+| Rails and workers | TLS-required `DATABASE_URL`, optimized Cognito issuer/client/UserInfo URL, web origin, artifact bucket, model provider, and Temporal Cloud settings as applicable |
+| Market data | TLS-required `DATABASE_URL`, `MARKET_JWKS_URL`, `MARKET_JWT_ISSUER`, `MARKET_JWT_AUDIENCE`, `MARKET_ALLOWED_ORIGINS`, and Alpaca credentials |
+
+Use the RDS-managed master secret to provision a PostgreSQL runtime role with
+the database and schema privileges required by Rails and Rust. Do not configure
+Kafka or ElastiCache IAM settings here. To rotate secrets, update Secrets
+Manager and restart the optimized systemd service; startup refreshes the
+root-owned files under `/run/indus-optimized`.
+
+The Cognito pool has its own users and issuer; MFA is off. Before enabling
+`enable_branded_cognito_email`, confirm SES production sending access in the
+region and set `branded_email_zone_id` to the existing `tryindus.ca` zone.
+Terraform creates the SES identity and DKIM records there. Keep the flag off
+until delivery prerequisites are met; the default Cognito sender remains available.
+
+## Publish and deploy
+
+1. Set public GitHub variables `OPTIMIZED_WEB_ORIGIN`,
+   `OPTIMIZED_COGNITO_AUTHORITY`, and `OPTIMIZED_COGNITO_CLIENT_ID` from the
+   optimized outputs. Set the instance ID, release-role ARN, and runtime secret
+   ARNs in the deployment environment. See the
+   [release workflow](../../.github/workflows/optimized-application.yml) for names.
+2. Dispatch `optimized-application` with `publish`. It scans and pushes images,
+   then opens a PR updating `releases/production.env` with immutable digests.
+   Review and merge that manifest.
+3. Dispatch `deploy` from `main`. The host fetches its secrets, pulls pinned
+   images, runs the Rails migration job, and starts the application.
+4. Verify health. The installer checks that `web-proxy` is running; this alone
+   does not establish application readiness.
+
+Check Rails `/readyz`, Rust `/health/ready`, an authenticated `/api/v1/...`
+request, and authenticated SSE for `AAPL` and slash-delimited crypto such as
+`BTC/USD`, including reconnection with a replay cursor. Caddy serves the SPA,
+routes `/api` to Rails, and routes `/stream` to Rust without SSE buffering.
+
+## DNS and www
+
+Use the existing authoritative Route 53 zone:
+
+| Name | Record | Target |
+| --- | --- | --- |
+| `tryindus.ca` | A | Host Elastic IP |
+| `www.tryindus.ca` | CNAME | `tryindus.ca` |
+
+Replace any registrar-forwarding `www` record. Keep ports 80 and 443 reachable
+for HTTPS and certificate renewal. Caddy serves both names and permanently
+redirects `www` to the apex, preserving paths and queries. Allow the previous
+DNS TTL to expire, then verify without disabling certificate validation:
+
+```bash
+curl --head 'https://www.tryindus.ca/research?symbol=BTC%2FUSD'
 ```
 
-The EC2 host runs in a public subnet in AZ A with an Elastic IP and only ports
-80 and 443 open. RDS is private in AZ A and accepts PostgreSQL only from the
-host security group. A private subnet in AZ B is a member of the RDS subnet
-group but has no running resource, no NAT, and no standby. The subnet itself
-does not have a separate hourly cost. The topology has a single application
-host and a single database instance, so either host failure or AZ A failure
-interrupts service.
+Expect `301` with `Location: https://tryindus.ca/research?symbol=BTC%2FUSD`.
+Run `node --test scripts/optimized/web-proxy.test.mjs` with Docker for isolated
+routing tests using the production-pinned image and a trusted temporary CA.
+These tests do not access AWS or request public certificates.
 
-## Bootstrap and provision
+### Temporary proxy repair
 
-1. Create GitHub Environments named `optimized-production-plan` and
-   `optimized-production`, both restricted to `main`. Require human approval
-   on `optimized-production`. Create the GitHub OIDC provider at the account
-   boundary if it does not already exist.
-2. Copy `infra/optimized/terraform/bootstrap/terraform.tfvars.example` to its
-   ignored counterpart. Supply the account ID and operator-supplied OIDC provider
-   ARN. Run `terraform init`, save and review `terraform plan`, then apply only
-   with explicit authorization. The bootstrap state begins locally because it
-   creates the backend.
-3. Migrate the reviewed bootstrap state into the new optimized state bucket.
-   Record the bucket, KMS key, optimized ECR repositories, Terraform role, and
-   release role. Do not reuse main's state bucket or state key.
-4. Copy the environment backend and variables examples to ignored files. Select
-   a VPC CIDR that does not overlap main, a branded-email domain only if that
-   optional feature will be enabled, two AZs, and optimized bootstrap ECR ARNs.
-   Use the second RDS subnet for the DB subnet group only. Review the saved
-   plan before apply. The production hostname is `tryindus.ca`, which points
-   directly to the host Elastic IP; this profile does not create or require a
-   second hosted zone or a delegated subdomain. In the authoritative Route 53
-   zone, point `www.tryindus.ca` to `tryindus.ca` with a CNAME. The web proxy
-   serves HTTPS for `www` and permanently redirects requests, including their
-   paths and query strings, to the apex hostname. Remove any old `www` record
-   pointing to a registrar forwarding service before creating the CNAME.
-5. Put the base64-encoded ignored backend and variable files in both
-   environments as `OPTIMIZED_TF_BACKEND_CONFIG_B64` and
-   `OPTIMIZED_TF_VARS_B64`. Set `OPTIMIZED_AWS_REGION` in both, and set the
-   optimized plan and apply role ARNs as `OPTIMIZED_PLAN_ROLE_ARN` and
-   `OPTIMIZED_TERRAFORM_ROLE_ARN` respectively. Dispatch the manual
-   `optimized-infrastructure` workflow from `main`. `plan` only reviews;
-   `apply` first saves an exact plan, publishes its readable form in the job
-   summary, then waits for approval of `optimized-production` before applying
-   that saved plan. Both jobs require the optimized state bucket and key.
+If a repair must precede the updated web image:
 
-The optimized web image uses the same `/auth` confirmation and recovery
-experience as the main application: signup codes, recoverable unconfirmed
-accounts, resend cooldowns, and password-reset codes. Cognito MFA remains off.
-The optimized pool has its own users and issuer; it does not inherit main-pool
-accounts.
+1. Back up the running Caddyfile under `/opt/indus-optimized/ops-backups/`.
+2. Validate the replacement with the running Caddy binary and install it as
+   `/opt/indus-optimized/www-redirect.Caddyfile`.
+3. Mount it read-only at `/etc/caddy/Caddyfile` for `web-proxy` through
+   `/opt/indus-optimized/compose.override.yaml`. Validate the merged Compose
+   configuration and recreate only `web-proxy` with `up -d --no-deps web-proxy`.
+4. After deploying an image containing the redirect, compare its Caddyfile with
+   the mounted file, remove only that mount, and recreate `web-proxy`. Preserve
+   unrelated override settings; delete the override file only if empty.
 
-`enable_branded_cognito_email` defaults to `false`. Setting it to `true` in the
-private optimized Terraform variables configures Cognito to send the Indus HTML
-verification template through SES. Set `branded_email_zone_id` to the existing
-`tryindus.ca` hosted-zone ID before enabling it; Terraform then creates the SES
-identity and DKIM records there without creating a second hosted zone. Confirm
-SES can send to arbitrary recipients in this region. SES may otherwise remain
-in its sandbox, where signup delivery is restricted. Keep the flag false until
-those prerequisites are ready; Cognito's standard sender continues to work
-meanwhile.
+The override survives releases and restarts. To undo a repair, restore the prior
+DNS record and proxy configuration and recreate `web-proxy`. A plain apex A
+record provides no automatic Vercel failover.
 
-The optimized bootstrap creates its own plan, apply, release, and host IAM
-roles. These are roles in the configured AWS account, not new human IAM users.
-An existing MFA-backed operator identity with permission to bootstrap the
-optimized stack can be reused. The account-level GitHub OIDC provider can also
-be reused if it already exists; the optimized workflow still needs its own
-GitHub environment approvals and role ARN variables.
+## Rollback and recovery
 
-`enable_supplementary_monitoring` defaults to `false`, matching the optional
-monitoring switch in the main profile. With the flag off, optimized has no
-CloudWatch alarms, SNS alert topic, RDS event subscription, Route 53 HTTPS
-health check, monthly budget notification, RDS Performance Insights, or
-CloudWatch agent metric publication. AWS basic EC2 and RDS metrics, RDS backups,
-local bounded Docker logs, and SSM host access remain available. Operators must
-check service health and spend directly while notifications are disabled.
+| Failure | Procedure |
+| --- | --- |
+| Bad release | Review `/opt/indus-optimized/previous-release.env`, restore the prior manifest through the release process, and dispatch `deploy`. Installer startup failure also attempts to restore the saved manifest. Verify health afterward. |
+| Lost host | Replace it through a reviewed plan, restore configuration and secrets, and verify health before switching DNS. Recover Valkey from available backups; account for lost recent queue work. |
+| Database damage | Restore a tested RDS backup and reconcile writes after the recovery point. Image rollback does not undo migrations or data writes; schema corrections are forward-only. |
+| Identity migration | Map subjects through an audited process. Rails ownership uses `(issuer, external_subject)`; changing Cognito pools does not preserve ownership automatically. |
 
-The [capacity retry workflow](../../scripts/capacity/README.md) periodically
-retries the approved in-place RDS class change when AWS reports insufficient
-capacity for the desired class. It uses the optimized production GitHub OIDC
-role and Terraform state, so no repeated operator MFA is needed. Its saved-plan
-guard permits only the `aws_db_instance.this` `instance_class` update to
-`db.t4g.micro` plus the `apply_immediately` scheduling flag; it does not
-reconcile unrelated infrastructure. It first rejects any pending RDS changes,
-since applying immediately would include those too. The accepted resize
-interrupts database connections while RDS applies it. Once the target size is
-reached, the workflow opens a GitHub issue for follow-up health verification.
-If issue creation fails after the resize, the next no-op run retries the
-notification without resizing again. Scheduled capacity errors leave the
-existing database running and are retried on the next run.
-The Terraform `apply_immediately` setting also affects future RDS changes in
-this profile; inspect pending modifications before manual infrastructure applies.
+## Monitoring
 
-To restore supplementary monitoring, set the flag to `true` in optimized's
-private Terraform variables and apply a reviewed plan. The plan also updates
-the optimized SSM monitoring setting and host agent permission. After apply,
-run `/opt/indus-optimized/install-release.sh /opt/indus-optimized/release.env
---reconcile-monitoring` on the optimized host through SSM with `AWS_REGION` set
-to the optimized region; this starts the CloudWatch agent without restarting the
-application. Confirm the agent is active and accept the SNS email subscription.
-Use the same procedure after setting the flag back to `false`; the host stops
-the agent. A subsequent app service start also reconciles the setting.
+`enable_supplementary_monitoring` defaults to `false`. Basic EC2/RDS metrics,
+RDS backups, bounded Docker logs, and SSM remain available. Check health and
+spend directly while notifications are disabled.
 
-Terraform creates secret containers only. Add runtime secret values through an
-audited operator session. Do not place database, Alpaca, Gemini, Temporal, or
-Cognito migration values in Terraform, user data, source, workflow output, or
-release manifests.
+1. To change monitoring, update the flag in private variables and apply a
+   reviewed plan.
+2. Through SSM, run this on the host with `AWS_REGION` set:
 
-Create a least-privilege PostgreSQL runtime role from an audited operator
-session using the RDS-managed master secret. Give it only the database and
-schema privileges needed by the Rails and Rust migrations and runtime; store
-its TLS-required `DATABASE_URL` in each relevant optimized runtime secret.
-Each secret value must be a Docker env-file payload with one `KEY=value` entry
-per line. Keep the optimized Cognito issuer, client, UserInfo URL, web origin,
-artifact bucket, Temporal Cloud configuration, and model provider configuration
-in the appropriate service secret. Set `MARKET_JWKS_URL`,
-`MARKET_JWT_ISSUER`, `MARKET_JWT_AUDIENCE`, `MARKET_ALLOWED_ORIGINS`, and
-Alpaca credentials for market data. Never set Kafka or ElastiCache IAM
-variables in this profile. Rotate a value in Secrets Manager and restart the
-optimized systemd service to refresh its root-owned `/run` secret files.
+   ```bash
+   /opt/indus-optimized/install-release.sh \
+     /opt/indus-optimized/release.env --reconcile-monitoring
+   ```
 
-## Release and operations
+3. Verify the CloudWatch agent state. When enabled, confirm SNS subscriptions
+   and test alarm delivery. Reconciliation does not restart the application.
 
-Set the optimized public browser variables from the optimized environment
-outputs: `OPTIMIZED_WEB_ORIGIN`, `OPTIMIZED_COGNITO_AUTHORITY`, and
-`OPTIMIZED_COGNITO_CLIENT_ID`. Configure the optimized instance ID and the
-three runtime secret ARNs as non-secret GitHub Environment variables. The
-release role is restricted to optimized ECR and tagged SSM targets.
-
-Dispatch `optimized-application` with `publish`. It scans and pushes immutable
-images, then opens a pull request that changes only
-`infra/optimized/releases/production.env`. Review and merge that digest manifest.
-Dispatch it with `deploy` from `main` only after that merge. The host fetches
-its own secret values with its instance profile; the workflow never receives
-them. The deployment checks digest pinning, pulls images, runs exactly one
-Rails migration job, starts workers and market data, then starts Caddy.
-
-The host uses Systems Manager; there is no SSH access. Caddy terminates HTTPS,
-serves the SPA, proxies `/api` to Rails, and proxies `/stream` to Rust with
-SSE buffering disabled. The Valkey AOF volume sits on the encrypted EBS volume.
-An abrupt host loss can lose recent queue work; do not represent it as a durable
-replacement for a separate managed cache.
-The AL2023 AMI provides AWS CLI v2, while bootstrap installs Docker and a
-checksum-verified Compose plugin. The systemd service refreshes secrets on
-reboot before starting containers. Review the saved prior manifest at
-`/opt/indus-optimized/previous-release.env` before a rollback. A failed new
-release restores those prior image digests, but does not reverse a database
-migration.
-
-Keep `tryindus.ca` pointed at the optimized Elastic IP and leave port 80
-reachable so ACME can issue and renew its
-certificate. Caddy redirects HTTP to HTTPS after issuance and renews the
-certificate while the hostname and port 80 remain reachable. Verify Rails
-`/readyz`, Rust `/health/ready`, authenticated `/api/v1/...`, and an
-authenticated `/stream/v1/streams/AAPL` connection after a separately
-authorized deployment; repeat with a slash-delimited crypto symbol and a
-reconnect cursor.
-
-### Domain alias repair
-
-Keep the apex A record pointed at the host Elastic IP and use a CNAME from
-`www` to the apex in the existing authoritative Route 53 zone. The web image's
-Caddyfile terminates HTTPS for both names and redirects `www` to the apex while
-preserving the request path and query string. DNS caches can retain a replaced
-record until its previous TTL expires; certificate issuance can retry during
-that interval. Verify HTTPS without bypassing certificate validation.
-
-Run `node --test scripts/optimized/web-proxy.test.mjs` with Docker available
-to verify the redirect and canonical SPA routing locally. The test uses the
-production-pinned Caddy image with a disposable local CA; it does not contact
-AWS or request public certificates.
-
-For a live repair before a replacement web image is available, preserve the
-running Caddyfile under `/opt/indus-optimized/ops-backups/`, validate the updated
-file with the running Caddy binary, and install it as
-`/opt/indus-optimized/www-redirect.Caddyfile`. A host-local
-`/opt/indus-optimized/compose.override.yaml` can mount that file read-only at
-`/etc/caddy/Caddyfile` for `web-proxy`. Validate the merged Compose configuration
-and recreate only `web-proxy` with `up -d --no-deps web-proxy`. This override
-persists across host restarts and normal releases. After deploying a web image
-that includes the alias, compare the image's Caddyfile with the mounted file,
-remove only the Caddyfile mount from the override, and recreate only `web-proxy`
-so subsequent image updates again control the proxy configuration. Preserve
-any unrelated override settings; remove the override file only if it is empty.
-To roll back the repair, restore the
-previous DNS record and Caddyfile and recreate only `web-proxy`.
-
-A simple apex A record does not provide automatic Vercel failover. Inspect the
-live Route 53 record's routing policy and health checks before treating any
-retained Vercel deployment as a fallback. References to legacy traffic weights
-in older runbooks do not establish an active DNS fallback.
-
-For image rollback, restore a prior reviewed manifest and dispatch `deploy`.
-Schema migrations are forward-only: an image rollback must remain compatible
-with the migrated schema. For host recovery, replace the instance through a
-reviewed Terraform plan, restore runtime configuration and secrets, then test
-health before restoring DNS. Restore RDS from a tested backup when data repair
-is required.
-
-## Identity and data recovery
-
-The Cognito issuer and user subjects belong to this profile. Rails keys
-ownership by `(issuer, external_subject)`; changing identity pools or restoring
-data from another environment requires an audited subject mapping. An image
-rollback does not revert identity or database writes. Restore data from tested
-backups and reconcile any writes made after the recovery point.
-
-## Capacity, cost, and monitoring
-
-The configured `t3a.medium` and `db.t4g.micro` sizes require capacity monitoring.
-Measure memory, CPU credits, disk, database connections, latency, market
-ingestion, and Sidekiq backlog under representative load. The host retains
-4 GiB because the full process set has not been demonstrated within 2 GiB;
-resize only after measuring headroom.
-
-Budget for EC2 and any burst credits, EBS, public IPv4, RDS compute/storage/
-backups/I/O, S3, Cognito and optional SES, ECR, KMS/Secrets Manager, Route 53,
-CloudWatch, and data transfer. The profile
-omits the large recurring EKS, Aurora, Proxy, MSK, ElastiCache, ALB, CloudFront,
-and NAT charges. With supplementary monitoring enabled, it creates alarms for
-EC2 status, memory and disk pressure, RDS CPU, storage and connections, RDS
-backup/failure events, HTTPS readiness, and a tagged budget. Confirm SNS email
-subscriptions and alarm delivery when notifications are enabled;
-pending email confirmations receive no alerts.
+The flag controls CloudWatch alarms and agent metrics, SNS, RDS events and
+Performance Insights, an HTTPS health check, and budget notifications. A later
+application start also reconciles the agent setting.
