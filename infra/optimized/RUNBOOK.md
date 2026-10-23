@@ -49,7 +49,11 @@ interrupts service.
    Use the second RDS subnet for the DB subnet group only. Review the saved
    plan before apply. The production hostname is `tryindus.ca`, which points
    directly to the host Elastic IP; this profile does not create or require a
-   second hosted zone or a delegated subdomain.
+   second hosted zone or a delegated subdomain. In the authoritative Route 53
+   zone, point `www.tryindus.ca` to `tryindus.ca` with a CNAME. The web proxy
+   serves HTTPS for `www` and permanently redirects requests, including their
+   paths and query strings, to the apex hostname. Remove any old `www` record
+   pointing to a registrar forwarding service before creating the CNAME.
 5. Put the base64-encoded ignored backend and variable files in both
    environments as `OPTIMIZED_TF_BACKEND_CONFIG_B64` and
    `OPTIMIZED_TF_VARS_B64`. Set `OPTIMIZED_AWS_REGION` in both, and set the
@@ -171,6 +175,35 @@ certificate while the hostname and port 80 remain reachable. Verify Rails
 authenticated `/stream/v1/streams/AAPL` connection after a separately
 authorized deployment; repeat with a slash-delimited crypto symbol and a
 reconnect cursor.
+
+### Domain alias repair
+
+Keep the apex A record pointed at the host Elastic IP and use a CNAME from
+`www` to the apex in the existing authoritative Route 53 zone. The web image's
+Caddyfile terminates HTTPS for both names and redirects `www` to the apex while
+preserving the request path and query string. DNS caches can retain a replaced
+record until its previous TTL expires; certificate issuance can retry during
+that interval. Verify HTTPS without bypassing certificate validation.
+
+For a live repair before a replacement web image is available, preserve the
+running Caddyfile under `/opt/indus-optimized/ops-backups/`, validate the updated
+file with the running Caddy binary, and install it as
+`/opt/indus-optimized/www-redirect.Caddyfile`. A host-local
+`/opt/indus-optimized/compose.override.yaml` can mount that file read-only at
+`/etc/caddy/Caddyfile` for `web-proxy`. Validate the merged Compose configuration
+and recreate only `web-proxy` with `up -d --no-deps web-proxy`. This override
+persists across host restarts and normal releases. After deploying a web image
+that includes the alias, compare the image's Caddyfile with the mounted file,
+remove only the Caddyfile mount from the override, and recreate only `web-proxy`
+so subsequent image updates again control the proxy configuration. Preserve
+any unrelated override settings; remove the override file only if it is empty.
+To roll back the repair, restore the
+previous DNS record and Caddyfile and recreate only `web-proxy`.
+
+A simple apex A record does not provide automatic Vercel failover. Inspect the
+live Route 53 record's routing policy and health checks before treating any
+retained Vercel deployment as a fallback. References to legacy traffic weights
+in older runbooks do not establish an active DNS fallback.
 
 For image rollback, restore a prior reviewed manifest and dispatch `deploy`.
 Schema migrations are forward-only: an image rollback must remain compatible

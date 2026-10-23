@@ -26,3 +26,7 @@
     file_server
   }
 }
+
+www.{$INDUS_HOSTNAME} {
+  redir https://{$INDUS_HOSTNAME}{uri} permanent
+}
