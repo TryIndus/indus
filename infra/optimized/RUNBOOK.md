@@ -94,6 +94,10 @@ request, and authenticated SSE for `AAPL` and slash-delimited crypto such as
 `BTC/USD`, including reconnection with a replay cursor. Caddy serves the SPA,
 routes `/api` to Rails, and routes `/stream` to Rust without SSE buffering.
 
+The web image rebuilds Caddy with a pinned Go toolchain and
+[locked modules](images/web/caddy/go.mod) to patch dependencies in the upstream
+binary. Proxy routing tests and the runtime vulnerability scan run before merge.
+
 ## DNS and www
 
 Use the existing authoritative Route 53 zone:
